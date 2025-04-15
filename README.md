@@ -9,3 +9,7 @@ Documentation/Usage Information is currently not available, but will be written 
 
 ---
 Get the latest release [here](https://github.com/r-ex/rsx/releases/latest).
+
+
+---
+By using this software, you acknowledge that the software is provided "as is", without any representations, warranties, conditions, or liabilities, to the extent permitted by law.

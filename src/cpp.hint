@@ -1,0 +1,6 @@
+// Hint files help the Visual Studio IDE interpret Visual C++ identifiers
+// such as names of functions and macros.
+// For more information see https://go.microsoft.com/fwlink/?linkid=865984
+#define NAN (-(float)(INFINITY * 0.0F))
+#define NAN ((float)(INFINITY * 0.0F))
+#define FORCEINLINE __forceinline

@@ -1,0 +1,599 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="thirdparty">
+      <UniqueIdentifier>{b913064c-9fda-4768-9832-5ca6d6db1120}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\imgui">
+      <UniqueIdentifier>{f4d2b1ac-d9e3-4a39-9a58-72eb83d58f36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\imgui\backends">
+      <UniqueIdentifier>{ef294eed-2b0e-4124-9215-5f4f8e4170cf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\imgui\misc">
+      <UniqueIdentifier>{329c65a8-805b-425e-a77d-b8776c9e7b7c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\imgui\misc\std">
+      <UniqueIdentifier>{eff7ef1c-54ed-40ac-925a-555d516812cc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core">
+      <UniqueIdentifier>{e4fd2258-c96e-4727-af0d-f77684140ff6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="pch">
+      <UniqueIdentifier>{ace169ab-2b9a-4100-91d2-786408ced775}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game">
+      <UniqueIdentifier>{925d4045-f64e-4fbe-b22a-dfde22d71654}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\rtech">
+      <UniqueIdentifier>{36d2f5cc-8568-4e10-bad6-7c474f395794}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\utils">
+      <UniqueIdentifier>{6e7e5dea-734d-44d4-89cd-05986b06e461}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\rtech\assets">
+      <UniqueIdentifier>{2b154630-aad8-4324-913a-4d81517c797f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\rtech\utils">
+      <UniqueIdentifier>{d0b3e118-bed4-4086-96d8-837611f21884}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\input">
+      <UniqueIdentifier>{6a80225e-3ce8-4261-8e30-78d0d1ea749d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\mdl">
+      <UniqueIdentifier>{ba57d81d-b5fd-48df-8f86-fb74cba4e6dc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\math">
+      <UniqueIdentifier>{1ca004f4-ffaf-4003-a279-0fba0e95c64f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\rtech\utils\studio">
+      <UniqueIdentifier>{5892a27e-f1e8-4e85-9de8-1c12a8dc6a71}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="resources">
+      <UniqueIdentifier>{fac2d04b-c078-4b07-b908-de9504e909d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\filehandling">
+      <UniqueIdentifier>{caa121f1-18bb-4672-8bfa-16cb06c49d76}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\shaderexp">
+      <UniqueIdentifier>{b37c55b0-fc1a-4c0a-b1af-4db285c486fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\logging">
+      <UniqueIdentifier>{100965df-5f21-4a61-8cd5-936e2549ed14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\fonts">
+      <UniqueIdentifier>{371dcbf4-9cc7-47bc-a490-afeee2a5556c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="core\render">
+      <UniqueIdentifier>{f595f1b2-cf30-4691-96b6-e0ba0d35728a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\rtech\utils\bvh">
+      <UniqueIdentifier>{61594ea9-8a16-4876-a1a8-081f955ab8df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\audio">
+      <UniqueIdentifier>{6d483da9-cc47-4d95-81e8-31f7becb56e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\model">
+      <UniqueIdentifier>{4935c4ef-7853-42ff-ac58-a875336d31d8}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h">
+      <Filter>pch</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\cpakfile.h">
+      <Filter>game\rtech</Filter>
+    </ClInclude>
+    <ClInclude Include="core\utils\fileio.h">
+      <Filter>core\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\animrig.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\model.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\shader.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\texture.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\backends\imgui_impl_dx11.h">
+      <Filter>thirdparty\imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\backends\imgui_impl_win32.h">
+      <Filter>thirdparty\imgui\backends</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\misc\cpp\imgui_stdlib.h">
+      <Filter>thirdparty\imgui\misc\std</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\misc\imgui_editor.h">
+      <Filter>thirdparty\imgui\misc</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\misc\imgui_logger.h">
+      <Filter>thirdparty\imgui\misc</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\misc\imgui_utility.h">
+      <Filter>thirdparty\imgui\misc</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\imconfig.h">
+      <Filter>thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\imgui.h">
+      <Filter>thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\imgui_internal.h">
+      <Filter>thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\imstb_rectpack.h">
+      <Filter>thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\imstb_textedit.h">
+      <Filter>thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\imstb_truetype.h">
+      <Filter>thirdparty\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\wrap.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\material.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\shaderset.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\animseq.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\utils\thread.h">
+      <Filter>core\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="core\render\dx.h">
+      <Filter>core\render</Filter>
+    </ClInclude>
+    <ClInclude Include="core\render\dxshader.h">
+      <Filter>core\render</Filter>
+    </ClInclude>
+    <ClInclude Include="core\input\input.h">
+      <Filter>core\input</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\rson.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\mdl\rmax.h">
+      <Filter>core\mdl</Filter>
+    </ClInclude>
+    <ClInclude Include="core\math\mathlib.h">
+      <Filter>core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="core\math\vector.h">
+      <Filter>core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="core\math\vector2d.h">
+      <Filter>core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="core\math\vector4d.h">
+      <Filter>core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="core\math\color32.h">
+      <Filter>core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="core\math\compressedvector.h">
+      <Filter>core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="core\mdl\stringtable.h">
+      <Filter>core\mdl</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\studio.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\optimize.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\patchapi.h">
+      <Filter>game\rtech</Filter>
+    </ClInclude>
+    <ClInclude Include="core\math\matrix.h">
+      <Filter>core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="core\render\dxscene.h">
+      <Filter>core\render</Filter>
+    </ClInclude>
+    <ClInclude Include="core\render\dxutils.h">
+      <Filter>core\render</Filter>
+    </ClInclude>
+    <ClInclude Include="core\math\float16.h">
+      <Filter>core\math</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>resources</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\settings.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\settings_layout.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\mdl\cast.h">
+      <Filter>core\mdl</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\datatable.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\window.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\splash.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\render.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\localisation.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\filehandling\load.h">
+      <Filter>core\filehandling</Filter>
+    </ClInclude>
+    <ClInclude Include="core\filehandling\export.h">
+      <Filter>core\filehandling</Filter>
+    </ClInclude>
+    <ClInclude Include="core\utils\buffermanager.h">
+      <Filter>core\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="core\utils\ramen.h">
+      <Filter>core\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="core\shaderexp\multishader.h">
+      <Filter>core\shaderexp</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\patch_master.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\crashhandler.h">
+      <Filter>core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\logging\logger.h">
+      <Filter>core\logging</Filter>
+    </ClInclude>
+    <ClInclude Include="core\fonts\sourcesans.h">
+      <Filter>core\fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\anim_recording.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\render\uistate.h">
+      <Filter>core\render</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\bvh\bvh.h">
+      <Filter>game\rtech\utils\bvh</Filter>
+    </ClInclude>
+    <ClInclude Include="game\audio\miles.h">
+      <Filter>game\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\asset.h">
+      <Filter>game</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\weapon_definition.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\impact.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\texture_anim.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\effect.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\subtitles.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\ui.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\utils\exportsettings.h">
+      <Filter>core\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\ui_font_atlas.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\ui_image.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\ui_image_atlas.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\ui_rtk.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\audio\wavefile.h">
+      <Filter>game\audio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\model\sourcemodel.h">
+      <Filter>game\model</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\studio_generic.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\studio_r5.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\studio_r1.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\studio_r2.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="core\mdl\compdata.h">
+      <Filter>core\mdl</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\studio_r5_v8.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\studio_r5_v12.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\studio\studio_r5_v16.h">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\utils.h">
+      <Filter>game\rtech\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="core\utils\utils_general.h">
+      <Filter>core\utils</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp">
+      <Filter>pch</Filter>
+    </ClCompile>
+    <ClCompile Include="core\main.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\cpakfile.cpp">
+      <Filter>game\rtech</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\animrig.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\model.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\shader.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\texture.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\utils\fileio.cpp">
+      <Filter>core\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\backends\imgui_impl_dx11.cpp">
+      <Filter>thirdparty\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\backends\imgui_impl_win32.cpp">
+      <Filter>thirdparty\imgui\backends</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\misc\cpp\imgui_stdlib.cpp">
+      <Filter>thirdparty\imgui\misc\std</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\misc\imgui_editor.cpp">
+      <Filter>thirdparty\imgui\misc</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\misc\imgui_logger.cpp">
+      <Filter>thirdparty\imgui\misc</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\misc\imgui_utility.cpp">
+      <Filter>thirdparty\imgui\misc</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui.cpp">
+      <Filter>thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui_demo.cpp">
+      <Filter>thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui_draw.cpp">
+      <Filter>thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui_tables.cpp">
+      <Filter>thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui_widgets.cpp">
+      <Filter>thirdparty\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\wrap.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\material.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\shaderset.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\animseq.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\render\dx.cpp">
+      <Filter>core\render</Filter>
+    </ClCompile>
+    <ClCompile Include="core\render\dxshader.cpp">
+      <Filter>core\render</Filter>
+    </ClCompile>
+    <ClCompile Include="core\input\input.cpp">
+      <Filter>core\input</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\rson.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\math\mathlib.cpp">
+      <Filter>core\math</Filter>
+    </ClCompile>
+    <ClCompile Include="core\math\vector.cpp">
+      <Filter>core\math</Filter>
+    </ClCompile>
+    <ClCompile Include="core\math\vector2d.cpp">
+      <Filter>core\math</Filter>
+    </ClCompile>
+    <ClCompile Include="core\math\vector4d.cpp">
+      <Filter>core\math</Filter>
+    </ClCompile>
+    <ClCompile Include="core\math\color32.cpp">
+      <Filter>core\math</Filter>
+    </ClCompile>
+    <ClCompile Include="core\mdl\stringtable.cpp">
+      <Filter>core\mdl</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\utils\studio\studio.cpp">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\patchapi.cpp">
+      <Filter>game\rtech</Filter>
+    </ClCompile>
+    <ClCompile Include="core\render\dxscene.cpp">
+      <Filter>core\render</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\settings.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\settings_layout.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\math\matrix.cpp">
+      <Filter>core\math</Filter>
+    </ClCompile>
+    <ClCompile Include="core\mdl\cast.cpp">
+      <Filter>core\mdl</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\datatable.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\window.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="core\splash.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="core\render.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="core\filehandling\rpak.cpp">
+      <Filter>core\filehandling</Filter>
+    </ClCompile>
+    <ClCompile Include="core\filehandling\mdl.cpp">
+      <Filter>core\filehandling</Filter>
+    </ClCompile>
+    <ClCompile Include="core\filehandling\load.cpp">
+      <Filter>core\filehandling</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\localisation.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\mdl\rmax.cpp">
+      <Filter>core\mdl</Filter>
+    </ClCompile>
+    <ClCompile Include="core\utils\ramen.cpp">
+      <Filter>core\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\patch_master.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\crashhandler.cpp">
+      <Filter>core</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\utils\bvh\bvh.cpp">
+      <Filter>game\rtech\utils\bvh</Filter>
+    </ClCompile>
+    <ClCompile Include="game\audio\miles.cpp">
+      <Filter>game\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\weapon_definition.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\impact.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\filehandling\list.cpp">
+      <Filter>core\filehandling</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\texture_anim.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\effect.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\subtitles.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\ui.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\ui_font_atlas.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\ui_image.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\ui_image_atlas.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\ui_rtk.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\filehandling\mbnk.cpp">
+      <Filter>core\filehandling</Filter>
+    </ClCompile>
+    <ClCompile Include="game\asset.cpp">
+      <Filter>game</Filter>
+    </ClCompile>
+    <ClCompile Include="game\model\sourcemodel.cpp">
+      <Filter>game\model</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\anim_recording.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\audio\miles_rada.cpp">
+      <Filter>game\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="game\audio\miles_bcf.cpp">
+      <Filter>game\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\utils\studio\studio_generic.cpp">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\utils\studio\studio_r5.cpp">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClCompile>
+    <ClCompile Include="core\mdl\compdata.cpp">
+      <Filter>core\mdl</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\utils\utils.cpp">
+      <Filter>game\rtech\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="core\utils\utils_general.cpp">
+      <Filter>core\utils</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\utils\studio\studio_r2.cpp">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\utils\studio\studio_r1.cpp">
+      <Filter>game\rtech\utils\studio</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\splashimage.bmp">
+      <Filter>resources</Filter>
+    </Image>
+    <Image Include="resources\icon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="rsx.rc">
+      <Filter>resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="core\crashhandler.h" />
+    <ClInclude Include="core\mdl\compdata.h" />
+    <ClInclude Include="core\render\dx.h" />
+    <ClInclude Include="core\render\dxscene.h" />
+    <ClInclude Include="core\render\dxshader.h" />
+    <ClInclude Include="core\render\uistate.h" />
+    <ClInclude Include="core\render\dxutils.h" />
+    <ClInclude Include="core\filehandling\export.h" />
+    <ClInclude Include="core\filehandling\load.h" />
+    <ClInclude Include="core\fonts\sourcesans.h" />
+    <ClInclude Include="core\input\input.h" />
+    <ClInclude Include="core\logging\logger.h" />
+    <ClInclude Include="core\math\color32.h" />
+    <ClInclude Include="core\math\compressedvector.h" />
+    <ClInclude Include="core\math\float16.h" />
+    <ClInclude Include="core\math\mathlib.h" />
+    <ClInclude Include="core\math\matrix.h" />
+    <ClInclude Include="core\math\vector.h" />
+    <ClInclude Include="core\math\vector2d.h" />
+    <ClInclude Include="core\math\vector4d.h" />
+    <ClInclude Include="core\mdl\cast.h" />
+    <ClInclude Include="core\mdl\rmax.h" />
+    <ClInclude Include="core\mdl\stringtable.h" />
+    <ClInclude Include="core\render.h" />
+    <ClInclude Include="core\shaderexp\multishader.h" />
+    <ClInclude Include="core\splash.h" />
+    <ClInclude Include="core\utils\buffermanager.h" />
+    <ClInclude Include="core\utils\exportsettings.h" />
+    <ClInclude Include="core\utils\fileio.h" />
+    <ClInclude Include="core\utils\ramen.h" />
+    <ClInclude Include="core\utils\thread.h" />
+    <ClInclude Include="core\utils\utils_general.h" />
+    <ClInclude Include="core\window.h" />
+    <ClInclude Include="game\asset.h" />
+    <ClInclude Include="game\audio\miles.h" />
+    <ClInclude Include="game\audio\wavefile.h" />
+    <ClInclude Include="game\model\sourcemodel.h" />
+    <ClInclude Include="game\rtech\assets\animrig.h" />
+    <ClInclude Include="game\rtech\assets\animseq.h" />
+    <ClInclude Include="game\rtech\assets\anim_recording.h" />
+    <ClInclude Include="game\rtech\assets\datatable.h" />
+    <ClInclude Include="game\rtech\assets\effect.h" />
+    <ClInclude Include="game\rtech\assets\impact.h" />
+    <ClInclude Include="game\rtech\assets\localisation.h" />
+    <ClInclude Include="game\rtech\assets\material.h" />
+    <ClInclude Include="game\rtech\assets\model.h" />
+    <ClInclude Include="game\rtech\assets\patch_master.h" />
+    <ClInclude Include="game\rtech\assets\rson.h" />
+    <ClInclude Include="game\rtech\assets\settings.h" />
+    <ClInclude Include="game\rtech\assets\settings_layout.h" />
+    <ClInclude Include="game\rtech\assets\shader.h" />
+    <ClInclude Include="game\rtech\assets\shaderset.h" />
+    <ClInclude Include="game\rtech\assets\subtitles.h" />
+    <ClInclude Include="game\rtech\assets\texture.h" />
+    <ClInclude Include="game\rtech\assets\texture_anim.h" />
+    <ClInclude Include="game\rtech\assets\ui.h" />
+    <ClInclude Include="game\rtech\assets\ui_font_atlas.h" />
+    <ClInclude Include="game\rtech\assets\ui_image.h" />
+    <ClInclude Include="game\rtech\assets\ui_image_atlas.h" />
+    <ClInclude Include="game\rtech\assets\ui_rtk.h" />
+    <ClInclude Include="game\rtech\assets\weapon_definition.h" />
+    <ClInclude Include="game\rtech\assets\wrap.h" />
+    <ClInclude Include="game\rtech\cpakfile.h" />
+    <ClInclude Include="game\rtech\patchapi.h" />
+    <ClInclude Include="game\rtech\utils\bvh\bvh.h" />
+    <ClInclude Include="game\rtech\utils\studio\optimize.h" />
+    <ClInclude Include="game\rtech\utils\studio\studio.h" />
+    <ClInclude Include="game\rtech\utils\studio\studio_generic.h" />
+    <ClInclude Include="game\rtech\utils\studio\studio_r1.h" />
+    <ClInclude Include="game\rtech\utils\studio\studio_r2.h" />
+    <ClInclude Include="game\rtech\utils\studio\studio_r5.h" />
+    <ClInclude Include="game\rtech\utils\studio\studio_r5_v12.h" />
+    <ClInclude Include="game\rtech\utils\studio\studio_r5_v16.h" />
+    <ClInclude Include="game\rtech\utils\studio\studio_r5_v8.h" />
+    <ClInclude Include="game\rtech\utils\utils.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="thirdparty\imgui\backends\imgui_impl_dx11.h" />
+    <ClInclude Include="thirdparty\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="thirdparty\imgui\imconfig.h" />
+    <ClInclude Include="thirdparty\imgui\imgui.h" />
+    <ClInclude Include="thirdparty\imgui\imgui_internal.h" />
+    <ClInclude Include="thirdparty\imgui\imstb_rectpack.h" />
+    <ClInclude Include="thirdparty\imgui\imstb_textedit.h" />
+    <ClInclude Include="thirdparty\imgui\imstb_truetype.h" />
+    <ClInclude Include="thirdparty\imgui\misc\cpp\imgui_stdlib.h" />
+    <ClInclude Include="thirdparty\imgui\misc\imgui_editor.h" />
+    <ClInclude Include="thirdparty\imgui\misc\imgui_logger.h" />
+    <ClInclude Include="thirdparty\imgui\misc\imgui_utility.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="core\crashhandler.cpp" />
+    <ClCompile Include="core\filehandling\list.cpp" />
+    <ClCompile Include="core\filehandling\mbnk.cpp" />
+    <ClCompile Include="core\mdl\compdata.cpp" />
+    <ClCompile Include="core\render\dx.cpp" />
+    <ClCompile Include="core\render\dxscene.cpp" />
+    <ClCompile Include="core\render\dxshader.cpp" />
+    <ClCompile Include="core\filehandling\load.cpp" />
+    <ClCompile Include="core\filehandling\mdl.cpp" />
+    <ClCompile Include="core\filehandling\rpak.cpp" />
+    <ClCompile Include="core\input\input.cpp" />
+    <ClCompile Include="core\main.cpp" />
+    <ClCompile Include="core\math\color32.cpp" />
+    <ClCompile Include="core\math\mathlib.cpp" />
+    <ClCompile Include="core\math\matrix.cpp" />
+    <ClCompile Include="core\math\vector.cpp" />
+    <ClCompile Include="core\math\vector2d.cpp" />
+    <ClCompile Include="core\math\vector4d.cpp" />
+    <ClCompile Include="core\mdl\cast.cpp" />
+    <ClCompile Include="core\mdl\rmax.cpp" />
+    <ClCompile Include="core\mdl\stringtable.cpp" />
+    <ClCompile Include="core\render.cpp" />
+    <ClCompile Include="core\splash.cpp" />
+    <ClCompile Include="core\utils\fileio.cpp" />
+    <ClCompile Include="core\utils\ramen.cpp" />
+    <ClCompile Include="core\utils\utils_general.cpp" />
+    <ClCompile Include="core\window.cpp" />
+    <ClCompile Include="game\asset.cpp" />
+    <ClCompile Include="game\audio\miles.cpp" />
+    <ClCompile Include="game\audio\miles_bcf.cpp" />
+    <ClCompile Include="game\audio\miles_rada.cpp" />
+    <ClCompile Include="game\model\sourcemodel.cpp" />
+    <ClCompile Include="game\rtech\assets\animrig.cpp" />
+    <ClCompile Include="game\rtech\assets\animseq.cpp" />
+    <ClCompile Include="game\rtech\assets\anim_recording.cpp" />
+    <ClCompile Include="game\rtech\assets\datatable.cpp" />
+    <ClCompile Include="game\rtech\assets\effect.cpp" />
+    <ClCompile Include="game\rtech\assets\impact.cpp" />
+    <ClCompile Include="game\rtech\assets\localisation.cpp" />
+    <ClCompile Include="game\rtech\assets\material.cpp" />
+    <ClCompile Include="game\rtech\assets\model.cpp" />
+    <ClCompile Include="game\rtech\assets\patch_master.cpp" />
+    <ClCompile Include="game\rtech\assets\rson.cpp" />
+    <ClCompile Include="game\rtech\assets\settings.cpp" />
+    <ClCompile Include="game\rtech\assets\settings_layout.cpp" />
+    <ClCompile Include="game\rtech\assets\shader.cpp" />
+    <ClCompile Include="game\rtech\assets\shaderset.cpp" />
+    <ClCompile Include="game\rtech\assets\subtitles.cpp" />
+    <ClCompile Include="game\rtech\assets\texture.cpp" />
+    <ClCompile Include="game\rtech\assets\texture_anim.cpp" />
+    <ClCompile Include="game\rtech\assets\ui.cpp" />
+    <ClCompile Include="game\rtech\assets\ui_font_atlas.cpp" />
+    <ClCompile Include="game\rtech\assets\ui_image.cpp" />
+    <ClCompile Include="game\rtech\assets\ui_image_atlas.cpp" />
+    <ClCompile Include="game\rtech\assets\ui_rtk.cpp" />
+    <ClCompile Include="game\rtech\assets\weapon_definition.cpp" />
+    <ClCompile Include="game\rtech\assets\wrap.cpp" />
+    <ClCompile Include="game\rtech\cpakfile.cpp" />
+    <ClCompile Include="game\rtech\patchapi.cpp" />
+    <ClCompile Include="game\rtech\utils\bvh\bvh.cpp" />
+    <ClCompile Include="game\rtech\utils\studio\studio.cpp" />
+    <ClCompile Include="game\rtech\utils\studio\studio_generic.cpp" />
+    <ClCompile Include="game\rtech\utils\studio\studio_r1.cpp" />
+    <ClCompile Include="game\rtech\utils\studio\studio_r2.cpp" />
+    <ClCompile Include="game\rtech\utils\studio\studio_r5.cpp" />
+    <ClCompile Include="game\rtech\utils\utils.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\backends\imgui_impl_dx11.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\backends\imgui_impl_win32.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui_demo.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui_draw.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui_tables.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\imgui_widgets.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\misc\cpp\imgui_stdlib.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\misc\imgui_editor.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\misc\imgui_logger.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\misc\imgui_utility.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="cpp.hint" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="rsx.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="resources\icon.ico" />
+    <Image Include="resources\splashimage.bmp" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{db022a6b-c72e-47cb-bbad-d9a6ff3656c5}</ProjectGuid>
+    <RootNamespace>rtechutils</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+    <EnableASAN>false</EnableASAN>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+    <EnableASAN>false</EnableASAN>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <OutDir>..\bin\$(Configuration)\</OutDir>
+    <IntDir>..\build\$(Configuration)\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <OutDir>..\bin\$(Configuration)\</OutDir>
+    <IntDir>..\build\$(Configuration)\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>RADA_WRAP=MIRA;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions> /ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+      <IgnoreAllDefaultLibraries>
+      </IgnoreAllDefaultLibraries>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>RADA_WRAP=MIRA;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
+      <StringPooling>true</StringPooling>
+      <RuntimeTypeInfo>false</RuntimeTypeInfo>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>d3d11.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalOptions> /ignore:4099 %(AdditionalOptions)</AdditionalOptions>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+    </Link>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

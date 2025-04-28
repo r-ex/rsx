@@ -31,6 +31,7 @@ struct ProgressBarEvent_t
 
     bool slotIsUsed;
     bool isInverted;
+    bool hasCloseButton;
     const char* eventName;
     uint32_t eventNum;
     std::atomic<uint32_t>* remainingEvents;
@@ -48,7 +49,7 @@ public:
     void HelpMarker(const char* const desc);
 
     template <typename T>
-    const ProgressBarEvent_t* const AddProgressBarEvent(const char* const eventName, const uint32_t eventNum, T const eventClass, void* const fnRemainingEvents)
+    const ProgressBarEvent_t* const AddProgressBarEvent(const char* const eventName, const uint32_t eventNum, T const eventClass, void* const fnRemainingEvents, const bool hasCloseButton = false)
     {
         std::unique_lock<std::mutex> lock(eventMutex);
         if (eventNum != 0 && !pbAvailSlots.empty())
@@ -63,6 +64,7 @@ public:
             event->remainingEvents = nullptr;
             event->eventClass = reinterpret_cast<void*>(eventClass);
             event->fnRemainingEvents = fnRemainingEvents;
+            event->hasCloseButton = hasCloseButton;
 
             event->slotIsUsed = true;
             return event;
@@ -75,7 +77,7 @@ public:
         unreachable();
     }
 
-    const ProgressBarEvent_t* const AddProgressBarEvent(const char* const eventName, const uint32_t eventNum, std::atomic<uint32_t>* const remainingEvents, const bool isInverted);
+    const ProgressBarEvent_t* const AddProgressBarEvent(const char* const eventName, const uint32_t eventNum, std::atomic<uint32_t>* const remainingEvents, const bool isInverted, const bool hasCloseButton = false);
     void FinishProgressBarEvent(const ProgressBarEvent_t* const event);
     void HandleProgressBar();
 

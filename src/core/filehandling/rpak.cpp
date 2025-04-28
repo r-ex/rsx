@@ -144,7 +144,7 @@ void HandlePakAssetExportList(std::deque<CAsset*> selectedAssets, const bool exp
             }, 1u);
     }
 
-    const ProgressBarEvent_t* const exportAssetListEvent = g_pImGuiHandler->AddProgressBarEvent("Exporting asset list..", parallelProcessTask.getRemainingTasks(), &parallelProcessTask, PB_FNCLASS_TO_VOID(&CParallelTask::getRemainingTasks));
+    const ProgressBarEvent_t* const exportAssetListEvent = g_pImGuiHandler->AddProgressBarEvent("Exporting asset list..", parallelProcessTask.getRemainingTasks(), &parallelProcessTask, PB_FNCLASS_TO_VOID(&CParallelTask::getRemainingTasks), true);
     parallelProcessTask.execute();
     parallelProcessTask.wait();
     g_pImGuiHandler->FinishProgressBarEvent(exportAssetListEvent);
@@ -165,7 +165,7 @@ void HandleExportAllPakAssets(std::vector<CGlobalAssetData::AssetLookup_t>* cons
             }, 1u);
     }
 
-    const ProgressBarEvent_t* const exportAllAssetsEvent = g_pImGuiHandler->AddProgressBarEvent("Exporting all assets..", parallelProcessTask.getRemainingTasks(), &parallelProcessTask, PB_FNCLASS_TO_VOID(&CParallelTask::getRemainingTasks));
+    const ProgressBarEvent_t* const exportAllAssetsEvent = g_pImGuiHandler->AddProgressBarEvent("Exporting all assets..", parallelProcessTask.getRemainingTasks(), &parallelProcessTask, PB_FNCLASS_TO_VOID(&CParallelTask::getRemainingTasks), true);
     parallelProcessTask.execute();
     parallelProcessTask.wait();
     g_pImGuiHandler->FinishProgressBarEvent(exportAllAssetsEvent);

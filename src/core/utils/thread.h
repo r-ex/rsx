@@ -117,11 +117,26 @@ private:
     std::queue<std::function<void()>> tasks;
     std::mutex queueMutex;
     uint32_t maxConcurrentThreads;
+    std::atomic<bool> stopRequested{false};
+
+public:
+    void requestStop()
+    {
+        stopRequested = true;
+    }
+
+    bool isStopRequested() const
+    {
+        return stopRequested;
+    }
 
     void workerThread()
     {
         while (true)
         {
+            if (isStopRequested())
+                break;
+
             std::function<void()> task;
             {
                 std::unique_lock<std::mutex> lock(queueMutex);

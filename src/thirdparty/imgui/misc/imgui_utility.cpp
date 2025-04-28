@@ -247,7 +247,7 @@ void ImGuiHandler::HelpMarker(const char* const desc)
     }
 }
 
-const ProgressBarEvent_t* const ImGuiHandler::AddProgressBarEvent(const char* const eventName, const uint32_t eventNum, std::atomic<uint32_t>* const remainingEvents, const bool isInverted)
+const ProgressBarEvent_t* const ImGuiHandler::AddProgressBarEvent(const char* const eventName, const uint32_t eventNum, std::atomic<uint32_t>* const remainingEvents, const bool isInverted, const bool hasCloseButton)
 {
     std::unique_lock<std::mutex> lock(eventMutex);
 
@@ -263,6 +263,7 @@ const ProgressBarEvent_t* const ImGuiHandler::AddProgressBarEvent(const char* co
         event->remainingEvents = remainingEvents;
         event->eventClass = nullptr;
         event->fnRemainingEvents = nullptr;
+        event->hasCloseButton = hasCloseButton;
 
         event->slotIsUsed = true;
         return event;
@@ -297,10 +298,12 @@ void ImGuiHandler::HandleProgressBar()
     bool foundTopLevelBar = false;
     for (int i = 0; i < PB_SIZE; ++i)
     {
-        const ProgressBarEvent_t* const event = &pbEvents[i];
+        ProgressBarEvent_t* const event = &pbEvents[i];
         if (!event->slotIsUsed)
             continue;
 
+        bool hasCloseButton = event->hasCloseButton;
+        bool isOpen = true;
 
         ImVec2 winPos = ImGui::GetCursorPos();
         const ImVec2 regAvail = ImGui::GetContentRegionAvail();
@@ -312,9 +315,11 @@ void ImGuiHandler::HandleProgressBar()
 
         if (!foundTopLevelBar)
         {
-            ImGui::SetNextWindowSize(ImVec2{ 0, 0});
+            ImGui::SetNextWindowSize(ImVec2{ 0, 0 });
             ImGui::SetNextWindowPos(winPos, ImGuiCond_Appearing);
-            if (!ImGui::Begin(event->eventName, nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoScrollWithMouse))
+            ImGui::SetNextWindowFocus(); // Set always on top
+
+            if (!ImGui::Begin(event->eventName, hasCloseButton ? &isOpen : nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoCollapse))
                 continue;
         }
         else
@@ -329,12 +334,25 @@ void ImGuiHandler::HandleProgressBar()
 
         const uint32_t leftOverEvents = event->isInverted ? remainingEvents : numEvents - remainingEvents;
         const float progressFraction = std::clamp(static_cast<float>(leftOverEvents) / static_cast<float>(numEvents), 0.0f, 1.0f);
-        ImGui::ProgressBar(progressFraction, ImVec2(485, 48), std::format("{}/{}", leftOverEvents, numEvents).c_str());
+        std::stringstream progressText;
+        progressText << leftOverEvents << "/" << numEvents;
+        ImGui::ProgressBar(progressFraction, ImVec2(485, 48), progressText.str().c_str());
+
+        // Handle close button click
+        if (hasCloseButton && !isOpen)
+        {
+            // Signal the associated task to stop
+            if (event->eventClass)
+            {
+                CParallelTask* parallelTask = reinterpret_cast<CParallelTask*>(event->eventClass);
+                parallelTask->requestStop();
+            }
+        }
 
         foundTopLevelBar = true;
     }
 
-    if(foundTopLevelBar)
+    if (foundTopLevelBar)
         ImGui::End();
 }
 

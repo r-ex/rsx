@@ -5,7 +5,7 @@
 #include <game/rtech/utils/utils.h>
 #include <thirdparty/radaudio/rada_decode.h>
 
-#pragma comment(lib, "thirdparty\\radaudio\\radaudio.lib")
+#pragma comment(lib, "thirdparty/radaudio/radaudio_decoder_win64.lib")
 
 #define min(a,b) a < b ? a : b
 

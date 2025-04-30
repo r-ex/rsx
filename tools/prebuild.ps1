@@ -17,8 +17,8 @@ if (Test-Path $OUT_PATH) {
 
 $response = Invoke-WebRequest -Uri $URL
 $gzipStream = New-Object System.IO.Compression.GzipStream(
-	$response.RawContentStream,
-	[System.IO.Compression.CompressionMode]::Decompress
+    $response.RawContentStream,
+    [System.IO.Compression.CompressionMode]::Decompress
 )
 
 try {

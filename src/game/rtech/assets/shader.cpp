@@ -282,24 +282,31 @@ void PostLoadShaderAsset(CAssetContainer* const pak, CAsset* const asset)
 
 	CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
 
-	// get the parent shader's data once it has been loaded.
+	// get the parent shader's data once it has been loaded. (if done in LoadShaderAsset and parent is in another pak, we will encounter issues.)
 	// [rika]: hack need to find actual code for this.
-	//if (asset->cpu() == nullptr && asset->version() == 15)
-	//{
-	//	ShaderAssetHeader_v15_t* const hdr = reinterpret_cast<ShaderAssetHeader_v15_t* const>(asset->header());
-	//	const uint64_t parentGuid = reinterpret_cast<uint64_t>(hdr->unk_18);
+#ifdef SHADER_CHILD_HACK
+	if (pakAsset->cpu() == nullptr && pakAsset->version() >= 15)
+	{
+		ShaderAssetHeader_v15_t* const hdr = reinterpret_cast<ShaderAssetHeader_v15_t* const>(pakAsset->header());
 
-	//	if (CPakAsset* const parentAsset = g_assetData.FindAssetByGUID(parentGuid))
-	//	{
-	//		asset->data()->dataPagePtr.ptr = parentAsset->cpu();
-	//		ShaderAsset* shaderAssetNew = new ShaderAsset(hdr, reinterpret_cast<ShaderAssetCPU_t*>(parentAsset->cpu()));
-	//		const ShaderAsset* const parentAssetHdr = reinterpret_cast<const ShaderAsset* const>(parentAsset->extraData());
+		assertm(hdr->type >= eShaderType::Invalid, "bad type, should have data ??");
 
-	//		shaderAssetNew->numShaders = parentAssetHdr->numShaders;
+		const uint64_t guid = reinterpret_cast<uint64_t>(hdr->unk_18); // [rika]: this is not cool
 
-	//		asset->setExtraData(shaderAssetNew); // memory leak?
-	//	}
-	//}
+		CPakAsset* const parentAsset = g_assetData.FindAssetByGUID<CPakAsset>(guid);
+		if (parentAsset)
+		{
+			ShaderAssetHeader_v15_t tmp;
+			memcpy(&tmp, parentAsset->header(), sizeof(ShaderAssetHeader_v15_t));
+			tmp.name = hdr->name;
+
+			ShaderAsset* assetNew = new ShaderAsset(&tmp, reinterpret_cast<ShaderAssetCPU_t*>(parentAsset->cpu())); // does this leak memory?
+			pakAsset->setExtraData(assetNew);
+
+			pakAsset->data()->dataPagePtr.ptr = parentAsset->cpu(); // new cpu new you (gets used later)
+		}
+	}
+#endif
 
 	ShaderAsset* const shaderAsset = reinterpret_cast<ShaderAsset*>(pakAsset->extraData());
 

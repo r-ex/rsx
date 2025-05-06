@@ -36,7 +36,7 @@ struct AnimRigAssetHeader_v5_t
 };
 static_assert(sizeof(AnimRigAssetHeader_v5_t) == 0x28);
 
-class AnimSeqAsset;
+// [rika]: if we use ModelParsedData_t we could reuse model exporting funcs
 class AnimRigAsset
 {
 public:

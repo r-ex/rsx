@@ -12,7 +12,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="core\crashhandler.h" />
-    <ClInclude Include="core\mdl\compdata.h" />
+    <ClInclude Include="core\mdl\modeldata.h" />
     <ClInclude Include="core\render\dx.h" />
     <ClInclude Include="core\render\dxscene.h" />
     <ClInclude Include="core\render\dxshader.h" />
@@ -55,7 +55,9 @@
     <ClInclude Include="game\rtech\assets\effect.h" />
     <ClInclude Include="game\rtech\assets\impact.h" />
     <ClInclude Include="game\rtech\assets\localisation.h" />
+    <ClInclude Include="game\rtech\assets\map.h" />
     <ClInclude Include="game\rtech\assets\material.h" />
+    <ClInclude Include="game\rtech\assets\material_snapshot.h" />
     <ClInclude Include="game\rtech\assets\model.h" />
     <ClInclude Include="game\rtech\assets\patch_master.h" />
     <ClInclude Include="game\rtech\assets\rson.h" />
@@ -66,6 +68,7 @@
     <ClInclude Include="game\rtech\assets\subtitles.h" />
     <ClInclude Include="game\rtech\assets\texture.h" />
     <ClInclude Include="game\rtech\assets\texture_anim.h" />
+    <ClInclude Include="game\rtech\assets\texture_list.h" />
     <ClInclude Include="game\rtech\assets\ui.h" />
     <ClInclude Include="game\rtech\assets\ui_font_atlas.h" />
     <ClInclude Include="game\rtech\assets\ui_image.h" />
@@ -105,7 +108,7 @@
     <ClCompile Include="core\crashhandler.cpp" />
     <ClCompile Include="core\filehandling\list.cpp" />
     <ClCompile Include="core\filehandling\mbnk.cpp" />
-    <ClCompile Include="core\mdl\compdata.cpp" />
+    <ClCompile Include="core\mdl\modeldata.cpp" />
     <ClCompile Include="core\render\dx.cpp" />
     <ClCompile Include="core\render\dxscene.cpp" />
     <ClCompile Include="core\render\dxshader.cpp" />
@@ -141,7 +144,9 @@
     <ClCompile Include="game\rtech\assets\effect.cpp" />
     <ClCompile Include="game\rtech\assets\impact.cpp" />
     <ClCompile Include="game\rtech\assets\localisation.cpp" />
+    <ClCompile Include="game\rtech\assets\map.cpp" />
     <ClCompile Include="game\rtech\assets\material.cpp" />
+    <ClCompile Include="game\rtech\assets\material_snapshot.cpp" />
     <ClCompile Include="game\rtech\assets\model.cpp" />
     <ClCompile Include="game\rtech\assets\patch_master.cpp" />
     <ClCompile Include="game\rtech\assets\rson.cpp" />
@@ -152,6 +157,7 @@
     <ClCompile Include="game\rtech\assets\subtitles.cpp" />
     <ClCompile Include="game\rtech\assets\texture.cpp" />
     <ClCompile Include="game\rtech\assets\texture_anim.cpp" />
+    <ClCompile Include="game\rtech\assets\texture_list.cpp" />
     <ClCompile Include="game\rtech\assets\ui.cpp" />
     <ClCompile Include="game\rtech\assets\ui_font_atlas.cpp" />
     <ClCompile Include="game\rtech\assets\ui_image.cpp" />

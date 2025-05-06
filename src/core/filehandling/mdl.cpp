@@ -10,7 +10,7 @@
 
 void HandleModelLoad(std::vector<std::string> filePaths)
 {
-    std::vector<uint64_t> guids;
+    std::vector<uint64_t> guids; // assets to load
     guids.reserve(filePaths.size());
 
     std::atomic<uint32_t> modelLoadingProgress = 0;
@@ -82,16 +82,27 @@ void HandleModelLoad(std::vector<std::string> filePaths)
             // use the model we stored so we don't point to bad data
             r2::studiohdr_t* const pLocalHdr = reinterpret_cast<r2::studiohdr_t* const>(srcMdlAsset->GetAssetData());
 
+            uint64_t* sequences = new uint64_t[pLocalHdr->numlocalseq];
+
+            assertm(s_AssetTypePaths.contains(AssetType_t::SEQ), "somehow missing prefix");
+            const char* const s_SeqPrefix = s_AssetTypePaths.find(AssetType_t::SEQ)->second;
+            const std::string basePath(std::format("{}/{}/{}", s_SeqPrefix, srcMdlPath.parent_path().string(), srcMdlPath.stem().string()));
+
             for (int i = 0; i < pLocalHdr->numlocalseq; i++)
             {
                 r2::mstudioseqdesc_t* const pSeqdesc = pLocalHdr->pSeqdesc(i);
-                const std::string seqPath = std::format("{}/{}/{}.seq", srcMdlPath.parent_path().string(), srcMdlPath.stem().string(), pSeqdesc->pszLabel());
+                const std::string seqPath = std::format("{}/{}.seq", basePath, pSeqdesc->pszLabel());
 
                 CSourceSequenceAsset* srcSeqAsset = new CSourceSequenceAsset(srcMdlAsset, pSeqdesc, seqPath);
 
-                g_assetData.v_assets.emplace_back(srcSeqAsset->GetAssetGUID(), srcSeqAsset);
-                guids.push_back(srcSeqAsset->GetAssetGUID());
+                const uint64_t guid = srcSeqAsset->GetAssetGUID();
+                g_assetData.v_assets.emplace_back(guid, srcSeqAsset);
+                guids.push_back(guid);
+
+                sequences[i] = guid;
             }
+
+            srcMdlAsset->SetSequenceList(sequences, pLocalHdr->numlocalseq);
 
             break;
         }

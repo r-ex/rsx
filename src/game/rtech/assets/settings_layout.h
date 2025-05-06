@@ -12,6 +12,8 @@ enum class eSettingsFieldType : uint16_t
 	ST_ASSET_2,
 	ST_ARRAY,
 	ST_ARRAY_2, // "dynamic array" - special type of array - need to check why it's a different type
+
+	ST_Invalid = 0xffff
 };
 
 static const char* s_settingsFieldTypeNames[] =
@@ -27,6 +29,8 @@ static const char* s_settingsFieldTypeNames[] =
 	"array",
 	"array_dynamic",
 };
+
+extern uint32_t SettingsLayout_GetFieldAlignmentForType(const eSettingsFieldType type);
 
 inline const char* Settings_GetTypeNameString(eSettingsFieldType type)
 {
@@ -103,31 +107,55 @@ public:
 	}
 };
 
+struct SettingsLayoutFindByOffsetResult_s
+{
+	SettingsLayoutFindByOffsetResult_s()
+	{
+		field = nullptr;
+		currentBase = 0;
+		lastArrayIdx = 0;
+	}
+
+	const SettingsField* field;
+	std::string fieldAccessPath;
+	uint32_t currentBase;  // Only used by SettingsLayout_FindFieldByAbsoluteOffset internally.
+	int lastArrayIdx;      // Only used by SettingsLayout_FindFieldByAbsoluteOffset internally.
+};
+
+class SettingsLayoutAsset;
+extern bool SettingsFieldFinder_FindFieldByAbsoluteOffset(const SettingsLayoutAsset* const layout, const uint32_t targetOffset, SettingsLayoutFindByOffsetResult_s& result);
+
 class SettingsLayoutAsset
 {
 public:
 	SettingsLayoutAsset(SettingsLayoutHeader_v0_t* hdr) :
 		name(hdr->name), fieldData(hdr->fieldData), fieldMap(hdr->fieldMap), hashTableSize(hdr->hashTableSize),
 		fieldCount(hdr->fieldCount), extraDataSizeIndex(hdr->extraDataSizeIndex), hashStepScale(hdr->hashStepScale), hashSeed(hdr->hashSeed), arrayValueCount(hdr->arrayValueCount), totalLayoutSize(hdr->totalBufferSize), unk_34(hdr->unk_34),
-		stringData(hdr->stringData), pSubHeaders(hdr->subHeaders), isSubHeader(false)
+		alignment(0), stringData(hdr->stringData), pSubHeaders(hdr->subHeaders)
 	{
+		uint32_t highestIndex = 0;
+
+		for (uint32_t i = 0; i < hashTableSize; i++)
+		{
+			const SettingsField_t& set = hdr->fieldData[i];
+
+			// Static arrays are of size 0, their alignments are dictated by their contents.
+			if (set.dataType != eSettingsFieldType::ST_ARRAY)
+			{
+				const uint32_t fieldAlign = SettingsLayout_GetFieldAlignmentForType(set.dataType);
+
+				if (fieldAlign > alignment)
+					alignment = fieldAlign;
+			}
+
+			if (set.valueSubLayoutIdx > highestIndex)
+				highestIndex = set.valueSubLayoutIdx;
+		}
+
 		if (pSubHeaders)
 		{
-			uint32_t highestIndex = 0;
-
-			for (uint32_t i = 0; i < hashTableSize; i++)
-			{
-				const SettingsField_t& set = hdr->fieldData[i];
-
-				if (set.valueSubLayoutIdx > highestIndex)
-					highestIndex = set.valueSubLayoutIdx;
-			}
-
 			for (uint32_t i = 0; i <= highestIndex; i++)
-			{
-				SettingsLayoutAsset& newSubLayout = subHeaders.emplace_back(&pSubHeaders[i]);
-				newSubLayout.isSubHeader = true;
-			}
+				subHeaders.emplace_back(&pSubHeaders[i]);
 		}
 	}
 
@@ -149,6 +177,7 @@ public:
 
 	uint32_t totalLayoutSize;
 	uint32_t unk_34;
+	uint32_t alignment;
 	char* stringData; // contains all the field names
 
 	// This is seemingly an array of unnamed "sub layouts"
@@ -157,8 +186,6 @@ public:
 
 	std::vector<SettingsLayoutAsset> subHeaders;
 	std::vector<SettingsField> layoutFields;
-
-	bool isSubHeader;
 
 public:
 	void ParseAndSortFields();

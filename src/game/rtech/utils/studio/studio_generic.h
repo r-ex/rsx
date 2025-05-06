@@ -10,11 +10,16 @@
 struct animmovement_t
 {
 	animmovement_t(const animmovement_t& movement);
-	animmovement_t(r5::mstudioframemovement_t* movement, const int frameCount, const bool indexType);
 	animmovement_t(r1::mstudioframemovement_t* movement);
+	animmovement_t(r5::mstudioframemovement_t* movement, const int frameCount, const bool indexType);
+
 	~animmovement_t()
 	{
-		if (nullptr != sections) delete[] sections;
+		// [rika]: make sure we're using sections in this
+		if (sectioncount > 0)
+		{
+			FreeAllocArray(sections);
+		}
 	}
 
 	void* baseptr;
@@ -45,10 +50,11 @@ struct animsection_t
 struct animdesc_t
 {
 	animdesc_t(const animdesc_t& animdesc);
+	animdesc_t(r2::mstudioanimdesc_t* animdesc);
 	animdesc_t(r5::mstudioanimdesc_v8_t* animdesc);
 	animdesc_t(r5::mstudioanimdesc_v12_1_t* animdesc, char* ext);
 	animdesc_t(r5::mstudioanimdesc_v16_t* animdesc, char* ext);
-	animdesc_t(r2::mstudioanimdesc_t* animdesc);
+
 	~animdesc_t()
 	{
 		if (nullptr != movement) delete movement;
@@ -133,14 +139,14 @@ static_assert(sizeof(studio_hw_groupdata_t) == 16);
 struct studiohdr_generic_t
 {
 	studiohdr_generic_t() = default;
+	studiohdr_generic_t(const r1::studiohdr_t* const pHdr, StudioLooseData_t* const pData);
+	studiohdr_generic_t(const r2::studiohdr_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v8_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v12_1_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v12_2_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v12_3_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v14_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v16_t* const pHdr, int dataSizePhys, int dataSizeModel);
-	studiohdr_generic_t(const r1::studiohdr_t* const pHdr, StudioLooseData_t* const pData);
-	studiohdr_generic_t(const r2::studiohdr_t* const pHdr);
 
 	const char* baseptr;
 
@@ -164,9 +170,12 @@ struct studiohdr_generic_t
 	int boneOffset;
 	int boneDataOffset; // guh
 	int boneCount;
+	inline const char* const pBones() const { return baseptr + boneOffset; };
+	inline const char* const pBoneData() const { return baseptr + boneDataOffset; };
 
 	int textureOffset;
 	int textureCount;
+	inline const char* const pTextures() const { return baseptr + textureOffset; }
 
 	int numSkinRef;
 	int numSkinFamilies;

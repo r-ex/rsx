@@ -98,13 +98,13 @@ namespace rmax
 
 	enum TextureType_t
 	{
-		ALBEDO		= 1 << 0,
-		NORMAL		= 1 << 1,
-		GLOSS		= 1 << 2,
-		SPECULAR	= 1 << 3,
-		EMISSIVE	= 1 << 4,
-		AO			= 1 << 5,
-		CAVITY		= 1 << 6,
+		ALBEDO,
+		NORMAL,
+		GLOSS,
+		SPECULAR,
+		EMISSIVE,
+		AO,
+		CAVITY,
 	};
 
 	static std::map<std::string, TextureType_t> s_TextureTypeMap = {
@@ -117,12 +117,18 @@ namespace rmax
 		{ "cavityTexture",		TextureType_t::CAVITY },
 	};
 
+	struct Texture_t
+	{
+		int nameOffset;
+		int type;
+	};
+
 	struct Material_t
 	{
 		int nameOffset;
 
-		uint32_t textureCount;
-		uint64_t textures; // each bit is a type of texture
+		int16_t textureCount;
+		int16_t textureIndex;
 	};
 
 	struct Bone_t
@@ -136,10 +142,11 @@ namespace rmax
 	};
 
 	constexpr int8_t curFmtVersion = 3;
-	constexpr int8_t curFmtVersionMin = 1;
+	constexpr int8_t curFmtVersionMin = 2;
 	constexpr int maxFileSize = 1024 * 1024 * 16;
 	constexpr int rmaxFileId = MAKEFOURCC('r', 'm', 'a', 'x');
 
+	// [rika]: add a sort of root path here, to do relative paths
 	struct Hdr_t
 	{
 		int id;
@@ -152,12 +159,16 @@ namespace rmax
 		int boneCount;
 		int boneOffset;
 
+		int textureCount;
+		int textureOffset;
+
 		int materialCount;
 		int materialOffset;
 
 		int meshCount;
 		int meshOffset;
 
+		// [rika]: basically bodypart sorting
 		int meshCollectionCount;
 		int meshCollectionOffset;
 
@@ -196,19 +207,28 @@ namespace rmax
 		Vector scale;
 	};
 
+	struct RMAXTexture
+	{
+		RMAXTexture(const char* nameIn, const TextureType_t typeIn) : name(nameIn), type(typeIn) {}
+
+		//const char* name;
+		std::string name; // yucky
+
+		int type;
+	};
+
 	struct RMAXMaterial
 	{
-		RMAXMaterial(const char* nameIn) : name(nameIn), textureCount(0), textures(0ll) {};
+		RMAXMaterial(const char* nameIn) :  name(nameIn) {};
 
-		inline void AddTexture(const TextureType_t type)
+		inline void AddTexture(const char* nameIn, const TextureType_t typeIn)
 		{
-			textureCount++;
-			textures |= type;
-		};
+			textures.emplace_back(nameIn, typeIn);
+		}
 
 		const char* name;
-		int textureCount;
-		int64_t textures;
+
+		std::vector<RMAXTexture> textures;
 	};
 
 	struct RMAXCollection

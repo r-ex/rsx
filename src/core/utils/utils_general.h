@@ -15,6 +15,10 @@
 #define UNLIKELY [[unlikely]]
 #define LIKELY [[likely]]
 
+// one liners to make it Look Fancy
+#define FreeAllocArray(var) if (nullptr != var) { delete[] var; }
+#define FreeAllocVar(var) if (nullptr != var) { delete var; }
+
 inline const char* keepAfterLastSlashOrBackslash(const char* src)
 {
 	const char* lastSlash = strrchr(src, '/');

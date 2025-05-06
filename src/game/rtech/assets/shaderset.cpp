@@ -9,6 +9,8 @@ void LoadShaderSetAsset(CAssetContainer* const pak, CAsset* const asset)
 	UNUSED(pak);
 
 	CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+	PakAsset_t* const internalAsset = pakAsset->data();
+	UNUSED(internalAsset);
 
 	ShaderSetAsset* shdsAsset = nullptr;
 
@@ -34,6 +36,17 @@ void LoadShaderSetAsset(CAssetContainer* const pak, CAsset* const asset)
 	}
 	case 13:
 	{
+		if (pakAsset->data()->headerStructSize != sizeof(ShaderSetAssetHeader_v13_t))
+		{
+			pakAsset->SetAssetVersion({ 13, 1 }); // [rika]: set minor version
+
+			assertm(pakAsset->data()->headerStructSize == sizeof(sizeof(ShaderSetAssetHeader_v12_t)), "incorrect header");
+
+			ShaderSetAssetHeader_v12_t* hdr = reinterpret_cast<ShaderSetAssetHeader_v12_t*>(pakAsset->header());
+			shdsAsset = new ShaderSetAsset(hdr);
+			break;
+		}
+
 		ShaderSetAssetHeader_v13_t* hdr = reinterpret_cast<ShaderSetAssetHeader_v13_t*>(pakAsset->header());
 		shdsAsset = new ShaderSetAsset(hdr);
 		break;

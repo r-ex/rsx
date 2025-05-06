@@ -23,7 +23,9 @@ extern std::atomic<uint32_t> maxConcurrentThreads;
 
 CBufferManager* g_BufferManager;
 
-ExportSettings_t g_ExportSettings { .exportNormalRecalcSetting = eNormalExportRecalc::NML_RECALC_NONE, .exportPhysicsContentsFilter = static_cast<uint32_t>(TRACE_MASK_ALL), .exportPathsFull = false, .exportAssetDeps = false, .exportSeqsWithRig = true, .exportTxtrWithMat = true, .useSemanticTextureNames = true };
+ExportSettings_t g_ExportSettings{ .previewedSkinIndex = 0, .exportNormalRecalcSetting = eNormalExportRecalc::NML_RECALC_NONE, .exportTextureNameSetting = eTextureExportName::TXTR_NAME_TEXT,
+    .exportPathsFull = false, .exportAssetDeps = false, .exportRigSequences = true, .exportModelSkin = false, .exportMaterialTextures = true, .exportPhysicsContentsFilter = static_cast<uint32_t>(TRACE_MASK_ALL) };
+PreviewSettings_t g_PreviewSettings { .previewCullDistance = PREVIEW_CULL_DEFAULT, .previewMovementSpeed = PREVIEW_SPEED_DEFAULT };
 
 std::atomic<bool> inJobAction = false;
 
@@ -145,7 +147,11 @@ void CreatePakAssetDependenciesTable(CAsset* asset)
                 AssetGuid_t guid = dependencies[d];
                 CAsset* depAsset = g_assetData.FindAssetByGUID<CPakAsset>(guid.guid);
 
-                assert(depAsset->GetAssetContainerType() == CAsset::ContainerType::PAK);
+#if _DEBUG
+                // [rika]: cannot access depAsset if nullptr
+                if (depAsset)
+                    assert(depAsset->GetAssetContainerType() == CAsset::ContainerType::PAK);
+#endif // _DEBUG
 
                 ImGui::PushID(d);
 
@@ -659,6 +665,9 @@ void HandleRenderFrame()
         ImGui::SetNextWindowSize(ImVec2(0.f, 0.f), ImGuiCond_Always);
         if (ImGui::Begin("Settings", &uiState.settingsWindowVisible, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize))
         {
+            // ===============================================================================================================
+            ImGui::SeparatorText("Export");
+
             ImGui::Checkbox("Export full asset paths", &g_ExportSettings.exportPathsFull);
             ImGui::SameLine();
             g_pImGuiHandler->HelpMarker("Enables exporting of assets to their full path within the export directory, as shown by the listed asset names.\nWhen disabled, assets will be exported into the root-level of a folder named after the asset's type (e.g. \"material/\",\"ui_image/\").");
@@ -667,22 +676,25 @@ void HandleRenderFrame()
             ImGui::SameLine();
             g_pImGuiHandler->HelpMarker("Enables exporting of all dependencies that are associated with any asset that is being exported.");
 
-            ImGui::Checkbox("Export AnimRig sequences", &g_ExportSettings.exportSeqsWithRig);
+            ImGui::Checkbox("Export AnimRig sequences", &g_ExportSettings.exportRigSequences);
             ImGui::SameLine();
-            g_pImGuiHandler->HelpMarker("Enables exporting of all animation sequences that are associated with any AnimRig asset that is being exported.");
+            g_pImGuiHandler->HelpMarker("Enables exporting of all animation sequences that are associated with any AnimRig (and MDL) asset that is being exported.");
 
-            ImGui::Checkbox("Export Material Textures", &g_ExportSettings.exportTxtrWithMat);
+            ImGui::Checkbox("Export Model Skin", &g_ExportSettings.exportModelSkin);
+            ImGui::SameLine();
+            g_pImGuiHandler->HelpMarker("Enables exporting a model with the previewed skin.");
+
+            ImGui::Checkbox("Export Material Textures", &g_ExportSettings.exportMaterialTextures);
             ImGui::SameLine();
             g_pImGuiHandler->HelpMarker("Enables exporting of all textures that are associated with any material asset that is being exported.");
 
-            ImGui::Checkbox("Use semantic texture names", &g_ExportSettings.useSemanticTextureNames);
+            ImGui::Combo("Material Texture Names", reinterpret_cast<int*>(&g_ExportSettings.exportTextureNameSetting), s_TextureExportNameSetting, static_cast<int>(ARRAYSIZE(s_TextureExportNameSetting)));
             ImGui::SameLine();
-            g_pImGuiHandler->HelpMarker("Recreate the texture names using details from the material if the name of the texture is unknown.");
+            g_pImGuiHandler->HelpMarker("Naming scheme for exporting textures via materials options are as follows:\nGUID: exports only using the asset's GUID as a name.\nReal: exports texture using a real name (asset name or guid if no name).\nText: exports the texture with a text name always, generating one if there is none provided.\nSemantic: exports with a generated name all the time, useful for models.");
 
-            // save to file at a later date ?
             ImGui::Combo("Normal Recalc", reinterpret_cast<int*>(&g_ExportSettings.exportNormalRecalcSetting), s_NormalExportRecalcSetting, static_cast<int>(ARRAYSIZE(s_NormalExportRecalcSetting)));
             ImGui::SameLine();
-            g_pImGuiHandler->HelpMarker("None exports the normal as it is stored, DirectX generates a blue channel, OpenGL generates a blue channel and inverts the green channel.");
+            g_pImGuiHandler->HelpMarker("None: exports the normal as it is stored.\nDirectX: exports with a generated blue channel.\nOpenGL: exports with a generated blue channel and inverts the green channel.");
 
             ImGui::InputInt("Physics contents filter", reinterpret_cast<int*>(&g_ExportSettings.exportPhysicsContentsFilter), 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
             ImGui::SameLine();
@@ -707,6 +719,17 @@ void HandleRenderFrame()
             ImGui::SameLine();
             g_pImGuiHandler->HelpMarker("The number of CPU threads that will be used for exporting assets.\n\nA higher number of threads will usually make RSX export assets more quickly, however the increased disk usage may cause decreased performance.");
 
+            // ===============================================================================================================
+            ImGui::SeparatorText("Preview");
+
+            ImGui::SliderFloat("Cull Distance", &g_PreviewSettings.previewCullDistance, PREVIEW_CULL_MIN, PREVIEW_CULL_MAX);
+            ImGui::SameLine();
+            g_pImGuiHandler->HelpMarker("Distance at which render of 3D objects will stop. Note: only updated on startup.\n"); // todo: recreate projection matrix ?
+
+            ImGui::SliderFloat("Movement Speed", &g_PreviewSettings.previewMovementSpeed, PREVIEW_SPEED_MIN, PREVIEW_SPEED_MAX);
+            ImGui::SameLine();
+            g_pImGuiHandler->HelpMarker("Speed at which the camera moves through the 3D scene.\n");
+            
             // ===============================================================================================================
             ImGui::SeparatorText("Export Formats");
 

@@ -5,8 +5,12 @@
 #include <game/rtech/cpakfile.h>
 #include <game/rtech/utils\utils.h>
 
-extern ExportSettings_t g_ExportSettings;
+#define ImGuiReadSetting(str, var, a)  if (sscanf_s(line, str, &a) == 1) { var = a; }
 
+extern ExportSettings_t g_ExportSettings;
+extern PreviewSettings_t g_PreviewSettings;
+
+// asset settings
 static void* AssetSettings_ReadOpen(ImGuiContext* const ctx, ImGuiSettingsHandler* const handler, const char* const name)
 {
     UNUSED(handler);
@@ -32,10 +36,9 @@ static void AssetSettings_ReadLine(ImGuiContext* const ctx, ImGuiSettingsHandler
     if (entry)
     {
         int* const exportSetting = static_cast<int*>(entry);
-        if (int i; sscanf_s(line, "Setting=%u", &i) == 1)
-        {
-            *exportSetting = i;
-        }
+
+        int i;
+        ImGuiReadSetting("Setting=%u", *exportSetting, i);
     }
 }
 
@@ -52,6 +55,7 @@ static void AssetSettings_WriteAll(ImGuiContext* const ctx, ImGuiSettingsHandler
     }
 }
 
+// utils settings
 static void* UtilSettings_ReadOpen(ImGuiContext* const ctx, ImGuiSettingsHandler* const handler, const char* const name)
 {
     UNUSED(handler);
@@ -71,15 +75,8 @@ static void UtilSettings_ReadLine(ImGuiContext* const ctx, ImGuiSettingsHandler*
         ImGuiHandler::UtilsSettings_t* const cfg = static_cast<ImGuiHandler::UtilsSettings_t*>(entry);
 
         uint32_t i;
-        if (sscanf_s(line, "ExportThreads=%u", &i) == 1)
-        {
-            cfg->exportThreadCount = i;
-        }
-
-        if (sscanf_s(line, "ParseThreads=%u", &i) == 1)
-        {
-            cfg->parseThreadCount = i;
-        }
+        ImGuiReadSetting("ExportThreads=%u", cfg->exportThreadCount, i);
+        ImGuiReadSetting("ParseThreads=%u", cfg->parseThreadCount, i);
     }
 }
 
@@ -94,6 +91,7 @@ static void UtilSettings_WriteAll(ImGuiContext* const ctx, ImGuiSettingsHandler*
     buf->append("\n");
 }
 
+// export settings
 static void* ExportSettings_ReadOpen(ImGuiContext* const ctx, ImGuiSettingsHandler* const handler, const char* const name)
 {
     UNUSED(handler);
@@ -103,7 +101,6 @@ static void* ExportSettings_ReadOpen(ImGuiContext* const ctx, ImGuiSettingsHandl
     return &g_ExportSettings;
 }
 
-#define ImGuiReadSetting(str, var, a)  if (sscanf_s(line, str, &a) == 1) { var = i; }
 static void ExportSettings_ReadLine(ImGuiContext* const ctx, ImGuiSettingsHandler* const handler, void* const entry, const char* const line)
 {
     UNUSED(handler);
@@ -116,10 +113,11 @@ static void ExportSettings_ReadLine(ImGuiContext* const ctx, ImGuiSettingsHandle
         int i;
         ImGuiReadSetting("ExportPathsFull=%i",              settings->exportPathsFull, i);
         ImGuiReadSetting("ExportAssetDeps=%i",              settings->exportAssetDeps, i);
-        ImGuiReadSetting("ExportSeqsWithRig=%i",            settings->exportSeqsWithRig, i);
-        ImGuiReadSetting("ExportTxtrWithMat=%i",            settings->exportTxtrWithMat, i);
-        ImGuiReadSetting("UseSemanticTextureNames=%i",      settings->useSemanticTextureNames, i);
+        ImGuiReadSetting("ExportRigSequences=%i",           settings->exportRigSequences, i);
+        ImGuiReadSetting("ExportModelSkin=%i",              settings->exportModelSkin, i);
+        ImGuiReadSetting("ExportMaterialTextures=%i",       settings->exportMaterialTextures, i);
 
+        ImGuiReadSetting("ExportTextureNameSetting=%i",     settings->exportTextureNameSetting, i);
         ImGuiReadSetting("ExportNormalRecalcSetting=%i",    settings->exportNormalRecalcSetting, i);
     }
 }
@@ -133,11 +131,52 @@ static void ExportSettings_WriteAll(ImGuiContext* const ctx, ImGuiSettingsHandle
     
     buf->appendf("ExportPathsFull=%i\n",            g_ExportSettings.exportPathsFull);
     buf->appendf("ExportAssetDeps=%i\n",            g_ExportSettings.exportAssetDeps);
-    buf->appendf("ExportSeqsWithRig=%i\n",          g_ExportSettings.exportSeqsWithRig);
-    buf->appendf("ExportTxtrWithMat=%i\n",          g_ExportSettings.exportTxtrWithMat);
-    buf->appendf("UseSemanticTextureNames=%i\n",    g_ExportSettings.useSemanticTextureNames);
+    buf->appendf("ExportRigSequences=%i\n",         g_ExportSettings.exportRigSequences);
+    buf->appendf("ExportModelSkin=%i\n",            g_ExportSettings.exportModelSkin);
+    buf->appendf("ExportMaterialTextures=%i\n",     g_ExportSettings.exportMaterialTextures);
 
+    buf->appendf("ExportTextureNameSetting=%i\n",   g_ExportSettings.exportTextureNameSetting);
     buf->appendf("ExportNormalRecalcSetting=%i\n",  g_ExportSettings.exportNormalRecalcSetting);
+
+    // [rika]: there is no reason the other settings could not be saved in the future, it just seemed unneeded to save them for now.
+
+    buf->appendf("\n");
+}
+
+// preview settings
+static void* PreviewSettings_ReadOpen(ImGuiContext* const ctx, ImGuiSettingsHandler* const handler, const char* const name)
+{
+    UNUSED(handler);
+    UNUSED(ctx);
+    UNUSED(name);
+
+    return &g_PreviewSettings;
+}
+
+static void PreviewSettings_ReadLine(ImGuiContext* const ctx, ImGuiSettingsHandler* const handler, void* const entry, const char* const line)
+{
+    UNUSED(handler);
+    UNUSED(ctx);
+
+    if (entry)
+    {
+        PreviewSettings_t* const settings = static_cast<PreviewSettings_t*>(entry);
+
+        float i;
+        ImGuiReadSetting("PreviewCullDistance=%f",  settings->previewCullDistance, i);
+        ImGuiReadSetting("PreviewMovementSpeed=%f", settings->previewMovementSpeed, i);;
+    }
+}
+
+static void PreviewSettings_WriteAll(ImGuiContext* const ctx, ImGuiSettingsHandler* handler, ImGuiTextBuffer* const buf)
+{
+    UNUSED(ctx);
+
+    buf->reserve(buf->size() + 128);
+    buf->appendf("[%s][general]\n", handler->TypeName);
+    
+    buf->appendf("PreviewCullDistance=%f\n",    g_PreviewSettings.previewCullDistance);
+    buf->appendf("PreviewMovementSpeed=%f\n",   g_PreviewSettings.previewMovementSpeed);
 
     buf->appendf("\n");
 }
@@ -161,6 +200,8 @@ void ImGuiHandler::SetupHandler()
     utilSettingsHandler.ReadLineFn = UtilSettings_ReadLine;
     utilSettingsHandler.WriteAllFn = UtilSettings_WriteAll;
 
+    // [rika]: go to for adding simple saved settings
+    // related to exporting assets (not auto generated format settings (AssetSettings))
     ImGuiSettingsHandler exportSettingsHandler = {};
     exportSettingsHandler.TypeName = "ExportSettings";
     exportSettingsHandler.TypeHash = ImHashStr("ExportSettings");
@@ -168,9 +209,18 @@ void ImGuiHandler::SetupHandler()
     exportSettingsHandler.ReadLineFn = ExportSettings_ReadLine;
     exportSettingsHandler.WriteAllFn = ExportSettings_WriteAll;
 
+    // related to preview (in the 3D viewport)
+    ImGuiSettingsHandler previewSettingsHandler = {};
+    previewSettingsHandler.TypeName = "PreviewSettings";
+    previewSettingsHandler.TypeHash = ImHashStr("PreviewSettings");
+    previewSettingsHandler.ReadOpenFn = PreviewSettings_ReadOpen;
+    previewSettingsHandler.ReadLineFn = PreviewSettings_ReadLine;
+    previewSettingsHandler.WriteAllFn = PreviewSettings_WriteAll;
+
     ImGui::AddSettingsHandler(&assetSettingsHandler);
     ImGui::AddSettingsHandler(&utilSettingsHandler);
     ImGui::AddSettingsHandler(&exportSettingsHandler);
+    ImGui::AddSettingsHandler(&previewSettingsHandler);
     ImGui::LoadIniSettingsFromDisk(io.IniFilename);
 }
 

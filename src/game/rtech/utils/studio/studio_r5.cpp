@@ -29,17 +29,17 @@ namespace r5
 	inline void ExtractAnimValue(mstudioanimvalue_t* panimvalue, const int frame, const float scale, float& v1)
 	{
 		// note: in R5 'valid' is not really used the same way as traditional source.
-
-		// '0' valid values is treated as the traditional source style track, having a 16bit signed integer per frame value. this will be used if the more compact tracks cannot be utilized
-		if (!panimvalue->num.valid)
+		switch (panimvalue->num.valid)
+		{
+			// '0' valid values is treated as the traditional source style track, having a 16bit signed integer per frame value. this will be used if the more compact tracks cannot be utilized
+		case 0:
 		{
 			v1 = static_cast<float>(panimvalue[frame + 1].value) * scale; // + 1 to skip over the base animvalue.
 
 			return;
 		}
-
 		// '1' valid values is a new type of compression, the track consists of one short, followed by a series of signed 8bit integers used to adjust the value after the first frame.
-		if (panimvalue->num.valid == 1)
+		case 1:
 		{
 			int16_t value = panimvalue[1].value;
 
@@ -51,7 +51,8 @@ namespace r5
 
 			return;
 		}
-		else
+		// 'other' valid values is a new type of compression, but can also be used to have a single value across many frames due to how it is setup
+		default:
 		{
 			float v7 = 1.0f;
 
@@ -99,6 +100,7 @@ namespace r5
 			v1 = value * scale;
 
 			return;
+		}
 		}
 	}
 

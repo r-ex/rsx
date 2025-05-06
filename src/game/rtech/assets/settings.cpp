@@ -180,12 +180,67 @@ void SettingsAsset::R_WriteSetFile(std::string& out, const size_t indentLevel, c
 
 void SettingsAsset::R_WriteModNames(std::string& out) const
 {
-	out += "\t\"modNames\": [\n";
+	out += "\t\"$modNames\": [\n";
 
-	for (int i = 0; i < modNameCount; i++)
+	for (uint32_t i = 0; i < modNameCount; i++)
 	{
 		const char* const commaChar = i != (modNameCount - 1) ? "," : "";
 		out += std::string("\t\t\"") + modNames[i] + "\"" + commaChar + "\n";
+	}
+
+	out += "\t]";
+}
+
+void SettingsAsset::R_WriteModValues(std::string& out, const SettingsLayoutAsset* const layout) const
+{
+	out += "\t\"$modValues\": [\n";
+
+	for (uint32_t i = 0; i < modValuesCount; i++)
+	{
+		const SettingsMod_s* const modValue = &modValues[i];
+		out += std::format("\t\t{{ // originally mapped to offset {:d}\n", modValue->valueOffset);
+
+		out += std::format("\t\t\t\"index\": {:d},\n\t\t\t\"type\": \"{:s}\",\n\t\t\t",
+			modValue->nameIndex, g_settingsModType[modValue->type]);
+
+		SettingsLayoutFindByOffsetResult_s searchResult;
+		const bool foundField = SettingsFieldFinder_FindFieldByAbsoluteOffset(layout, modValue->valueOffset, searchResult);
+
+		if (foundField)
+		{
+			switch (modValue->type)
+			{
+			case SettingsModType_e::kIntAdd:
+			case SettingsModType_e::kIntMultiply:
+				out += std::format("\"value\": {:d},\n", modValue->value.intValue);
+				break;
+			case SettingsModType_e::kFloatAdd:
+			case SettingsModType_e::kFloatMultiply:
+				out += std::format("\"value\": {:f},\n", modValue->value.floatValue);
+				break;
+			case SettingsModType_e::kBool:
+				out += std::format("\"value\": {:s},\n", modValue->value.boolValue ? "true" : "false");
+				break;
+			case SettingsModType_e::kNumber:
+				if (searchResult.field->dataType == eSettingsFieldType::ST_INTEGER)
+					out += std::format("\"value\": {:d},\n", modValue->value.intValue);
+				else
+					out += std::format("\"value\": {:f},\n", modValue->value.floatValue);
+				break;
+			case SettingsModType_e::kString:
+				out += std::format("\"value\": \"{:s}\",\n", &stringData[modValue->value.stringOffset]);
+				break;
+			}
+
+			out += std::format("\t\t\t\"field\": \"{:s}\"\n", searchResult.fieldAccessPath);
+		}
+		else
+		{
+			out += "// FAILURE( !!! SETTINGS FIELD NOT FOUND !!! )\n";
+		}
+
+		const char* const commaChar = i != (modValuesCount - 1) ? "," : "";
+		out += std::string("\t\t}") + commaChar + "\n";
 	}
 
 	out += "\t]";
@@ -202,7 +257,7 @@ static bool RenderSettingsAsset(CPakAsset* const asset, std::string& stringStrea
 	stringStream += std::string("{\n") + "\t\"layoutAsset\": \"" + layout->name + "\",\n";
 
 	if (settingsAsset->uniqueId)
-		stringStream += std::format("\t\"uniqueId\": {:d},\n", settingsAsset->uniqueId);;
+		stringStream += std::format("\t\"uniqueId\": {:d},\n", settingsAsset->uniqueId);
 
 	stringStream += "\t\"settings\": {\n";
 
@@ -216,6 +271,15 @@ static bool RenderSettingsAsset(CPakAsset* const asset, std::string& stringStrea
 		stringStream += ",\n";
 		settingsAsset->R_WriteModNames(stringStream);
 	}
+
+	if (settingsAsset->modValuesCount)
+	{
+		stringStream += ",\n";
+		settingsAsset->R_WriteModValues(stringStream, layout);
+	}
+
+	if (settingsAsset->modFlags)
+		stringStream += std::format(",\n\t\"$modFlags\": {:d}\n", settingsAsset->modFlags);
 
 	stringStream += "\n}";
 	FixSlashes(stringStream);
@@ -262,7 +326,7 @@ bool ExportSettingsAsset(CAsset* const asset, const int setting)
 	return true;
 }
 
-static void* PreviewRSONAsset(CAsset* const asset, const bool firstFrameForAsset)
+static void* PreviewSettingsAsset(CAsset* const asset, const bool firstFrameForAsset)
 {
 	CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
 
@@ -288,7 +352,7 @@ void InitSettingsAssetType()
 		.headerAlignment = 8,
 		.loadFunc = LoadSettingsAsset,
 		.postLoadFunc = PostLoadSettingsAsset,
-		.previewFunc = PreviewRSONAsset,
+		.previewFunc = PreviewSettingsAsset,
 		.e = { ExportSettingsAsset, 0, nullptr, 0ull },
 	};
 

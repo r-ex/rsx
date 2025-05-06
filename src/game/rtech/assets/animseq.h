@@ -121,11 +121,31 @@ public:
 			break;
 		}
 		case eSeqVersion::VERSION_11:
+		{
+			seqdesc = seqdesc_t(reinterpret_cast<r5::mstudioseqdesc_v16_t*>(data), dataExtraPerm);
+
+			const r5::mstudioseqdesc_v16_t* const tmp = reinterpret_cast<const r5::mstudioseqdesc_v16_t* const>(data);
+			const int boneCount = (tmp->activitymodifierindex - tmp->weightlistindex) / 4;
+
+			RawSizeV11(boneCount);
+
+			break;
+		}
 		case eSeqVersion::VERSION_12:
 		{
 			seqdesc = seqdesc_t(reinterpret_cast<r5::mstudioseqdesc_v16_t*>(data), dataExtraPerm);
 
-			RawSizeV11();
+			const r5::mstudioseqdesc_v18_t* const tmp = reinterpret_cast<const r5::mstudioseqdesc_v18_t* const>(data);
+
+			if (tmp->weightlistindex == 1 || tmp->weightlistindex == 3)
+			{
+				dataSize = 0;
+				break;
+			}
+
+			const int boneCount = (tmp->activitymodifierindex - tmp->weightlistindex) / 4;
+
+			RawSizeV11(boneCount);
 
 			break;
 		}
@@ -159,6 +179,7 @@ public:
 	seqdesc_t seqdesc;
 
 	inline const bool UseStall() const { return version == eSeqVersion::VERSION_7 ? false : true; };
+	inline void UpdateDataSizeNew(const int boneCount) { RawSizeV11(boneCount); }
 
 private:
 	inline void RawSizeV7()
@@ -176,24 +197,13 @@ private:
 	}
 
 	// this can't be done with strings, as data is after it. from memory the data order is: animation, framemovement, compressedikerrors. to get the end parsing through these animvalue tracks will be required.
-	inline void RawSizeV11()
+
+
+	void RawSizeV11(const int boneCount)
 	{
-		const r5::mstudioseqdesc_v16_t* const seqdesctmp = reinterpret_cast<const r5::mstudioseqdesc_v16_t* const>(seqdesc.baseptr);
-		const int boneCount = (seqdesctmp->activitymodifierindex - seqdesctmp->weightlistindex) / 4;
-
-		//assertm(seqdesctmp->weightlistindex >= sizeof(mstudioseqdesc_v16_t), "no weight data!");
-		// v12 animseqs can have a static indice instead of an offset into file, seems to appear in s24
-		if (seqdesctmp->weightlistindex < sizeof(r5::mstudioseqdesc_v16_t))
+		if (boneCount == 0)
 		{
-			const char* end = seqdesc.szlabel;
-			end += strnlen_s(end, MAX_PATH) + 1; // plus null terminator
-
-			dataSize = IALIGN4(end - (char*)seqdesc.baseptr);
-			
-//#ifdef _DEBUG
-//			Log("sequence %s used static indices\n", name);
-//#endif
-
+			dataSize = 0;
 			return;
 		}
 
@@ -265,6 +275,10 @@ private:
 
 				return;
 			}
+
+			// ikrules are static and do not have compresedikerrors (new as of v12)
+			if (animdesc->ikruleindex == 3 || animdesc->ikruleindex == 5)
+				return;
 
 			// not likely to get hit, but we should cover our bases.
 			// if the last data is compressedikerror data

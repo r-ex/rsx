@@ -15,6 +15,7 @@
 #define ToScratchImage reinterpret_cast<DirectX::ScratchImage*>(m_texture)
 
 extern CDXParentHandler* g_dxHandler;
+extern PreviewSettings_t g_PreviewSettings;
 
 CTexture::CTexture(const char* const buf, const size_t bufSize, const size_t width, const size_t height, const DXGI_FORMAT imgFormat, const size_t arraySize, const size_t mipLevels) : m_width(width), m_height(height), m_shaderResourceView(nullptr)
 {
@@ -479,7 +480,7 @@ bool CDXParentHandler::CreateMainView(const uint16_t w, const uint16_t h)
             assertm(false, "Failed to create sampler comparison state (shadowmapSampler)");
     }
 
-    m_wndProjMatrix = XMMatrixPerspectiveFovLH(0.25f * XM_PI, static_cast<float>(w) / h, 0.1f, 1000.f);
+    m_wndProjMatrix = XMMatrixPerspectiveFovLH(0.25f * XM_PI, static_cast<float>(w) / h, 0.1f, g_PreviewSettings.previewCullDistance);
 
     pBackBuffer->Release();
     return true;
@@ -569,10 +570,10 @@ void CDXCamera::Move(float dt)
 
     Vector& pos = this->position;
 
-    float moveSpeed = 10.f;
+    float moveSpeed = g_PreviewSettings.previewMovementSpeed;
 
     if(g_pInput->GetKeyState(CInput::KeyCode_t::KEY_CONTROL))
-        moveSpeed = 50.f;
+        moveSpeed = moveSpeed * PREVIEW_SPEED_MULT;
 
     if (g_pInput->GetKeyState(CInput::KeyCode_t::KEY_SPACE))
         pos.y += moveSpeed * dt;

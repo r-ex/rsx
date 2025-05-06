@@ -7,9 +7,22 @@ animmovement_t::animmovement_t(const animmovement_t & movement) : baseptr(moveme
 {
 	std::memcpy(this->scale, movement.scale, sizeof(float) * 4);
 
-	sections = new int[sectioncount];
+	if (sectioncount > 0)
+	{
+		sections = new int[sectioncount];
 
-	std::memcpy(sections, movement.sections, sizeof(int) * sectioncount);
+		std::memcpy(sections, movement.sections, sizeof(int) * sectioncount);
+
+		return;
+	}
+
+	std::memcpy(this->offset, movement.offset, sizeof(short) * 4);
+}
+
+animmovement_t::animmovement_t(r1::mstudioframemovement_t* movement) : baseptr(movement), sectionframes(0), sectioncount(0)
+{
+	std::memcpy(this->scale, movement->scale, sizeof(float) * 4);
+	std::memcpy(this->offset, movement->offset, sizeof(short) * 4);
 }
 
 animmovement_t::animmovement_t(r5::mstudioframemovement_t* movement, const int frameCount, const bool indexType) : baseptr(movement), sectionframes(movement->sectionframes), sectioncount(movement->SectionCount(frameCount))
@@ -26,12 +39,6 @@ animmovement_t::animmovement_t(r5::mstudioframemovement_t* movement, const int f
 	}
 }
 
-animmovement_t::animmovement_t(r1::mstudioframemovement_t* movement) : baseptr(movement), sectionframes(0), sectioncount(0)
-{
-	std::memcpy(this->scale, movement->scale, sizeof(float) * 4);
-	std::memcpy(this->offset, movement->offset, sizeof(short) * 4);
-}
-
 // animdesc
 animdesc_t::animdesc_t(const animdesc_t& animdesc) : baseptr(animdesc.baseptr), name(animdesc.name), fps(animdesc.fps), flags(animdesc.flags), numframes(animdesc.numframes), animindex(animdesc.animindex),
 sectionindex(animdesc.sectionindex), sectionframes(animdesc.sectionframes), sectionstallframes(animdesc.sectionstallframes), extraData(animdesc.extraData), nummovements(animdesc.nummovements), movementindex(animdesc.movementindex), framemovementindex(animdesc.framemovementindex), movement(nullptr), parsedBufferIndex(animdesc.parsedBufferIndex)
@@ -45,6 +52,27 @@ sectionindex(animdesc.sectionindex), sectionframes(animdesc.sectionframes), sect
 	if (nullptr != animdesc.movement)
 		movement = new animmovement_t(*animdesc.movement);
 }
+
+animdesc_t::animdesc_t(r2::mstudioanimdesc_t* animdesc) : baseptr(reinterpret_cast<void*>(animdesc)), name(animdesc->pszName()), fps(animdesc->fps), flags(animdesc->flags), numframes(animdesc->numframes), animindex(animdesc->animindex),
+sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(0), extraData(nullptr), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
+{
+	flags |= eStudioAnimFlags::ANIM_VALID;
+
+	if (sectionframes)
+	{
+		sections.resize(SectionCount());
+
+		for (int i = 0; i < SectionCount(); i++)
+		{
+			sections.at(i) = { .animindex = animdesc->pSection(i)->animindex, .isExternal = false };
+		}
+	}
+
+	if (framemovementindex && flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
+	{
+		movement = new animmovement_t(animdesc->pFrameMovement());
+	}
+};
 
 animdesc_t::animdesc_t(r5::mstudioanimdesc_v8_t* animdesc) : baseptr(reinterpret_cast<void*>(animdesc)), name(animdesc->pszName()), fps(animdesc->fps), flags(animdesc->flags), numframes(animdesc->numframes), animindex(animdesc->animindex),
 sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(0), extraData(nullptr), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
@@ -100,27 +128,6 @@ sectionindex(static_cast<int>(FIX_OFFSET(animdesc->sectionindex))), sectionframe
 	if (framemovementindex && flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
 	{
 		movement = new animmovement_t(animdesc->pFrameMovement(), numframes, true);
-	}
-};
-
-animdesc_t::animdesc_t(r2::mstudioanimdesc_t* animdesc) : baseptr(reinterpret_cast<void*>(animdesc)), name(animdesc->pszName()), fps(animdesc->fps), flags(animdesc->flags), numframes(animdesc->numframes), animindex(animdesc->animindex),
-sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(0), extraData(nullptr), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
-{
-	flags |= eStudioAnimFlags::ANIM_VALID;
-
-	if (sectionframes)
-	{
-		sections.resize(SectionCount());
-
-		for (int i = 0; i < SectionCount(); i++)
-		{
-			sections.at(i) = { .animindex = animdesc->pSection(i)->animindex, .isExternal = false };
-		}
-	}
-
-	if (framemovementindex && flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
-	{
-		movement = new animmovement_t(animdesc->pFrameMovement());
 	}
 };
 
@@ -188,6 +195,20 @@ char* animdesc_t::pAnimdataNoStall(int* piFrame) const
 }
 
 // seqdesc
+seqdesc_t::seqdesc_t(r2::mstudioseqdesc_t* seqdesc) : baseptr(reinterpret_cast<void*>(seqdesc)), szlabel(seqdesc->pszLabel()), szactivityname(seqdesc->pszActivityName()), flags(seqdesc->flags), weightlistindex(seqdesc->weightlistindex), parsedData(seqdesc->AnimCount())
+{
+	r2::studiohdr_t* const pStudioHdr = reinterpret_cast<r2::studiohdr_t* const>(reinterpret_cast<char*>(seqdesc) + seqdesc->baseptr);
+
+	for (int i = 0; i < seqdesc->AnimCount(); i++)
+	{
+		r2::mstudioanimdesc_t* const pAnimdesc = pStudioHdr->pAnimdesc(seqdesc->GetAnimIndex(i));
+
+		// no need to sanity check here
+
+		anims.emplace_back(pAnimdesc);
+	}
+};
+
 #define ANIMDESC_SANITY_CHECK(anim) (anim->fps < 0.0f || anim->fps > 2048.f || anim->numframes < 0 || anim->numframes > 0x20000)
 seqdesc_t::seqdesc_t(r5::mstudioseqdesc_v8_t* seqdesc) : baseptr(reinterpret_cast<void*>(seqdesc)), szlabel(seqdesc->pszLabel()), szactivityname(seqdesc->pszActivity()), flags(seqdesc->flags), weightlistindex(seqdesc->weightlistindex), parsedData(seqdesc->AnimCount())
 {
@@ -242,20 +263,6 @@ seqdesc_t::seqdesc_t(r5::mstudioseqdesc_v16_t* seqdesc, char* ext) : baseptr(rei
 		anims.emplace_back(pAnimdesc, ext);
 	}
 };
-
-seqdesc_t::seqdesc_t(r2::mstudioseqdesc_t* seqdesc) : baseptr(reinterpret_cast<void*>(seqdesc)), szlabel(seqdesc->pszLabel()), szactivityname(seqdesc->pszActivityName()), flags(seqdesc->flags), weightlistindex(seqdesc->weightlistindex), parsedData(seqdesc->AnimCount())
-{
-	r2::studiohdr_t* const pStudioHdr = reinterpret_cast<r2::studiohdr_t* const>(reinterpret_cast<char*>(seqdesc) + seqdesc->baseptr);
-
-	for (int i = 0; i < seqdesc->AnimCount(); i++)
-	{
-		r2::mstudioanimdesc_t* const pAnimdesc = pStudioHdr->pAnimdesc(seqdesc->GetAnimIndex(i));
-
-		// no need to sanity check here
-
-		anims.emplace_back(pAnimdesc);
-	}
-};
 #undef ANIMDESC_SANITY_CHECK // remove if needed in other files
 
 // studio hw group
@@ -274,6 +281,20 @@ lodIndex(static_cast<uint8_t>(group->lodIndex)), lodCount(static_cast<uint8_t>(g
 // studiohdr
 // clamp silly studiomdl offsets (negative is base ptr)
 #define FIX_FILE_OFFSET(offset) (offset < 0 ? 0 : offset)
+studiohdr_generic_t::studiohdr_generic_t(const r1::studiohdr_t* const pHdr, StudioLooseData_t* const pData) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(pData->VertOffset(StudioLooseData_t::SLD_VTX)), vvdOffset(pData->VertOffset(StudioLooseData_t::SLD_VVD)), vvcOffset(pData->VertOffset(StudioLooseData_t::SLD_VVC)), vvwOffset(0), phyOffset(pData->PhysOffset()),
+vtxSize(pData->VertSize(StudioLooseData_t::SLD_VTX)), vvdSize(pData->VertSize(StudioLooseData_t::SLD_VVD)), vvcSize(pData->VertSize(StudioLooseData_t::SLD_VVC)), vvwSize(0), phySize(pData->PhysSize()), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), groupCount(), groups(), /*bvhOffset(pHdr->bvhOffset), TODO, moved?*/ baseptr(reinterpret_cast<const char*>(pHdr))
+{
+
+};
+
+studiohdr_generic_t::studiohdr_generic_t(const r2::studiohdr_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(0), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
+vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(0), phySize(pHdr->phySize), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), groupCount(), groups(), /*bvhOffset(pHdr->bvhOffset), TODO, moved?*/ baseptr(reinterpret_cast<const char*>(pHdr))
+{
+
+};
+
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v8_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(0)/*set in vertex parsing*/, textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
 boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), groupCount(1), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
@@ -355,20 +376,6 @@ boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->bon
 		groups[i] = studio_hw_groupdata_t(pHdr->pLODGroup(static_cast<uint16_t>(i)));
 		hwDataSize += groups[i].dataSizeDecompressed;
 	}
-
-};
-
-studiohdr_generic_t::studiohdr_generic_t(const r1::studiohdr_t* const pHdr, StudioLooseData_t* const pData) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(pData->vertexDataOffset[StudioLooseData_t::SLD_VTX]), vvdOffset(pData->vertexDataOffset[StudioLooseData_t::SLD_VVD]), vvcOffset(pData->vertexDataOffset[StudioLooseData_t::SLD_VVC]), vvwOffset(0), phyOffset(pData->physicsDataOffset),
-vtxSize(pData->vertexDataSize[StudioLooseData_t::SLD_VTX]), vvdSize(pData->vertexDataSize[StudioLooseData_t::SLD_VVD]), vvcSize(pData->vertexDataSize[StudioLooseData_t::SLD_VVC]), vvwSize(0), phySize(pData->physicsDataSize), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), groupCount(), groups(), /*bvhOffset(pHdr->bvhOffset), TODO, moved?*/ baseptr(reinterpret_cast<const char*>(pHdr))
-{
-
-};
-
-studiohdr_generic_t::studiohdr_generic_t(const r2::studiohdr_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(0), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
-vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(0), phySize(pHdr->phySize), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), groupCount(), groups(), /*bvhOffset(pHdr->bvhOffset), TODO, moved?*/ baseptr(reinterpret_cast<const char*>(pHdr))
-{
 
 };
 #undef FIX_FILE_OFFSET

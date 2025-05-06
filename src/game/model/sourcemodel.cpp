@@ -1,17 +1,59 @@
 #include <pch.h>
+#include <core/mdl/modeldata.h>
 #include <game/model/sourcemodel.h>
+
+#include <core/render/dx.h>
+#include <thirdparty/imgui/imgui.h>
+#include <thirdparty/imgui/misc/imgui_utility.h>
 
 extern CDXParentHandler* g_dxHandler;
 extern CBufferManager* g_BufferManager;
 extern ExportSettings_t g_ExportSettings;
 
-template<typename studiohdr_t, typename mstudiomesh_t>
-void ParseSourceModelVertexData(ModelAsset* const modelAsset)
+static const char* const s_PathPrefixMDL = s_AssetTypePaths.find(AssetType_t::MDL)->second;
+static const char* const s_PathPrefixSEQ = s_AssetTypePaths.find(AssetType_t::SEQ)->second;
+
+void CSourceModelAsset::FixupSkinData()
 {
-    const studiohdr_t* const pStudioHdr = reinterpret_cast<const studiohdr_t* const>(modelAsset->data);
-    const OptimizedModel::FileHeader_t* const pVTX = modelAsset->GetVTX();
-    const vvd::vertexFileHeader_t* const pVVD = modelAsset->GetVVD();
-    const vvc::vertexColorFileHeader_t* const pVVC = modelAsset->GetVVC();
+    const int skinCount = static_cast<int>(m_modelParsed->skins.size());
+
+    // [rika]: for models with only animations basically.
+    if (skinCount == 0)
+        return;
+
+    ModelSkinData_t* const skinData = &m_modelParsed->skins.front();
+    skinData[0].name = STUDIO_DEFAULT_SKIN_NAME; // [rika]: use default name for first skin
+
+    // [rika]: only the default skin
+    if (skinCount == 1)
+        return;
+
+    char fmtbuf[16]{};
+
+    //
+    m_numModelSkinNames = skinCount - 1;
+    m_modelSkinNames = new char*[m_numModelSkinNames] {};
+    for (int i = 0; i < m_numModelSkinNames; i++)
+    {
+        snprintf(fmtbuf, sizeof(fmtbuf), "skin_%i\0", i);
+        const size_t length = strnlen_s(fmtbuf, sizeof(fmtbuf)) + 1;
+        
+        char* tmp = new char[length] {};
+        strcpy_s(tmp, length, fmtbuf);
+
+        m_modelSkinNames[i] = tmp;
+        skinData[i + 1].name = tmp;
+    }
+}
+
+// [rika]: check how practical it is to use this for v8 rmdl
+template<typename studiohdr_t, typename mstudiomesh_t>
+void ParseSourceModelVertexData(ModelParsedData_t* const parsedData, StudioLooseData_t* const looseData)
+{
+    const studiohdr_t* const pStudioHdr = reinterpret_cast<const studiohdr_t* const>(parsedData->pStudioHdr()->baseptr);
+    const OptimizedModel::FileHeader_t* const pVTX = looseData->GetVTX();
+    const vvd::vertexFileHeader_t* const pVVD = looseData->GetVVD();
+    const vvc::vertexColorFileHeader_t* const pVVC = looseData->GetVVC();
 
     // no valid vertex data
     if (!pVTX || !pVVD)
@@ -29,8 +71,8 @@ void ParseSourceModelVertexData(ModelAsset* const modelAsset)
     if (pVVC && (pVVC->id != MODEL_VERTEX_COLOR_FILE_ID))
         return;
 
-    modelAsset->lods.resize(pVTX->numLODs);
-    modelAsset->bodyParts.resize(pStudioHdr->numbodyparts);
+    parsedData->lods.resize(pVTX->numLODs);
+    parsedData->bodyParts.resize(pStudioHdr->numbodyparts);
 
     constexpr size_t maxVertexDataSize = sizeof(vvd::mstudiovertex_t) + sizeof(Vector4D) + sizeof(Vector2D) + sizeof(Color32);
     constexpr size_t maxVertexBufferSize = maxVertexDataSize * s_MaxStudioVerts;
@@ -47,7 +89,7 @@ void ParseSourceModelVertexData(ModelAsset* const modelAsset)
     {
         int lodMeshCount = 0;
 
-        ModelLODData_t& lodData = modelAsset->lods.at(lodIdx);
+        ModelLODData_t& lodData = parsedData->lods.at(lodIdx);
         lodData.vertexCount = 0;
         lodData.indexCount = 0;
 
@@ -56,7 +98,7 @@ void ParseSourceModelVertexData(ModelAsset* const modelAsset)
             const mstudiobodyparts_t* const pStudioBodyPart = pStudioHdr->pBodypart(bdyIdx);
             const OptimizedModel::BodyPartHeader_t* const pVertBodyPart = pVTX->pBodyPart(bdyIdx);
 
-            modelAsset->SetupBodyPart(bdyIdx, pStudioBodyPart->pszName(), static_cast<int>(lodData.models.size()), pStudioBodyPart->nummodels);
+            parsedData->SetupBodyPart(bdyIdx, pStudioBodyPart->pszName(), static_cast<int>(lodData.models.size()), pStudioBodyPart->nummodels);
 
             for (int modelIdx = 0; modelIdx < pStudioBodyPart->nummodels; modelIdx++)
             {
@@ -110,7 +152,7 @@ void ParseSourceModelVertexData(ModelAsset* const modelAsset)
                     meshData.vertCacheSize = static_cast<uint16_t>(pVTX->vertCacheSize);
 
                     // do we have a section texcoord
-                    meshData.rawVertexLayoutFlags |= modelAsset->studiohdr.flags & STUDIOHDR_FLAGS_USES_UV2 ? VERT_TEXCOORDn_FMT(2, 0x2) : 0x0;
+                    meshData.rawVertexLayoutFlags |= pStudioHdr->flags & STUDIOHDR_FLAGS_USES_UV2 ? VERT_TEXCOORDn_FMT(2, 0x2) : 0x0;
 
                     meshData.ParseTexcoords();
 
@@ -140,7 +182,7 @@ void ParseSourceModelVertexData(ModelAsset* const modelAsset)
                                 OptimizedModel::Vertex_t* pVert = pStripGrp->pVertex(pStrip->vertOffset + vertIdx);
 
                                 Vector2D* const texcoords = meshData.texcoordCount > 1 ? &parseTexcoords[(pStrip->vertOffset + vertIdx) * (meshData.texcoordCount - 1)] : nullptr;
-                                ParseVertexFromVTX(&parseVertices[pStrip->vertOffset + vertIdx], &parseWeights[weightIdx], texcoords, &meshData, pVert, verts, tangs, colors, uv2s, weightIdx, isHwSkinned, pBoneStates);
+                                Vertex_t::ParseVertexFromVTX(&parseVertices[pStrip->vertOffset + vertIdx], &parseWeights[weightIdx], texcoords, &meshData, pVert, verts, tangs, colors, uv2s, weightIdx, isHwSkinned, pBoneStates);
                             }
 
                             memcpy(&parseIndices[pStrip->indexOffset], pStripGrp->pIndex(pStrip->indexOffset), pStrip->numIndices * sizeof(uint16_t));
@@ -158,7 +200,7 @@ void ParseSourceModelVertexData(ModelAsset* const modelAsset)
 
                     meshVertexData->AddWeights(parseWeights, meshData.weightsCount);
 
-                    meshData.ParseMaterial(modelAsset, pStudioMesh->material, pStudioMesh->meshid);
+                    meshData.ParseMaterial(parsedData, pStudioMesh->material);
 
                     lodMeshCount++;
                     modelData.meshCount++;
@@ -170,8 +212,8 @@ void ParseSourceModelVertexData(ModelAsset* const modelAsset)
                     // remove it from usage
                     meshVertexData->DestroyWriter();
 
-                    meshData.meshVertexDataIndex = modelAsset->meshVertexData.size();
-                    modelAsset->meshVertexData.addBack(reinterpret_cast<char*>(meshVertexData), meshVertexData->GetSize());
+                    meshData.meshVertexDataIndex = parsedData->meshVertexData.size();
+                    parsedData->meshVertexData.addBack(reinterpret_cast<char*>(meshVertexData), meshVertexData->GetSize());
 
                     // relieve buffer
                     g_BufferManager->RelieveBuffer(buffer);
@@ -198,16 +240,16 @@ void ParseSourceModelVertexData(ModelAsset* const modelAsset)
 }
 
 template<typename mstudiotexture_t>
-void ParseSourceModelTextureData(ModelAsset* const modelAsset)
+void ParseSourceModelTextureData(ModelParsedData_t* const parsedData)
 {
-    const studiohdr_generic_t* const pStudioHdr = &modelAsset->studiohdr;
+    const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
 
-    const mstudiotexture_t* const pTextures = reinterpret_cast<const mstudiotexture_t* const>(pStudioHdr->baseptr + pStudioHdr->textureOffset);
-    modelAsset->materials.resize(modelAsset->studiohdr.textureCount);
+    const mstudiotexture_t* const pTextures = reinterpret_cast<const mstudiotexture_t* const>(pStudioHdr->pTextures());
+    parsedData->materials.resize(pStudioHdr->textureCount);
 
-    for (int i = 0; i < modelAsset->studiohdr.textureCount; ++i)
+    for (int i = 0; i < pStudioHdr->textureCount; ++i)
     {
-        ModelMaterialData_t& matlData = modelAsset->materials.at(i);
+        ModelMaterialData_t& matlData = parsedData->materials.at(i);
         const mstudiotexture_t* const texture = &pTextures[i];
 
         const std::string skn = std::format("material/{}_skn.rpak", texture->pszName());
@@ -221,39 +263,39 @@ void ParseSourceModelTextureData(ModelAsset* const modelAsset)
 
         if (sknAsset)
         {
-            matlData.materialAsset = sknAsset;
-            matlData.materialGuid = sknGUID;
+            matlData.asset = sknAsset;
+            matlData.guid = sknGUID;
         }
         else if (fixAsset)
         {
-            matlData.materialAsset = sknAsset;
-            matlData.materialGuid = fixGUID;
+            matlData.asset = sknAsset;
+            matlData.guid = fixGUID;
         }
         else
         {
-            matlData.materialAsset = nullptr;
-            matlData.materialGuid = 0;
+            matlData.asset = nullptr;
+            matlData.guid = 0;
         }
 
-        matlData.materialName = texture->pszName();
+        matlData.name = texture->pszName();
     }
 
-    // look into this (names)
-    modelAsset->skins.reserve(pStudioHdr->numSkinFamilies);
+    // [rika]: skin names will be fixed up in the load function
+    parsedData->skins.reserve(pStudioHdr->numSkinFamilies);
     for (int i = 0; i < pStudioHdr->numSkinFamilies; i++)
-        modelAsset->skins.emplace_back(STUDIO_NULL_SKIN_NAME, pStudioHdr->pSkinFamily(i));
+        parsedData->skins.emplace_back(STUDIO_NULL_SKIN_NAME, pStudioHdr->pSkinFamily(i));
 }
 
 template<typename mstudiobone_t>
-void ParseSouceModelBoneData(ModelAsset* const modelAsset)
+void ParseSouceModelBoneData(ModelParsedData_t* const parsedData)
 {
-    const mstudiobone_t* const bones = reinterpret_cast<mstudiobone_t*>((char*)modelAsset->data + modelAsset->studiohdr.boneOffset);
-    modelAsset->bones.resize(modelAsset->studiohdr.boneCount);
+    const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
 
-    for (int i = 0; i < modelAsset->studiohdr.boneCount; i++)
-    {
-        modelAsset->bones.at(i) = ModelBone_t(&bones[i]);
-    }
+    const mstudiobone_t* const bones = reinterpret_cast<const mstudiobone_t* const>(pStudioHdr->pBones());
+    parsedData->bones.resize(pStudioHdr->boneCount);
+
+    for (int i = 0; i < pStudioHdr->boneCount; i++)
+        parsedData->bones.at(i) = ModelBone_t(&bones[i]);
 }
 
 void LoadSourceModelAsset(CAssetContainer* container, CAsset* asset)
@@ -261,7 +303,8 @@ void LoadSourceModelAsset(CAssetContainer* container, CAsset* asset)
     CSourceModelAsset* const srcMdlAsset = static_cast<CSourceModelAsset* const>(asset);
     CSourceModelSource* const srcMdlSource = static_cast<CSourceModelSource* const>(container);
 
-    ModelAsset* mdlAsset = nullptr;
+    ModelParsedData_t* parsedData = nullptr;
+    StudioLooseData_t* looseData = nullptr;
 
     switch (srcMdlAsset->GetAssetVersion().majorVer)
     {
@@ -269,100 +312,38 @@ void LoadSourceModelAsset(CAssetContainer* container, CAsset* asset)
     {
         r1::studiohdr_t* const pStudioHdr = reinterpret_cast<r1::studiohdr_t* const>(srcMdlAsset->GetAssetData());
 
-        // next section is to fill out the StudioLooseData_t struct so we can properly store the loose files
-        // parse and load our vertex files
-        StudioLooseData_t looseData = {};
-
-        std::filesystem::path filePath = srcMdlSource->GetFilePath();
-
         CManagedBuffer* buffer = g_BufferManager->ClaimBuffer();
-        char* curpos = buffer->Buffer(); // current position in the buffer
-        size_t curoff = 0ull; // current offset in the buffer
 
-        const char* const fileStem = keepAfterLastSlashOrBackslash(pStudioHdr->pszName());
-
-        for (int i = 0; i < StudioLooseData_t::SLD_COUNT; i++)
-        {
-            filePath.replace_filename(fileStem); // because of vtx file extension
-            filePath.replace_extension(s_StudioLooseDataExtensions[i]);
-
-            if (!std::filesystem::exists(filePath))
-            {
-                looseData.vertexDataOffset[i] = static_cast<int>(curoff);
-                looseData.vertexDataSize[i] = 0;
-
-                continue;
-            }
-
-            const size_t fileSize = std::filesystem::file_size(filePath);
-            std::unique_ptr<char[]> fileBuf = std::make_unique<char[]>(fileSize);
-
-            StreamIO fileIn(filePath, eStreamIOMode::Read);
-            fileIn.R()->read(curpos, fileSize);
-
-            looseData.vertexDataOffset[i] = static_cast<int>(curoff);
-            looseData.vertexDataSize[i] = static_cast<int>(fileSize);
-
-            curoff += IALIGN16(fileSize);
-            curpos += IALIGN16(fileSize);
-
-            assertm(curoff < managedBufferSize, "overflowed managed buffer");
-        }
-
-        char* const vertexBuf = new char[curoff];
-        memcpy_s(vertexBuf, curoff, buffer->Buffer(), curoff);
-        srcMdlAsset->SetExtraData(vertexBuf, CSourceModelAsset::SRCMDL_VERT);
-
-        // parse and load phys
-        {
-            filePath.replace_extension(".phy");
-
-            if (!std::filesystem::exists(filePath))
-            {
-                looseData.physicsDataOffset = 0;
-                looseData.physicsDataSize = 0;
-            }
-            else
-            {
-                const size_t fileSize = std::filesystem::file_size(filePath);
-                std::unique_ptr<char[]> fileBuf = std::make_unique<char[]>(fileSize);
-
-                StreamIO fileIn(filePath, eStreamIOMode::Read);
-                fileIn.R()->read(buffer->Buffer(), fileSize);
-
-                looseData.physicsDataOffset = 0;
-                looseData.physicsDataSize = static_cast<int>(fileSize);
-            }
-        }
-
-        char* const physicsBuf = new char[looseData.physicsDataSize];
-        memcpy_s(physicsBuf, looseData.physicsDataSize, buffer->Buffer(), looseData.physicsDataSize);
-        srcMdlAsset->SetExtraData(physicsBuf, CSourceModelAsset::SRCMDL_PHYS);
-
-        // here's where ani will go when I do animations (soontm)
+        looseData = new StudioLooseData_t(srcMdlSource->GetFilePath(), pStudioHdr->pszName(), buffer->Buffer());
 
         g_BufferManager->RelieveBuffer(buffer);
 
-        looseData.vertexDataBuffer = srcMdlAsset->GetExtraData(CSourceModelAsset::SRCMDL_VERT);
-        looseData.physicsDataBuffer = srcMdlAsset->GetExtraData(CSourceModelAsset::SRCMDL_PHYS);
+        // these are now managed by the asset
+        srcMdlAsset->SetExtraData(looseData->VertBuf(), CSourceModelAsset::SRCMDL_VERT);
+        srcMdlAsset->SetExtraData(looseData->PhysBuf(), CSourceModelAsset::SRCMDL_PHYS);
 
-        // model asset
-        mdlAsset = new ModelAsset(pStudioHdr, &looseData);
+        // parsed data
+        parsedData = new ModelParsedData_t(pStudioHdr, looseData);
 
-        ParseSouceModelBoneData<r1::mstudiobone_t>(mdlAsset);
-        ParseSourceModelTextureData<r1::mstudiotexture_t>(mdlAsset);
-        ParseSourceModelVertexData<r1::studiohdr_t, r1::mstudiomesh_t>(mdlAsset);
+        ParseSouceModelBoneData<r1::mstudiobone_t>(parsedData);
+        ParseSourceModelTextureData<r1::mstudiotexture_t>(parsedData);
+        ParseSourceModelVertexData<r1::studiohdr_t, r1::mstudiomesh_t>(parsedData, looseData);
+
+        srcMdlAsset->SetName(pStudioHdr->pszName());
 
         break;
     }
     case 53:
     {
         r2::studiohdr_t* const pStudioHdr = reinterpret_cast<r2::studiohdr_t* const>(srcMdlAsset->GetAssetData());
-        mdlAsset = new ModelAsset(pStudioHdr);
+        looseData = new StudioLooseData_t(reinterpret_cast<char*>(pStudioHdr));
+        parsedData = new ModelParsedData_t(pStudioHdr);
 
-        ParseSouceModelBoneData<r2::mstudiobone_t>(mdlAsset);
-        ParseSourceModelTextureData<r2::mstudiotexture_t>(mdlAsset);
-        ParseSourceModelVertexData<r2::studiohdr_t, r2::mstudiomesh_t>(mdlAsset);
+        ParseSouceModelBoneData<r2::mstudiobone_t>(parsedData);
+        ParseSourceModelTextureData<r2::mstudiotexture_t>(parsedData);
+        ParseSourceModelVertexData<r2::studiohdr_t, r2::mstudiomesh_t>(parsedData, looseData);
+
+        srcMdlAsset->SetName(pStudioHdr->pszName());
 
         // include models
 
@@ -375,10 +356,17 @@ void LoadSourceModelAsset(CAssetContainer* container, CAsset* asset)
     }
     }
 
-    srcMdlAsset->SetAssetName(mdlAsset->name);
-    srcMdlAsset->SetModelAsset(mdlAsset);
+    assertm(srcMdlAsset->GetName(), "model should have name, invalid model.");
 
-    srcMdlSource->SetFileName(keepAfterLastSlashOrBackslash(mdlAsset->name));
+    const std::string name = std::format("{}/{}", s_PathPrefixMDL, srcMdlAsset->GetName());
+
+    srcMdlAsset->SetAssetName(name);
+    srcMdlAsset->SetParsedData(parsedData);
+    srcMdlAsset->SetLooseData(looseData);
+
+    srcMdlSource->SetFileName(keepAfterLastSlashOrBackslash(srcMdlAsset->GetName()));
+
+    srcMdlAsset->FixupSkinData();
 }
 
 void PostLoadSourceModelAsset(CAssetContainer* container, CAsset* asset)
@@ -386,92 +374,344 @@ void PostLoadSourceModelAsset(CAssetContainer* container, CAsset* asset)
     UNUSED(container);
 
     CSourceModelAsset* const srcMdlAsset = static_cast<CSourceModelAsset* const>(asset);
-    ModelAsset* const modelAsset = srcMdlAsset->GetModelAsset();
-
-    if (modelAsset->lods.empty())
+    ModelParsedData_t* const parsedData = srcMdlAsset->GetParsedData();
+    
+    if (parsedData->lods.empty())
         return;
 
-    const size_t lodLevel = 0;
+    const size_t lod = 0;
 
-    if (!modelAsset->drawData)
-    {
-        modelAsset->drawData = new CDXDrawData();
-        modelAsset->drawData->meshBuffers.resize(modelAsset->lods.at(lodLevel).meshes.size());
-        modelAsset->drawData->modelName = modelAsset->name;
-    }
+    if (!srcMdlAsset->GetDrawData())
+        srcMdlAsset->AllocateDrawData(lod);
 
-    // [rika]: eventually parse through models
-    CDXDrawData* const drawData = modelAsset->drawData;
-    for (size_t i = 0; i < modelAsset->lods.at(lodLevel).meshes.size(); ++i)
-    {
-        const ModelMeshData_t& mesh = modelAsset->lods.at(lodLevel).meshes.at(i);
-        DXMeshDrawData_t* const meshDrawData = &drawData->meshBuffers[i];
-
-        meshDrawData->visible = true;
-
-        if (mesh.material)
-            meshDrawData->uberStaticBuf = mesh.material->uberStaticBuffer;
-
-        assertm(mesh.meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
-
-        std::unique_ptr<char[]> parsedVertexDataBuf = modelAsset->meshVertexData.getIdx(mesh.meshVertexDataIndex);
-        const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
-
-        if (!meshDrawData->vertexBuffer)
-        {
-#if defined(ADVANCED_MODEL_PREVIEW)
-            const UINT vertStride = mesh.vertCacheSize;
-#else
-            const UINT vertStride = sizeof(Vertex_t);
-#endif
-
-            D3D11_BUFFER_DESC desc = {};
-
-            desc.Usage = D3D11_USAGE_DYNAMIC;
-            desc.ByteWidth = vertStride * mesh.vertCount;
-            desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-            desc.MiscFlags = 0;
-
-#if defined(ADVANCED_MODEL_PREVIEW)
-            const void* vertexData = mesh.rawVertexData;
-#else
-            const void* vertexData = parsedVertexData->GetVertices();
-#endif
-
-            D3D11_SUBRESOURCE_DATA srd{ vertexData };
-
-            if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData->vertexBuffer)))
-                return;
-
-            meshDrawData->vertexStride = vertStride;
-
-#if defined(ADVANCED_MODEL_PREVIEW)
-            delete[] mesh.rawVertexData;
-#endif
-        }
-
-        if (!meshDrawData->indexBuffer)
-        {
-            D3D11_BUFFER_DESC desc = {};
-
-            desc.Usage = D3D11_USAGE_DYNAMIC;
-            desc.ByteWidth = static_cast<UINT>(mesh.indexCount * sizeof(uint16_t));
-            desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-            desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-            desc.MiscFlags = 0;
-
-            D3D11_SUBRESOURCE_DATA srd = { parsedVertexData->GetIndices() };
-            if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData->indexBuffer)))
-                return;
-
-            meshDrawData->numIndices = mesh.indexCount;
-        }
-    }
+    ParseModelDrawData(parsedData, srcMdlAsset->GetDrawData(), lod);
 }
 
-extern void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset);
-extern bool ExportModelAsset(CAsset* const asset, const int setting);
+// [rika]: todo remove duplicate code and make one function (PreviewModelAsset)
+void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset)
+{
+    CSourceModelAsset* const srcMdlAsset = static_cast<CSourceModelAsset*>(asset);
+    assertm(srcMdlAsset, "Asset should be valid.");
+
+
+    CDXDrawData* const drawData = srcMdlAsset->GetDrawData();
+    if (!drawData)
+        return nullptr;
+
+    ModelParsedData_t* const parsedData = srcMdlAsset->GetParsedData();
+
+    static std::vector<size_t> bodygroupModelSelected;
+    static size_t lastSelectedBodypartIndex = 0;
+    static size_t selectedBodypartIndex = 0;
+
+    static size_t lastSelectedSkinIndex = 0;
+    static size_t selectedSkinIndex = 0;
+
+    static size_t lodLevel = 0;
+
+    if (firstFrameForAsset)
+    {
+        bodygroupModelSelected.clear();
+
+        bodygroupModelSelected.resize(parsedData->bodyParts.size(), 0ull);
+
+        selectedBodypartIndex = selectedBodypartIndex > parsedData->bodyParts.size() ? 0 : selectedBodypartIndex;
+        selectedSkinIndex = selectedSkinIndex > parsedData->skins.size() ? 0 : selectedSkinIndex;
+    }
+
+    assertm(parsedData->lods.size() > 0, "no lods in preview?");
+    const ModelLODData_t& lodData = parsedData->lods.at(lodLevel);
+
+    ImGui::Text("Bones: %llu", parsedData->bones.size());
+    ImGui::Text("LODs: %llu", parsedData->lods.size());
+    //ImGui::Text("Rigs: %i", modelAsset->numAnimRigs);
+    ImGui::Text("Sequences: %i", srcMdlAsset->GetSequenceCount());
+
+    if (parsedData->skins.size())
+    {
+        ImGui::TextUnformatted("Skins:");
+        ImGui::SameLine();
+
+        // [rika]: cheat a little here since the first skin name should always be 'STUDIO_DEFAULT_SKIN_NAME'
+        static const char* label = nullptr;
+        if (firstFrameForAsset)
+            label = STUDIO_DEFAULT_SKIN_NAME;
+
+        if (ImGui::BeginCombo("##SKins", label, ImGuiComboFlags_NoArrowButton))
+        {
+            for (size_t i = 0; i < parsedData->skins.size(); i++)
+            {
+                const ModelSkinData_t& skin = parsedData->skins.at(i);
+
+                const bool isSelected = selectedSkinIndex == i || (firstFrameForAsset && selectedSkinIndex == lastSelectedSkinIndex);
+
+                if (ImGui::Selectable(skin.name, isSelected))
+                {
+                    selectedSkinIndex = i;
+                    label = skin.name;
+                }
+
+                if (isSelected) ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::EndCombo();
+        }
+    }
+
+    g_ExportSettings.previewedSkinIndex = static_cast<int>(selectedSkinIndex);
+
+    if (parsedData->bodyParts.size())
+    {
+        ImGui::TextUnformatted("Bodypart:");
+        ImGui::SameLine();
+
+        // [rika]: previous implemention was loading an invalid string upon loading different files without closing the tool
+        static const char* bodypartLabel = nullptr;
+        if (firstFrameForAsset)
+            bodypartLabel = parsedData->bodyParts.at(0).GetNameCStr();
+
+        if (ImGui::BeginCombo("##Bodypart", bodypartLabel, ImGuiComboFlags_NoArrowButton))
+        {
+            for (size_t i = 0; i < parsedData->bodyParts.size(); i++)
+            {
+                const ModelBodyPart_t& bodypart = parsedData->bodyParts.at(i);
+
+                const bool isSelected = selectedBodypartIndex == i || (firstFrameForAsset && selectedBodypartIndex == lastSelectedBodypartIndex);
+
+                if (ImGui::Selectable(bodypart.GetNameCStr(), isSelected))
+                {
+                    selectedBodypartIndex = i;
+                    bodypartLabel = bodypart.GetNameCStr();
+                }
+
+                if (isSelected) ImGui::SetItemDefaultFocus();
+            }
+
+            ImGui::EndCombo();
+        }
+
+        if (parsedData->bodyParts.at(selectedBodypartIndex).numModels > 1)
+        {
+            const ModelBodyPart_t& bodypart = parsedData->bodyParts.at(selectedBodypartIndex);
+            size_t& selectedModelIndex = bodygroupModelSelected.at(selectedBodypartIndex);
+
+            ImGui::TextUnformatted("Model:");
+            ImGui::SameLine();
+
+            static const char* label = nullptr;
+
+            // update label if our bodypart changes
+            if (selectedBodypartIndex != lastSelectedBodypartIndex || firstFrameForAsset)
+                label = lodData.models.at(bodypart.modelIndex + selectedModelIndex).name.c_str();
+
+            if (ImGui::BeginCombo("##Model", label, ImGuiComboFlags_NoArrowButton))
+            {
+                for (int i = 0; i < bodypart.numModels; i++)
+                {
+                    const bool isSelected = selectedModelIndex == i;
+
+                    const char* tmp = lodData.models.at(bodypart.modelIndex + i).name.c_str();
+                    if (ImGui::Selectable(tmp, isSelected))
+                    {
+                        selectedModelIndex = static_cast<size_t>(i);
+                        label = tmp;
+                    }
+
+                    if (isSelected) ImGui::SetItemDefaultFocus();
+                }
+
+                ImGui::EndCombo();
+            }
+        }
+    }
+
+    // [rika]: our currently selected skin
+    const ModelSkinData_t& skinData = parsedData->skins.at(selectedSkinIndex);
+    for (size_t i = 0; i < lodData.meshes.size(); ++i)
+    {
+        const ModelMeshData_t& mesh = lodData.meshes.at(i);
+        DXMeshDrawData_t* const meshDrawData = &drawData->meshBuffers[i];
+
+        // the rest of this loop requires the material to be valid
+        // so if it isn't just continue to the next iteration
+        CPakAsset* const matlAsset = parsedData->materials.at(skinData.indices[mesh.materialId]).asset;
+        if (!matlAsset)
+            continue;
+
+        const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlAsset->extraData());
+
+        // If this body part is disabled, don't draw the mesh.
+        drawData->meshBuffers[i].visible = parsedData->bodyParts[mesh.bodyPartIndex].IsPreviewEnabled();
+
+        const ModelBodyPart_t& bodypart = parsedData->bodyParts[mesh.bodyPartIndex];
+        const ModelModelData_t& model = lodData.models.at(bodypart.modelIndex + bodygroupModelSelected.at(mesh.bodyPartIndex));
+        if (i >= model.meshIndex && i < model.meshIndex + model.meshCount)
+            drawData->meshBuffers[i].visible = true;
+        else
+            drawData->meshBuffers[i].visible = false;
+
+        if (matl->shaderSetAsset)
+        {
+            ShaderSetAsset* const shaderSet = reinterpret_cast<ShaderSetAsset*>(matl->shaderSetAsset->extraData());
+
+            if (shaderSet->vertexShaderAsset && shaderSet->pixelShaderAsset)
+            {
+                ShaderAsset* const vertexShader = reinterpret_cast<ShaderAsset*>(shaderSet->vertexShaderAsset->extraData());
+                ShaderAsset* const pixelShader = reinterpret_cast<ShaderAsset*>(shaderSet->pixelShaderAsset->extraData());
+
+                meshDrawData->vertexShader = vertexShader->vertexShader;
+                meshDrawData->pixelShader = pixelShader->pixelShader;
+
+                meshDrawData->inputLayout = vertexShader->vertexInputLayout;
+            }
+        }
+
+        if ((meshDrawData->textures.size() == 0 || lastSelectedSkinIndex != selectedSkinIndex) && matl)
+        {
+            meshDrawData->textures.clear();
+            for (auto& texEntry : matl->txtrAssets)
+            {
+                if (texEntry.asset)
+                {
+                    TextureAsset* txtr = reinterpret_cast<TextureAsset*>(texEntry.asset->extraData());
+                    const std::shared_ptr<CTexture> highestTextureMip = CreateTextureFromMip(texEntry.asset, &txtr->mipArray[txtr->mipArray.size() - 1], s_PakToDxgiFormat[txtr->imgFormat]);
+                    meshDrawData->textures.push_back({ texEntry.index, highestTextureMip });
+                }
+            }
+        }
+    }
+
+    if (!drawData->boneMatrixBuffer)
+        InitModelBoneMatrix(drawData, parsedData);
+
+
+    if (!drawData->transformsBuffer)
+    {
+        D3D11_BUFFER_DESC desc{};
+
+        constexpr UINT transformsBufferSizeAligned = IALIGN(sizeof(VS_TransformConstants), 16);
+
+        desc.ByteWidth = transformsBufferSizeAligned;
+
+        // make sure this buffer can be updated every frame
+        desc.Usage = D3D11_USAGE_DYNAMIC;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+        // const buffer
+        desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+
+        g_dxHandler->GetDevice()->CreateBuffer(&desc, NULL, &drawData->transformsBuffer);
+    }
+
+    D3D11_MAPPED_SUBRESOURCE resource;
+    g_dxHandler->GetDeviceContext()->Map(
+        drawData->transformsBuffer, 0,
+        D3D11_MAP_WRITE_DISCARD, 0,
+        &resource
+    );
+
+    CDXCamera* const camera = g_dxHandler->GetCamera();
+    const XMMATRIX view = camera->GetViewMatrix();
+    const XMMATRIX model = XMMatrixTranslationFromVector(drawData->position.AsXMVector());
+    const XMMATRIX projection = g_dxHandler->GetProjMatrix();
+
+    VS_TransformConstants* const transforms = reinterpret_cast<VS_TransformConstants*>(resource.pData);
+    transforms->modelMatrix = XMMatrixTranspose(model);
+    transforms->viewMatrix = XMMatrixTranspose(view);
+    transforms->projectionMatrix = XMMatrixTranspose(projection);
+
+    if (lastSelectedBodypartIndex != selectedBodypartIndex)
+        lastSelectedBodypartIndex = selectedBodypartIndex;
+
+    if (lastSelectedSkinIndex != selectedSkinIndex)
+        lastSelectedSkinIndex = selectedSkinIndex;
+
+    g_dxHandler->GetDeviceContext()->Unmap(drawData->transformsBuffer, 0);
+
+    return srcMdlAsset->GetDrawData();
+}
+
+bool ExportSourceModelAsset(CAsset* const asset, const int setting)
+{
+    UNUSED(setting);
+
+    // fix our setting
+    if (!g_assetData.m_assetTypeBindings.count(static_cast<uint32_t>(AssetType_t::MDL_)))
+    {
+        assertm(false, "bad export setting");
+        return false;
+    }
+
+    const int settingFixup = g_assetData.m_assetTypeBindings.find(static_cast<uint32_t>(AssetType_t::MDL_))->second.e.exportSetting;
+
+    CSourceModelAsset* const srcMdlAsset = static_cast<CSourceModelAsset* const>(asset);
+    assertm(srcMdlAsset, "Asset should be valid.");
+
+    // Create exported path + asset path.
+    std::filesystem::path exportPath = std::filesystem::current_path().append(EXPORT_DIRECTORY_NAME);
+    const std::filesystem::path modelPath(srcMdlAsset->GetAssetName());
+    const std::string modelStem(modelPath.stem().string());
+
+    // truncate paths?
+    if (g_ExportSettings.exportPathsFull)
+    {
+        exportPath.append(modelPath.parent_path().string());
+    }
+    else
+    {
+        exportPath.append(s_PathPrefixMDL);
+        exportPath.append(modelStem);
+    }
+
+    if (!CreateDirectories(exportPath))
+    {
+        assertm(false, "Failed to create asset directory.");
+        return false;
+    }
+
+    // [rika]: handle sequence exporting
+    if (g_ExportSettings.exportRigSequences && srcMdlAsset->GetSequenceCount() > 0)
+    {
+        const uint32_t type = static_cast<uint32_t>(AssetType_t::SEQ);
+
+        assertm(g_assetData.m_assetTypeBindings.contains(type), "did not contain asset binding for source sequences");
+
+        const AssetTypeBinding_t& binding = g_assetData.m_assetTypeBindings.find(type)->second;
+
+        for (int i = 0; i < srcMdlAsset->GetSequenceCount(); i++)
+        {
+            const uint64_t guid = srcMdlAsset->GetSequenceGUID(i);
+
+            CSourceSequenceAsset* const sequence = static_cast<CSourceSequenceAsset*>(g_assetData.FindAssetByGUID(guid));
+            if (!sequence)
+                continue;
+
+            binding.e.exportFunc(sequence, binding.e.exportSetting);
+        }
+    }
+
+    exportPath.append(std::format("{}.mdl", modelStem));    
+
+    const ModelParsedData_t* const parsedData = srcMdlAsset->GetParsedData();
+    switch (settingFixup)
+    {
+    case eModelExportSetting::MODEL_CAST:
+    {
+        return ExportModelCast(parsedData, exportPath, asset->GetAssetGUID());
+    }
+    case eModelExportSetting::MODEL_RMAX:
+    {
+        return ExportModelRMAX(parsedData, exportPath);
+    }
+    default:
+    {
+        assertm(false, "Export setting is not handled.");
+        return false;
+    }
+    }
+
+    unreachable();
+}
 
 void InitSourceModelAssetType()
 {
@@ -481,8 +721,8 @@ void InitSourceModelAssetType()
         .headerAlignment = 8,
         .loadFunc = LoadSourceModelAsset,
         .postLoadFunc = PostLoadSourceModelAsset,
-        .previewFunc = PreviewModelAsset,
-        .e = { ExportModelAsset, 0, nullptr, 0ull },
+        .previewFunc = PreviewSourceModelAsset,
+        .e = { ExportSourceModelAsset, 0, nullptr, 0ull },
     };
 
     REGISTER_TYPE(type);
@@ -531,7 +771,7 @@ void PostLoadSourceSequenceAsset(CAssetContainer* const container, CAsset* const
         return;
     }
 
-    srcSeqAsset->SetRig(&srcMdlAsset->GetModelAsset()->bones); // bone
+    srcSeqAsset->SetRig(srcMdlAsset->GetRig()); // bone
     const std::vector<ModelBone_t>* bones = srcSeqAsset->GetRig();
     assertm(!bones->empty(), "we should have bones at this point.");
 
@@ -665,18 +905,17 @@ void PostLoadSourceSequenceAsset(CAssetContainer* const container, CAsset* const
     srcSeqAsset->SetParsed();
 }
 
-extern bool ExportSeqDescRMAX(const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones);
-extern bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones, const uint64_t guid);
-
-// MUST MATCH ASEQ!
-enum eSrcSeqExportSetting
+void* PreviewSourceSequenceAsset(CAsset* const asset, const bool firstFrameForAsset)
 {
-    SEQ_CAST,
-    SEQ_RMAX,
-    SEQ_NULL, // RSEQ
-};
+    UNUSED(firstFrameForAsset);
 
-static const char* const s_PathPrefixASEQ = s_AssetTypePaths.find(AssetType_t::ASEQ)->second;
+    const CSourceSequenceAsset* const srcSeqAsset = static_cast<CSourceSequenceAsset*>(asset);
+
+    PreviewSeqDesc(srcSeqAsset->GetSequence());
+
+    return nullptr;
+}
+
 bool ExportSourceSequenceAsset(CAsset* const asset, const int setting)
 {
     UNUSED(setting);
@@ -689,6 +928,10 @@ bool ExportSourceSequenceAsset(CAsset* const asset, const int setting)
     }
 
     const int settingFixup = g_assetData.m_assetTypeBindings.find(static_cast<uint32_t>(AssetType_t::ASEQ))->second.e.exportSetting;
+
+    // [rika]: don't support exporting the raw data as it should be stored in the model file
+    if (settingFixup == eAnimSeqExportSetting::ANIMSEQ_RSEQ)
+        return true;
 
     CSourceSequenceAsset* const srcSeqAsset = static_cast<CSourceSequenceAsset* const>(asset);
 
@@ -710,9 +953,14 @@ bool ExportSourceSequenceAsset(CAsset* const asset, const int setting)
 
     // truncate paths?
     if (g_ExportSettings.exportPathsFull)
+    {
         exportPath.append(seqPath.parent_path().string());
+    }
     else
-        exportPath.append(std::format("{}/{}/{}", s_PathPrefixASEQ, srcStem, seqStem));
+    {
+        exportPath.append(s_PathPrefixSEQ);
+        exportPath.append(srcStem);
+    }
 
     if (!CreateDirectories(exportPath))
     {
@@ -730,11 +978,11 @@ bool ExportSourceSequenceAsset(CAsset* const asset, const int setting)
     switch (settingFixup)
     {
 
-    case eSrcSeqExportSetting::SEQ_CAST:
+    case eAnimSeqExportSetting::ANIMSEQ_CAST:
     {
         return ExportSeqDescCast(srcSeqAsset->GetSequence(), exportPathCop, srcMdlAsset->GetAssetName().c_str(), bones, asset->GetAssetGUID());
     }
-    case eSrcSeqExportSetting::SEQ_RMAX:
+    case eAnimSeqExportSetting::ANIMSEQ_RMAX:
     {
         return ExportSeqDescRMAX(srcSeqAsset->GetSequence(), exportPathCop, srcMdlAsset->GetAssetName().c_str(), bones);
     }
@@ -754,7 +1002,7 @@ void InitSourceSequenceAssetType()
         .headerAlignment = 8,
         .loadFunc = LoadSourceSequenceAsset,
         .postLoadFunc = PostLoadSourceSequenceAsset,
-        .previewFunc = nullptr,
+        .previewFunc = PreviewSourceSequenceAsset,
         .e = { ExportSourceSequenceAsset, 0, nullptr, 0ull },
     };
 

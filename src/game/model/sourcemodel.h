@@ -1,10 +1,5 @@
 #pragma once
 #include <game/asset.h>
-#include <game/rtech/assets/model.h>
-
-// erm what the heck
-extern inline void ParseVertexFromVTX(Vertex_t* const vert, VertexWeight_t* const weights, Vector2D* const texcoords, ModelMeshData_t* mesh, const OptimizedModel::Vertex_t* const pVertex, const vvd::mstudiovertex_t* const pVerts, const Vector4D* const pTangs, const Color32* const pColors, const Vector2D* const pUVs,
-	int& weightIdx, const bool isHwSkinned, const OptimizedModel::BoneStateChangeHeader_t* const pBoneStates);
 
 class CSourceModelSource : public CAssetContainer
 {
@@ -30,7 +25,7 @@ private:
 class CSourceModelAsset : public CAsset
 {
 public:
-	CSourceModelAsset(const studiohdr_short_t* const pStudioHdr)
+	CSourceModelAsset(const studiohdr_short_t* const pStudioHdr) : m_modelParsed(nullptr), m_modelDrawData(nullptr), m_sequences(nullptr), m_numSequences(0)
 	{
 		const int length = pStudioHdr->length();
         char* tmpBuf = new char[length];
@@ -47,17 +42,23 @@ public:
 
 	~CSourceModelAsset()
 	{
-        if (m_assetData)
-            delete[] m_assetData;
+		FreeAllocArray(m_assetData);
+		FreeAllocVar(m_modelParsed);
+		FreeAllocVar(m_modelLoose);
+		FreeAllocVar(m_modelDrawData);
 
-		if (m_modelAsset)
-			delete m_modelAsset;
+		if (m_numModelSkinNames)
+		{
+			for (int i = 0; i < m_numModelSkinNames; i++)
+				FreeAllocArray(m_modelSkinNames[i]);
+
+			FreeAllocArray(m_modelSkinNames);
+		}
 
 		for (int i = 0; i < ExtraData::SRCMDL_COUNT; i++)
-		{
-			if (m_assetDataExtra[i])
-				delete[] m_assetDataExtra[i];
-		}
+			FreeAllocArray(m_assetDataExtra[i]);
+
+		FreeAllocArray(m_sequences);
 	};
 
 	enum ExtraData
@@ -73,20 +74,53 @@ public:
 	const ContainerType GetAssetContainerType() const { return ContainerType::MDL; }
 	std::string GetContainerFileName() const { return static_cast<CSourceModelSource*>(m_containerFile)->GetFileName(); }
 
-	const void* GetInternalAssetData() { return m_assetData; }
-	const uint64_t GetAssetGUID() const { return m_assetGuid; }
-	ModelAsset* const GetModelAsset() const { return m_modelAsset; }
-	char* const GetExtraData(const ExtraData type) { return m_assetDataExtra[type]; }
+	inline const void* GetInternalAssetData() { return m_assetData; }
+	inline const uint64_t GetAssetGUID() const { return m_assetGuid; }
+	inline char* const GetExtraData(const ExtraData type) { return m_assetDataExtra[type]; }
 
-	void SetAssetGUID(const uint64_t guid) { m_assetGuid = guid; }
-	void SetModelAsset(ModelAsset* const mdlAsset) { m_modelAsset = mdlAsset; }
-	void SetExtraData(char* const data, const ExtraData type) { m_assetDataExtra[type] = data; }
+	inline void SetAssetGUID(const uint64_t guid) { m_assetGuid = guid; }
+	inline void SetExtraData(char* const data, const ExtraData type) { m_assetDataExtra[type] = data; }
+
+	inline void SetParsedData(ModelParsedData_t* const parsedData) { m_modelParsed = parsedData; }
+	inline void SetLooseData(StudioLooseData_t* const looseData) { m_modelLoose = looseData; }
+	inline void SetName(char* const name) { m_modelName = name; }
+	void SetSequenceList(uint64_t* guids, const int count)
+	{
+		m_sequences = guids;
+		m_numSequences = count;
+	}
+
+	inline ModelParsedData_t* const GetParsedData() const { return m_modelParsed; }
+	inline StudioLooseData_t* const GetLooseData() const { return m_modelLoose; }
+	inline const char* const GetName() const { return m_modelName; }
+	inline const int GetSequenceCount() const { return m_numSequences; }
+	inline const uint64_t GetSequenceGUID(const int index) const { return m_sequences[index]; }
+	inline const std::vector<ModelBone_t>* const GetRig() const { return m_modelParsed ? &m_modelParsed->bones : nullptr; }
+	inline CDXDrawData* const GetDrawData() const { return m_modelDrawData; }
+
+	inline void AllocateDrawData(const uint64_t lod)
+	{
+		m_modelDrawData = new CDXDrawData();
+		m_modelDrawData->meshBuffers.resize(m_modelParsed->lods.at(lod).meshes.size());
+		m_modelDrawData->modelName = m_modelName;
+	}
+
+	void FixupSkinData();
 
 private:
 	uint64_t m_assetGuid;
-	ModelAsset* m_modelAsset; // todo: eliminate this
-
 	char* m_assetDataExtra[ExtraData::SRCMDL_COUNT];
+
+	ModelParsedData_t* m_modelParsed;
+	StudioLooseData_t* m_modelLoose;
+	CDXDrawData* m_modelDrawData;
+	char* m_modelName;
+
+	char** m_modelSkinNames;
+	int m_numModelSkinNames;
+
+	int m_numSequences;
+	uint64_t* m_sequences;
 };
 
 class CSourceSequenceAsset : public CAsset
@@ -109,8 +143,7 @@ public:
 	{
 		// m_assetData should be allocated to a model asset.
 
-		if (m_sequence)
-			delete m_sequence;
+		FreeAllocVar(m_sequence);
 	};
 
 	uint32_t GetAssetType() const { return 'qes'; }

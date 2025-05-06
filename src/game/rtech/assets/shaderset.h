@@ -55,6 +55,7 @@ struct ShaderSetAssetHeader_v11_t
 static_assert(sizeof(ShaderSetAssetHeader_v11_t) == 64);
 static_assert(offsetof(ShaderSetAssetHeader_v11_t, reserved_vsInputLayoutIds) == 0x20);
 
+// [rika]: newer versions of v13 use this header, seemingly omitting unk_40
 struct ShaderSetAssetHeader_v12_t
 {
 	uint64_t reserved_vftable;

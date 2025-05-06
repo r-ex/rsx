@@ -5,6 +5,18 @@
 
 extern ExportSettings_t g_ExportSettings;
 
+inline std::string FormatTextureAssetName(const char* const str)
+{
+    std::string name(str);
+    if (!name.starts_with("texture/"))
+        name = "texture/" + name;
+
+    if (!name.ends_with(".rpak"))
+        name += ".rpak";
+
+    return name;
+}
+
 #undef max
 void LoadTextureAsset(CAssetContainer* const pak, CAsset* const asset)
 {
@@ -43,12 +55,7 @@ void LoadTextureAsset(CAssetContainer* const pak, CAsset* const asset)
 
     if (txtrAsset->name)
     {
-        std::string name = txtrAsset->name;
-        if (!name.starts_with("texture/"))
-            name = "texture/" + name;
-
-        if (!name.ends_with(".rpak"))
-            name += ".rpak";
+        std::string name = FormatTextureAssetName(txtrAsset->name);
 
         pakAsset->SetAssetName(name);
     }
@@ -628,7 +635,7 @@ void* PreviewTextureAsset(CAsset* const asset, const bool firstFrameForAsset)
         constexpr const char* const zoomHelpText = "Hold CTRL and scroll to zoom";
         IMGUI_RIGHT_ALIGN_FOR_TEXT(zoomHelpText);
         ImGui::TextUnformatted(zoomHelpText);
-        if (ImGui::BeginChild("Texture Preview", ImVec2(0.f, 0.f), true, ImGuiWindowFlags_HorizontalScrollbar))
+        if (ImGui::BeginChild("Texture Preview", ImVec2(0.f, 0.f), true, ImGuiWindowFlags_HorizontalScrollbar)) // [rika]: todo smaller screens will not have the most ideal viewing experience do to the image being squashed
         {
             const bool previewHovering = ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
             ImGui::Image(selectedMipTxtr->GetSRV(), ImVec2(imageWidth, imageHeight));
@@ -843,7 +850,8 @@ static void ExportTextureMetaData(const TextureAsset* const txtrAsset, std::file
 
 bool ExportDdsTextureAsset(CPakAsset* const asset, const TextureAsset* const txtrAsset, std::filesystem::path& exportPath, const int setting, const bool isNormal)
 {
-    UNUSED(isNormal);
+    // [rika]: run this first, the file name can be altered if a texture is an array. not to mention we likely want this data if exporting as dds.
+    ExportTextureMetaData(txtrAsset, exportPath);
 
     // Add extension | replace the .rpak ext.
     exportPath.replace_extension("dds");
@@ -874,7 +882,6 @@ bool ExportDdsTextureAsset(CPakAsset* const asset, const TextureAsset* const txt
                 return false;
         }
 
-        ExportTextureMetaData(txtrAsset, exportPath);
         return true;
     }
     case eTextureExportSetting::DDS_AM:
@@ -903,7 +910,6 @@ bool ExportDdsTextureAsset(CPakAsset* const asset, const TextureAsset* const txt
             }
         }
 
-        ExportTextureMetaData(txtrAsset, exportPath);
         return true;
     }
     case eTextureExportSetting::DDS_MM:
@@ -935,12 +941,10 @@ bool ExportDdsTextureAsset(CPakAsset* const asset, const TextureAsset* const txt
         if (!exportTexture->ExportAsDds(exportPath))
             return false;
 
-        ExportTextureMetaData(txtrAsset, exportPath);
         return true;
     }
     case eTextureExportSetting::DDS_MD:
     {
-        ExportTextureMetaData(txtrAsset, exportPath);
         return true;
     }
     default:
@@ -964,16 +968,11 @@ bool ExportTextureAsset(CAsset* const asset, const int setting)
     std::filesystem::path exportPath = std::filesystem::current_path().append(EXPORT_DIRECTORY_NAME); // 
     const std::filesystem::path texturePath(asset->GetAssetName());
 
-    // truncate paths?
-    if (g_ExportSettings.exportPathsFull)
+    // [rika]: there is no point to add the parent path if we don't have a proper name (it will just end up in 's_PathPrefixTXTR' anyway)
+    if (txtrAsset->name && g_ExportSettings.exportPathsFull)
         exportPath.append(texturePath.parent_path().string());
     else
         exportPath.append(s_PathPrefixTXTR);
-
-    if (txtrAsset->arraySize > 1 && !txtrAsset->name)
-    {
-        exportPath.replace_filename(std::format("{}\\{}", exportPath.stem().string(), exportPath.filename().string()));
-    }
 
     // verify created directory
     if (!CreateDirectories(exportPath))

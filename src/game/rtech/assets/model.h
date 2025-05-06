@@ -4,8 +4,7 @@
 #include <game/rtech/utils/studio/studio_generic.h>
 #include <game/rtech/assets/material.h>
 
-#include <core/utils/ramen.h>
-#include <core/mdl/compdata.h>
+#include <core/mdl/modeldata.h>
 
 class CDXDrawData;
 
@@ -20,7 +19,7 @@ struct ModelAssetHeader_v8_t
 
 	void* physics;
 
-	char* vertData; // permanent vertex components
+	char* permVertData; // permanent vertex components
 
 	AssetGuid_t* animRigs;
 	int numAnimRigs;
@@ -34,8 +33,6 @@ struct ModelAssetHeader_v8_t
 	char unk_48[8];
 };
 
-// [rika]: something in this struct is off?
-// [amos]: probably the animseq stuff that was off? fixed in cl946
 struct ModelAssetHeader_v9_t
 {
 	void* data; // ptr to studiohdr & rmdl buffer
@@ -47,7 +44,7 @@ struct ModelAssetHeader_v9_t
 	void* physics;
 	void* unk_28;
 
-	char* unkVertData; // used for static prop cache
+	char* permVertData; // used for static prop cache
 
 	AssetGuid_t* animRigs;
 	int numAnimRigs;
@@ -78,7 +75,7 @@ struct ModelAssetHeader_v12_1_t
 	void* physics;
 	void* unk_28;
 
-	char* unkVertData; // used for static prop cache
+	char* permVertData; // used for static prop cache
 
 	AssetGuid_t* animRigs;
 	int numAnimRigs;
@@ -95,7 +92,6 @@ struct ModelAssetHeader_v12_1_t
 	char gap_60[8];
 };
 
-// size: 0x80
 struct ModelAssetHeader_v13_t
 {
 	void* data; // ptr to studiohdr & rmdl buffer
@@ -107,7 +103,7 @@ struct ModelAssetHeader_v13_t
 	void* physics;
 	void* unk_28;
 
-	char* unkVertData; // used for static prop cache
+	char* permVertData; // used for static prop cache
 
 	AssetGuid_t* animRigs;
 	int numAnimRigs;
@@ -115,11 +111,8 @@ struct ModelAssetHeader_v13_t
 	int componentDataSize; // size of individual mdl components pre-baking (vtx, vvd, etc.)
 	int streamingDataSize; // size of VG data post-baking
 
-	// [rika]: we need a vector class
-	//Vector bbox_min;
-	//Vector bbox_max;
-	float bbox_min[3];
-	float bbox_max[3];
+	Vector bbox_min;
+	Vector bbox_max;
 
 	char gap_unk[8];
 
@@ -129,6 +122,7 @@ struct ModelAssetHeader_v13_t
 
 	char gap_unk1[8];
 };
+static_assert(sizeof(ModelAssetHeader_v13_t) == 128);
 
 struct ModelAssetHeader_v16_t
 {
@@ -136,27 +130,25 @@ struct ModelAssetHeader_v16_t
 	char* name;
 	char gap_10[8];
 
-	char* unkVertData; // used for static prop cache
+	char* permVertData; // used for static prop cache
 
 	AssetGuid_t* animRigs;
 	int numAnimRigs;
 
 	int streamingDataSize; // size of VG data post-baking
 
-	//Vector bbox_min;
-	//Vector bbox_max;
-	float bbox_min[3];
-	float bbox_max[3];
+	Vector bbox_min;
+	Vector bbox_max;
 
-	short gap_unk;
+	short gap_48;
 
 	short numAnimSeqs;
 
-	char gap_unk1[4];
+	char gap_4C[4];
 
 	AssetGuid_t* animSeqs;
 
-	char gap_unk2[8];
+	char gap_58[8];
 };
 static_assert(sizeof(ModelAssetHeader_v16_t) == 96);
 
@@ -309,153 +301,19 @@ inline const eMDLVersion GetModelPakVersion(const int* const pHdr)
 	return eMDLVersion::VERSION_UNK;
 }
 
-class ModelAsset;
-struct ModelMeshData_t
-{
-	ModelMeshData_t() : meshVertexDataIndex(invalidNoodleIdx), rawVertexData(nullptr), rawVertexLayoutFlags(0ull), indexCount(0), vertCount(0), vertCacheSize(0), weightsPerVert(0), weightsCount(0), texcoordCount(0), texcoodIndices(0), materialId(0), material(nullptr), bodyPartIndex(-1) {};
-	ModelMeshData_t(const ModelMeshData_t& mesh) : meshVertexDataIndex(mesh.meshVertexDataIndex), rawVertexData(mesh.rawVertexData), rawVertexLayoutFlags(mesh.rawVertexLayoutFlags), indexCount(mesh.indexCount), vertCount(mesh.vertCount), vertCacheSize(mesh.vertCacheSize),
-		weightsPerVert(mesh.weightsPerVert), weightsCount(mesh.weightsCount), texcoordCount(mesh.texcoordCount), texcoodIndices(mesh.texcoodIndices), materialId(mesh.materialId), material(mesh.material), bodyPartIndex(mesh.bodyPartIndex) {};
-	ModelMeshData_t(ModelMeshData_t& mesh) : meshVertexDataIndex(mesh.meshVertexDataIndex), rawVertexData(mesh.rawVertexData), rawVertexLayoutFlags(mesh.rawVertexLayoutFlags), indexCount(mesh.indexCount), vertCount(mesh.vertCount), vertCacheSize(mesh.vertCacheSize),
-		weightsPerVert(mesh.weightsPerVert), weightsCount(mesh.weightsCount), texcoordCount(mesh.texcoordCount), texcoodIndices(mesh.texcoodIndices), materialId(mesh.materialId), material(mesh.material), bodyPartIndex(mesh.bodyPartIndex) {};
-
-	~ModelMeshData_t() { }
-
-	size_t meshVertexDataIndex;
-
-	char* rawVertexData; // for model preview only
-	uint64_t rawVertexLayoutFlags; // the flags from a 'vg' (baked hwData) mesh, identical to 'Vertex Layout Flags' (DX)
-	
-	uint32_t indexCount;
-
-	uint32_t vertCount;
-	uint16_t vertCacheSize;
-
-	uint16_t weightsPerVert; // max number of weights per vertex
-	uint32_t weightsCount; // the total number of weights in this mesh
-	
-	int16_t texcoordCount;
-	int16_t texcoodIndices; // texcoord indices, e.g. texcoord0, texcoord2, etc
-
-	int materialId; // the index of this material
-	MaterialAsset* material; // pointer to the material's asset (if loaded)
-
-	int bodyPartIndex;
-
-	// gets the texcoord and indice based off rawVertexLayoutFlags
-	inline void ParseTexcoords();
-	inline void ParseMaterial(ModelAsset* const modelAsset, const int materialIdx, const int meshid);
-};
-
-struct ModelModelData_t
-{
-	std::string name;
-	ModelMeshData_t* meshes;
-	size_t meshIndex;
-	uint32_t meshCount;
-};
-
-struct ModelLODData_t
-{
-	std::vector<ModelModelData_t> models;
-	std::vector<ModelMeshData_t> meshes;
-	size_t vertexCount;
-	size_t indexCount;
-	float switchPoint;
-
-	// for exporting
-	uint16_t texcoordsPerVert; // max texcoords used in any mesh from this lod
-	uint16_t weightsPerVert; // max weights used in any mesh from this lod
-
-	inline const int GetMeshCount() const { return static_cast<int>(meshes.size()); }
-	inline const int GetModelCount() const { return static_cast<int>(models.size()); }
-};
-
-struct ModelBone_t
-{
-	ModelBone_t() = default;
-	ModelBone_t(const r5::mstudiobone_v8_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-	ModelBone_t(const r5::mstudiobone_v12_1_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-	ModelBone_t(const r5::mstudiobonehdr_v16_t* bonehdr, const r5::mstudiobonedata_v16_t* bonedata) : name(bonehdr->pszName()), parentIndex(bonedata->parent), flags(bonedata->flags), poseToBone(bonedata->poseToBone), pos(bonedata->pos), quat(bonedata->quat), rot(bonedata->rot), scale(bonedata->scale) {};
-	ModelBone_t(const r1::mstudiobone_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-	ModelBone_t(const r2::mstudiobone_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-
-	const char* name;
-	int parentIndex;
-
-	int flags;
-
-	matrix3x4_t poseToBone;
-
-	Vector pos;
-	Quaternion quat;
-	RadianEuler rot;
-	Vector scale;
-};
-
-struct ModelMaterialData_t
-{
-	// pointer to the referenced material asset
-	CPakAsset* materialAsset;
-
-	// also store guid and name just in case the material is not loaded
-	uint64_t materialGuid;
-	std::string materialName;
-};
-
-struct ModelSkinData_t
-{
-	ModelSkinData_t(const char* nameIn, const int16_t* indiceIn) : name(nameIn), indices(indiceIn) {};
-
-	const char* name;
-	const int16_t* indices;
-};
-
-struct ModelBodyPart_t
-{
-	ModelBodyPart_t() : partName(), modelIndex(-1), numModels(0), previewEnabled(true) {};
-
-	std::string partName;
-
-	int modelIndex;
-	int numModels;
-
-	bool previewEnabled;
-
-	FORCEINLINE void SetName(const std::string& name) { partName = name; };
-	FORCEINLINE std::string GetName() const { return partName; };
-	FORCEINLINE const char* GetNameCStr() const { return partName.c_str(); };
-	FORCEINLINE bool IsPreviewEnabled() const { return previewEnabled; };
-};
-
-struct ModelAnimSequence_t
-{
-	enum class eType : uint8_t
-	{
-		UNLOADED = 0,
-		DIRECT,
-		RIG,
-	};
-
-	CPakAsset* asset;
-	uint64_t guid;
-	eType type;
-
-	FORCEINLINE const bool IsLoaded() const { return type != eType::UNLOADED; };
-};
-
 class ModelAsset
 {
 public:
 	ModelAsset() = default;
-	ModelAsset(ModelAssetHeader_v8_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->vertData), vertDataStreamed(streamedData), physics(hdr->physics),
+	ModelAsset(ModelAssetHeader_v8_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->permVertData), vertDataStreamed(streamedData), physics(hdr->physics),
 		componentDataSize(hdr->componentDataSize), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
-		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), studiohdr(studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v8_t*>(data))) {};
+		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), parsedData(reinterpret_cast<r5::studiohdr_v8_t*>(data)) {};
 
-	ModelAsset(ModelAssetHeader_v9_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->unkVertData), vertDataStreamed(streamedData), physics(hdr->physics),
+	ModelAsset(ModelAssetHeader_v9_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->permVertData), vertDataStreamed(streamedData), physics(hdr->physics),
 		componentDataSize(hdr->componentDataSize), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
-		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), studiohdr(studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v8_t*>(data))) {};
+		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), parsedData(reinterpret_cast<r5::studiohdr_v8_t*>(data)) {};
 
-	ModelAsset(ModelAssetHeader_v12_1_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->unkVertData), vertDataStreamed(streamedData), physics(hdr->physics),
+	ModelAsset(ModelAssetHeader_v12_1_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->permVertData), vertDataStreamed(streamedData), physics(hdr->physics),
 		componentDataSize(hdr->componentDataSize), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
 		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver)
 	{
@@ -463,23 +321,23 @@ public:
 		{
 		case eMDLVersion::VERSION_12_1:
 		{
-			studiohdr = studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v12_1_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_1_t*>(data));
 			break;
 		}
 		case eMDLVersion::VERSION_12_2:
 		{
-			studiohdr = studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v12_2_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_2_t*>(data));
 			break;
 		}
 		case eMDLVersion::VERSION_12_3:
 		{
-			studiohdr = studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
 			break;
 		}
 		}
 	};
 
-	ModelAsset(ModelAssetHeader_v13_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->unkVertData), vertDataStreamed(streamedData), physics(hdr->physics),
+	ModelAsset(ModelAssetHeader_v13_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->permVertData), vertDataStreamed(streamedData), physics(hdr->physics),
 		componentDataSize(hdr->componentDataSize), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
 		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver)
 	{
@@ -488,50 +346,30 @@ public:
 		case eMDLVersion::VERSION_13:
 		case eMDLVersion::VERSION_13_1:
 		{
-			studiohdr = studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
 			break;
 		}
 		case eMDLVersion::VERSION_14:
 		case eMDLVersion::VERSION_14_1:
 		case eMDLVersion::VERSION_15:
 		{
-			studiohdr = studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v14_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v14_t*>(data));
 			break;
 		}
 		}
 	};
 
-	ModelAsset(ModelAssetHeader_v16_t* hdr, ModelAssetCPU_v16_t* cpu, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->unkVertData), vertDataStreamed(streamedData), physics(cpu->physics),
+	ModelAsset(ModelAssetHeader_v16_t* hdr, ModelAssetCPU_v16_t* cpu, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->permVertData), vertDataStreamed(streamedData), physics(cpu->physics),
 		componentDataSize(-1), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
-		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), studiohdr(studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v16_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel)) {};
-
-	// oh ya this is gaming
-	ModelAsset(r1::studiohdr_t* hdr, StudioLooseData_t* data) : name(hdr->name), data(reinterpret_cast<void*>(hdr)), vertDataPermanent(data->vertexDataBuffer), vertDataStreamed(), physics(data->physicsDataBuffer),
-		componentDataSize(data->vertexDataSize[StudioLooseData_t::SLD_VTX] + data->vertexDataSize[StudioLooseData_t::SLD_VVD] + data->vertexDataSize[StudioLooseData_t::SLD_VVC]), streamingDataSize(0), animRigs(nullptr), numAnimRigs(0),
-		numAnimSeqs(0), animSeqs(nullptr), version(eMDLVersion::VERSION_52), studiohdr(hdr, data) {};
-
-	ModelAsset(r2::studiohdr_t* hdr) : name(hdr->name), data(reinterpret_cast<void*>(hdr)), vertDataPermanent(reinterpret_cast<char*>(hdr)), vertDataStreamed(), physics(hdr->pPHY()),
-		componentDataSize(hdr->vtxSize + hdr->vvdSize + hdr->vvcSize), streamingDataSize(0), animRigs(nullptr), numAnimRigs(0),
-		numAnimSeqs(0), animSeqs(nullptr), version(eMDLVersion::VERSION_53), studiohdr(hdr) {};
+		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), parsedData(reinterpret_cast<r5::studiohdr_v16_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel) {};
 
 	~ModelAsset()
 	{
 		delete drawData;
 	}
 
-	void InitBoneMatrix();
-	void UpdateBoneMatrix();
-
-	FORCEINLINE void SetupBodyPart(int i, const char* partName, const int modelIndex, const int numModels)
-	{
-		ModelBodyPart_t& part = bodyParts.at(i);
-		if (part.partName.empty())
-		{
-			part.SetName(partName);
-			part.modelIndex = modelIndex;
-			part.numModels = numModels;
-		};
-	};
+	//void InitBoneMatrix();
+	//void UpdateBoneMatrix();
 
 	char* name;
 	void* data; // ptr to studiohdr & rmdl buffer
@@ -549,81 +387,19 @@ public:
 	int numAnimSeqs;
 
 	CDXDrawData* drawData;
-	CRamen meshVertexData;
 
-	std::vector<ModelBone_t> bones;
-
-	std::vector<ModelLODData_t> lods;
-	std::vector<ModelMaterialData_t> materials;
-	std::vector<ModelSkinData_t> skins;
-
-	std::vector<ModelBodyPart_t> bodyParts;
-
-	// Resolved vector of animation sequences for use in model preview
-	std::vector<ModelAnimSequence_t> animSequences;
-
-	studiohdr_generic_t studiohdr;
+	ModelParsedData_t parsedData;
 
 	eMDLVersion version; // like asset version, but takes between version revisions into consideration
 
+	inline const studiohdr_generic_t& StudioHdr() const { return parsedData.studiohdr; }
+	inline const studiohdr_generic_t* const pStudioHdr() const { return &parsedData.studiohdr; }
+	inline ModelParsedData_t* const GetParsedData() { return &parsedData; }
+	inline const std::vector<ModelBone_t>* const GetRig() const { return &parsedData.bones; } // slerp them bones
+
 	// get loose files from vertDataPermanent
-	const OptimizedModel::FileHeader_t* const GetVTX() const
-	{
-		return studiohdr.vtxSize > 0 ? reinterpret_cast<const OptimizedModel::FileHeader_t* const>(vertDataPermanent + studiohdr.vtxOffset) : nullptr;
-	}
-	const vvd::vertexFileHeader_t* const GetVVD() const
-	{
-		return studiohdr.vvdSize > 0 ? reinterpret_cast<const vvd::vertexFileHeader_t* const>(vertDataPermanent + studiohdr.vvdOffset) : nullptr;
-	}
-	const vvc::vertexColorFileHeader_t* const GetVVC() const
-	{
-		return studiohdr.vvcSize > 0 ? reinterpret_cast<const vvc::vertexColorFileHeader_t* const>(vertDataPermanent + studiohdr.vvcOffset) : nullptr;
-	}
-	const vvw::vertexBoneWeightsExtraFileHeader_t* const GetVVW() const
-	{
-		return studiohdr.vvwSize > 0 ? reinterpret_cast<const vvw::vertexBoneWeightsExtraFileHeader_t* const>(vertDataPermanent + studiohdr.vvwOffset) : nullptr;
-	}
+	const OptimizedModel::FileHeader_t* const GetVTX() const { return StudioHdr().vtxSize > 0 ? reinterpret_cast<const OptimizedModel::FileHeader_t* const>(vertDataPermanent + StudioHdr().vtxOffset) : nullptr; }
+	const vvd::vertexFileHeader_t* const GetVVD() const { return StudioHdr().vvdSize > 0 ? reinterpret_cast<const vvd::vertexFileHeader_t* const>(vertDataPermanent + StudioHdr().vvdOffset) : nullptr; }
+	const vvc::vertexColorFileHeader_t* const GetVVC() const { return StudioHdr().vvcSize > 0 ? reinterpret_cast<const vvc::vertexColorFileHeader_t* const>(vertDataPermanent + StudioHdr().vvcOffset) : nullptr; }
+	const vvw::vertexBoneWeightsExtraFileHeader_t* const GetVVW() const { return StudioHdr().vvwSize > 0 ? reinterpret_cast<const vvw::vertexBoneWeightsExtraFileHeader_t* const>(vertDataPermanent + StudioHdr().vvwOffset) : nullptr; }
 };
-
-// define after ModelAsset
-void ModelMeshData_t::ParseTexcoords()
-{
-	if (rawVertexLayoutFlags & VERT_TEXCOORD0)
-	{
-		int texCoordIdx = 0;
-		int texCoordShift = 24;
-
-		uint64_t inputFlagsShifted = rawVertexLayoutFlags >> texCoordShift;
-		do
-		{
-			inputFlagsShifted = rawVertexLayoutFlags >> texCoordShift;
-
-			int8_t texCoordFormat = inputFlagsShifted & VERT_TEXCOORD_MASK;
-
-			assertm(texCoordFormat == 2 || texCoordFormat == 0, "invalid texcoord format");
-
-			if (texCoordFormat != 0)
-			{
-				texcoordCount++;
-				texcoodIndices |= (1 << texCoordIdx);
-			}
-
-			texCoordShift += VERT_TEXCOORD_BITS;
-			texCoordIdx++;
-		} while (inputFlagsShifted >= (1 << VERT_TEXCOORD_BITS)); // while the flag value is large enough that there is more than just one 
-	}
-}
-
-void ModelMeshData_t::ParseMaterial(ModelAsset* const modelAsset, const int materialIdx, const int meshid)
-{
-	UNUSED(meshid);
-	// [rika]: handling mesh's material here since we've already looped through everything
-	assertm(materialIdx < modelAsset->materials.size() && materialIdx >= 0, "invalid mesh material index");
-	materialId = materialIdx;
-
-	ModelMaterialData_t& matlData = modelAsset->materials.at(materialIdx);
-	if (matlData.materialAsset)
-		material = reinterpret_cast<MaterialAsset*>(matlData.materialAsset->extraData());
-	//else
-	//	Log("%s %d: null material\n", modelAsset->name, meshid);
-}

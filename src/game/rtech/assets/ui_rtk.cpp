@@ -26,6 +26,8 @@ void LoadRTKAsset(CAssetContainer* pak, CAsset* asset)
     }
     case 0x28:
     {
+        asset->SetAssetVersion({ 2, 1 });
+
         RTKAssetHeader_v2_1_t* hdr = reinterpret_cast<RTKAssetHeader_v2_1_t*>(pakAsset->header());
         rtkAsset = new RTKAsset(hdr);
 
@@ -33,6 +35,8 @@ void LoadRTKAsset(CAssetContainer* pak, CAsset* asset)
     }
     case 0x30:
     {
+        asset->SetAssetVersion({ 2, 2 });
+
         RTKAssetHeader_v2_2_t* hdr = reinterpret_cast<RTKAssetHeader_v2_2_t*>(pakAsset->header());
         rtkAsset = new RTKAsset(hdr);
 

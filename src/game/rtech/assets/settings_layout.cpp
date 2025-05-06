@@ -7,6 +7,92 @@
 extern ExportSettings_t g_ExportSettings;
 static const char* const s_PathPrefixSTLT = s_AssetTypePaths.find(AssetType_t::STLT)->second;
 
+uint32_t SettingsLayout_GetFieldAlignmentForType(const eSettingsFieldType type)
+{
+	switch (type)
+	{
+	case eSettingsFieldType::ST_BOOL:
+		return sizeof(bool);
+	case eSettingsFieldType::ST_INTEGER:
+	case eSettingsFieldType::ST_ARRAY_2:
+		return sizeof(int);
+	case eSettingsFieldType::ST_FLOAT:
+	case eSettingsFieldType::ST_FLOAT2:
+	case eSettingsFieldType::ST_FLOAT3:
+		return sizeof(float);
+	case eSettingsFieldType::ST_STRING:
+	case eSettingsFieldType::ST_ASSET:
+	case eSettingsFieldType::ST_ASSET_2:
+		return sizeof(void*);
+
+	default: assert(0); return 0;
+	}
+}
+
+bool SettingsFieldFinder_FindFieldByAbsoluteOffset(const SettingsLayoutAsset* const layout, const uint32_t targetOffset, SettingsLayoutFindByOffsetResult_s& result)
+{
+	for (const SettingsField& field : layout->layoutFields)
+	{
+		const uint32_t totalValueBufSizeAligned = IALIGN(layout->totalLayoutSize, layout->alignment);
+		const uint32_t originalBase = result.currentBase;
+
+		if (targetOffset > result.currentBase + (layout->arrayValueCount * totalValueBufSizeAligned))
+			return false; // Beyond this layout.
+
+		if (targetOffset < field.valueOffset)
+			return false; // Invalid offset (i.e. we have 2 ints at 4 and 8, but target was 5).
+
+		// [amos]: handle everything in our current layout, including nested arrays.
+		// I haven't seen mods mapped to nested arrays yet, and I also haven't seen
+		// dynamic arrays nested into static arrays yet in original paks, but RePak
+		// supports nesting static arrays and dynamic arrays into static arrays.
+		for (int currArrayIdx = 0; currArrayIdx < layout->arrayValueCount; currArrayIdx++)
+		{
+			const uint32_t elementBase = result.currentBase + (currArrayIdx * totalValueBufSizeAligned);
+			const uint32_t absoluteFieldOffset = elementBase + field.valueOffset;
+
+			const bool isStaticArray = field.dataType == eSettingsFieldType::ST_ARRAY;
+
+			// [amos]: the first member of an element in a static array will
+			// share the same offset as its static array. Delay it off to
+			// the next recursion so we return the name of the member of the
+			// element in the array instead since this function does a lookup
+			// by absolute offsets, and static arrays technically don't exist
+			// in that context. This is also required for constructing the 
+			// field access path correctly for given offset.
+			if (!isStaticArray && targetOffset == absoluteFieldOffset)
+			{
+				result.field = &field;
+				result.fieldAccessPath.insert(0, field.fieldName);
+				result.lastArrayIdx = currArrayIdx;
+
+				return true;
+			}
+
+			// [amos]: getting offsets to dynamic arrays items outside the
+			// game's runtime is not supported! Only static arrays are.
+			if (isStaticArray)
+			{
+				const SettingsLayoutAsset* const subLayout = &layout->subHeaders[field.valueSubLayoutIdx];
+				result.currentBase = IALIGN(absoluteFieldOffset, subLayout->alignment);
+
+				if (SettingsFieldFinder_FindFieldByAbsoluteOffset(subLayout, targetOffset, result))
+				{
+					result.fieldAccessPath.insert(0, std::format("{:s}[{:d}].", field.fieldName, result.lastArrayIdx));
+					result.lastArrayIdx = currArrayIdx;
+
+					return true;
+				}
+
+				result.currentBase = originalBase;
+			}
+		}
+	}
+
+	// Not found.
+	return false;
+}
+
 void SettingsLayoutAsset::ParseAndSortFields()
 {
 	for (uint32_t i = 0; i < this->fieldCount; ++i)
@@ -70,13 +156,82 @@ enum eSettingsLayoutColumnID
 	_SLC_COUNT
 };
 
+struct SettingsLayoutPreviewState_s
+{
+	void ResetIndices(CAsset* const asset, const SettingsLayoutAsset* layout)
+	{
+		lastAssetCached = asset;
+
+		previewList.clear();
+		previewList.emplace_back(layout);
+	}
+
+	const SettingsLayoutAsset* GetCurrent()
+	{
+		return previewList.back();
+	}
+
+	const void SetCurrent(const SettingsLayoutAsset* layout)
+	{
+		previewList.emplace_back(layout);
+	}
+
+	bool HasParent() const
+	{
+		return previewList.size() > 1;
+	}
+
+	const void SetToParent()
+	{
+		previewList.pop_back();
+	}
+
+	const CAsset* lastAssetCached;
+	std::vector<const SettingsLayoutAsset*> previewList;
+};
+
+static SettingsLayoutPreviewState_s s_settingsLayoutPreviewState;
+
 void* PreviewSettingsLayoutAsset(CAsset* const asset, const bool firstFrameForAsset)
 {
 	UNUSED(firstFrameForAsset);
-
 	CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
 
-	SettingsLayoutAsset* layoutAsset = reinterpret_cast<SettingsLayoutAsset*>(pakAsset->extraData());
+	const SettingsLayoutAsset* const layoutAsset = reinterpret_cast<SettingsLayoutAsset*>(pakAsset->extraData());
+
+	if (asset != s_settingsLayoutPreviewState.lastAssetCached)
+		s_settingsLayoutPreviewState.ResetIndices(asset, layoutAsset);
+
+	ImGui::BeginDisabled(!s_settingsLayoutPreviewState.HasParent());
+
+	if (ImGui::Button("Return to Parent##SettingsLayoutPreview"))
+		s_settingsLayoutPreviewState.SetToParent();
+
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+
+	const SettingsLayoutAsset* const currentLayoutAsset = s_settingsLayoutPreviewState.GetCurrent();
+	const size_t numSubHeaders = currentLayoutAsset->subHeaders.size();
+
+	ImGui::BeginDisabled(numSubHeaders == 0);
+
+	if (ImGui::BeginCombo("Sub-layout", nullptr))
+	{
+		for (size_t i = 0; i < numSubHeaders; i++)
+		{
+			const SettingsLayoutAsset* const subLayout = &currentLayoutAsset->subHeaders[i];
+
+			if (ImGui::Selectable(std::format("{:d}##SettingsLayoutPreview", i).c_str(), subLayout == currentLayoutAsset))
+			{
+				s_settingsLayoutPreviewState.SetCurrent(subLayout);
+				break;
+			}
+		}
+
+		ImGui::EndCombo();
+	}
+
+	ImGui::EndDisabled();
 
 	constexpr ImGuiTableFlags tableFlags =
 		ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable | ImGuiTableFlags_Hideable
@@ -98,13 +253,13 @@ void* PreviewSettingsLayoutAsset(CAsset* const asset, const bool firstFrameForAs
 
 		ImGui::TableHeadersRow();
 
-		for (size_t i = 0; i < layoutAsset->layoutFields.size(); ++i)
+		for (size_t i = 0; i < currentLayoutAsset->layoutFields.size(); ++i)
 		{
 			ImGui::PushID(static_cast<int>(i));
 
 			ImGui::TableNextRow(ImGuiTableRowFlags_None, 0.f);
 
-			const SettingsField& layoutField = layoutAsset->layoutFields[i];
+			const SettingsField& layoutField = currentLayoutAsset->layoutFields[i];
 
 			if (ImGui::TableSetColumnIndex(eSettingsLayoutColumnID::SLC_NAME))
 				ImGui::TextUnformatted(layoutField.fieldName);

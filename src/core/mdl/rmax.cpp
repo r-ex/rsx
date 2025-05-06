@@ -112,16 +112,31 @@ namespace rmax
         hdr->materialOffset = static_cast<int>(curpos - baseptr);
         hdr->materialCount = static_cast<int>(materials.size());
 
+        Texture_t* const texbase = reinterpret_cast<Texture_t*>(curpos + (sizeof(Material_t) * materials.size()));
+        Texture_t* texcurr = texbase;
         for (auto& material : materials)
         {
             Material_t* matl = reinterpret_cast<Material_t*>(curpos);
 
-            matl->textureCount = material.textureCount;
-            matl->textures = material.textures;
+            matl->textureCount = static_cast<int16_t>(material.textures.size());
+            matl->textureIndex = static_cast<int16_t>(texcurr - texbase);
             stringtable.AddString(reinterpret_cast<char*>(matl), &matl->nameOffset, material.name);
+
+            for (const RMAXTexture& texture : material.textures)
+            {
+                texcurr->type = texture.type;
+                stringtable.AddString(reinterpret_cast<char*>(texcurr), &texcurr->nameOffset, texture.name.c_str());
+
+                texcurr++;
+            }
 
             curpos += sizeof(Material_t);
         }
+
+        hdr->textureOffset = static_cast<int>(curpos - baseptr);
+        hdr->textureCount = static_cast<int>(texcurr - texbase);
+
+        curpos += hdr->textureCount * sizeof(Texture_t);
 
         hdr->meshCollectionOffset = static_cast<int>(curpos - baseptr);
         hdr->meshCollectionCount = static_cast<int>(collections.size());

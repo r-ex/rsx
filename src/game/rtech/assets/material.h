@@ -116,7 +116,7 @@ struct __declspec(align(16)) MaterialDXState_v12_t
 	// r2 only supports 4 render targets?
 	MaterialBlendState_t blendStates[4];
 
-	uint32_t unk;
+	uint32_t blendStateMask; // [rika]: no reason this should be different than r5
 
 	// flags to determine how the D3D11_DEPTH_STENCIL_DESC is defined for this material
 	uint16_t depthStencilFlags;
@@ -134,7 +134,7 @@ DISABLE_WARNING(4324);
 struct __declspec(align(16)) MaterialDXState_t
 {
 	MaterialDXState_t() = default;
-	MaterialDXState_t(MaterialDXState_v12_t& dxState) : blendStateMask(dxState.unk), depthStencilFlags(dxState.depthStencilFlags), rasterizerFlags(dxState.rasterizerFlags)
+	MaterialDXState_t(MaterialDXState_v12_t& dxState) : blendStates(), blendStateMask(dxState.blendStateMask), depthStencilFlags(dxState.depthStencilFlags), rasterizerFlags(dxState.rasterizerFlags)
 	{
 		memcpy_s(blendStates, 4 * sizeof(MaterialBlendState_t), dxState.blendStates, 4 * sizeof(MaterialBlendState_t));
 	};
@@ -149,6 +149,8 @@ struct __declspec(align(16)) MaterialDXState_t
 
 	// flags to determine how the D3D11_RASTERIZER_DESC is defined
 	uint16_t rasterizerFlags;
+
+	char unk_28[8]; // [rika]: there is data here in newer versions!
 };
 static_assert(sizeof(MaterialDXState_t) == 0x30);
 ENABLE_WARNING();
@@ -272,6 +274,13 @@ static const char* s_MaterialShaderTypeHelpText = ""
 " - FIX: Skinned model fixup for use as a static prop\n"
 " - WLD: World geometry\n"
 " - GEN: UI, general use, particles, etc\n";
+
+struct MaterialAssetCPU_t
+{
+	void* data;
+	int dataSize;
+	int unk_C; // varies between shaders?
+};
 
 struct __declspec(align(16)) MaterialAssetHeader_v12_t
 {
@@ -420,7 +429,11 @@ struct MaterialAssetHeader_v16_t
 
 	uint64_t textureAnimation;
 
-	int unk_D8[6]; // last var is apparently a float
+	int unk_D8[4];
+
+	float unk_E8;
+
+	int unk_EA;
 };
 static_assert(sizeof(MaterialAssetHeader_v16_t) == 240);
 
@@ -476,17 +489,73 @@ struct MaterialAssetHeader_v22_t
 
 	uint64_t textureAnimation;
 
-	int unk_D8[6]; // last var is apparently a float
+	int unk_D8[4];
+
+	float unk_E8;
+
+	int unk_EA;
+
 	char unk_F0[16];
 };
 static_assert(sizeof(MaterialAssetHeader_v22_t) == 256);
 
-struct MaterialAssetCPU_t
+struct MaterialAssetHeader_v23_1_t
 {
-	void* data;
-	int dataSize;
-	int unk_C; // varies between shaders?
+	uint64_t unk_0; // same as previous version (as of v23), does not seem to be vtftableReserved (contains data)
+
+	uint64_t snapshotMaterial; // 'msnp' asset
+
+	uint64_t guid; // guid of this material asset
+
+	char* name; // pointer to partial asset path
+	char* surfaceProp; // pointer to surfaceprop (as defined in surfaceproperties.rson)
+	char* surfaceProp2; // pointer to surfaceprop2 
+
+	uint64_t depthShadowMaterial;
+	uint64_t depthPrepassMaterial;
+	uint64_t depthVSMMaterial;
+	uint64_t depthShadowTightMaterial;
+	uint64_t colpassMaterial;
+
+	uint64_t shaderSet; // guid of the shaderset asset that this material uses
+
+	void* textureHandles; // ptr to array of texture guids
+	void* streamingTextureHandles; // ptr to array of streamable texture guids (empty at build time)
+
+	short numStreamingTextureHandles; // number of textures with streamed mip levels.
+	short width;
+	short height;
+	short depth;
+
+	// array of indices into sampler states array. must be set properly to have accurate texture tiling
+	// used in CShaderGlue::SetupShader (1403B3C60)
+	char samplers[4];// = 0x1D0300;
+
+	uint32_t unk_7C;
+
+	uint32_t unk_80;// = 0x1F5A92BD; // REQUIRED but why?
+
+
+	uint32_t glueFlags;
+	uint32_t glueFlags2;
+
+	char unk_8C[16];
+
+	uint16_t numAnimationFrames; // used in CMaterialGlue::GetNumAnimationFrames (0x1403B4250), which is called from GetSpriteInfo @ 0x1402561FC
+	MaterialShaderType_t materialType;
+	uint8_t uberBufferFlags; // used for unksections loading in UpdateMaterialAsset
+
+	int unk_A0; // unk_CC?
+
+	float unk_A4; // unk_E8?
+
+	uint64_t textureAnimation;
+
+	char unk_B0[8]; // unk_F0 ?
+
+	MaterialAssetCPU_t* cpuDataPtr;
 };
+static_assert(sizeof(MaterialAssetHeader_v23_1_t) == 192);
 
 struct TextureAssetEntry_t
 {
@@ -535,10 +604,10 @@ class MaterialAsset
 {
 public:
 	// [rika]: didn't test these so have fun
-	MaterialAsset(MaterialAssetHeader_v12_t* const hdr, MaterialAssetCPU_t* const cpu) : guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
-		depthShadowMaterial(hdr->depthShadowMaterial), depthPrepassMaterial(hdr->depthPrepassMaterial), depthVSMMaterial(hdr->depthVSMMaterial), depthShadowTightMaterial(0/*[amos]: v12 doesn't have this!*/), colpassMaterial(hdr->colpassMaterial), shaderSet(hdr->shaderSet),
+	MaterialAsset(MaterialAssetHeader_v12_t* const hdr, MaterialAssetCPU_t* const cpu) : snapshotMaterial(0ull), guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
+		depthShadowMaterial(hdr->depthShadowMaterial), depthPrepassMaterial(hdr->depthPrepassMaterial), depthVSMMaterial(hdr->depthVSMMaterial), depthShadowTightMaterial(0ull/*[amos]: v12 doesn't have this!*/), colpassMaterial(hdr->colpassMaterial), shaderSet(hdr->shaderSet),
 		numAnimationFrames(0), textureAnimation(0), textureHandles(hdr->textureHandles), streamingTextureHandles(hdr->streamingTextureHandles),
-		width(hdr->width), height(hdr->height), depth(0), unk(hdr->unk_B8), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(MaterialShaderType_t::_TYPE_LEGACY), shaderSetAsset(nullptr),
+		width(hdr->width), height(hdr->height), depth(0), unk(hdr->unk_B8), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(MaterialShaderType_t::_TYPE_LEGACY), shaderSetAsset(nullptr), snapshotAsset(nullptr),
 		cpuData(cpu->data), cpuDataSize(cpu->dataSize)
 	{
 		memcpy_s(samplers, sizeof(samplers), hdr->samplers, sizeof(hdr->samplers));
@@ -551,10 +620,10 @@ public:
 		numRenderTargets = 4;
 	};
 
-	MaterialAsset(MaterialAssetHeader_v15_t* const hdr, MaterialAssetCPU_t* const cpu) : guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
+	MaterialAsset(MaterialAssetHeader_v15_t* const hdr, MaterialAssetCPU_t* const cpu) : snapshotMaterial(0ull), guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
 		depthShadowMaterial(hdr->depthShadowMaterial), depthPrepassMaterial(hdr->depthPrepassMaterial), depthVSMMaterial(hdr->depthVSMMaterial), depthShadowTightMaterial(hdr->depthShadowTightMaterial), colpassMaterial(hdr->colpassMaterial), shaderSet(hdr->shaderSet),
 		numAnimationFrames(hdr->numAnimationFrames), textureAnimation(hdr->textureAnimation), textureHandles(hdr->textureHandles), streamingTextureHandles(hdr->streamingTextureHandles),
-		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr),
+		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr), snapshotAsset(nullptr),
 		cpuData(cpu->data), cpuDataSize(cpu->dataSize)
 	{
 		memcpy_s(samplers, sizeof(samplers), hdr->samplers, sizeof(hdr->samplers));
@@ -563,10 +632,10 @@ public:
 		numRenderTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
 	};
 
-	MaterialAsset(MaterialAssetHeader_v16_t* const hdr, MaterialAssetCPU_t* const cpu) : guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
+	MaterialAsset(MaterialAssetHeader_v16_t* const hdr, MaterialAssetCPU_t* const cpu) : snapshotMaterial(0ull), guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
 		depthShadowMaterial(hdr->depthShadowMaterial), depthPrepassMaterial(hdr->depthPrepassMaterial), depthVSMMaterial(hdr->depthVSMMaterial), depthShadowTightMaterial(hdr->depthShadowTightMaterial), colpassMaterial(hdr->colpassMaterial), shaderSet(hdr->shaderSet),
 		numAnimationFrames(hdr->numAnimationFrames), textureAnimation(hdr->textureAnimation), textureHandles(hdr->textureHandles), streamingTextureHandles(hdr->streamingTextureHandles),
-		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr),
+		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr), snapshotAsset(nullptr),
 		cpuData(cpu->data), cpuDataSize(cpu->dataSize)
 	{
 		memcpy_s(samplers, sizeof(samplers), hdr->samplers, sizeof(hdr->samplers));
@@ -575,10 +644,10 @@ public:
 		numRenderTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
 	};
 
-	MaterialAsset(MaterialAssetHeader_v22_t* const hdr, MaterialAssetCPU_t* const cpu) : guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
+	MaterialAsset(MaterialAssetHeader_v22_t* const hdr, MaterialAssetCPU_t* const cpu) : snapshotMaterial(0ull), guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
 		depthShadowMaterial(hdr->depthShadowMaterial), depthPrepassMaterial(hdr->depthPrepassMaterial), depthVSMMaterial(hdr->depthVSMMaterial), depthShadowTightMaterial(hdr->depthShadowTightMaterial), colpassMaterial(hdr->colpassMaterial), shaderSet(hdr->shaderSet),
 		numAnimationFrames(hdr->numAnimationFrames), textureAnimation(hdr->textureAnimation), textureHandles(hdr->textureHandles), streamingTextureHandles(hdr->streamingTextureHandles),
-		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr),
+		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr), snapshotAsset(nullptr),
 		cpuData(cpu->data), cpuDataSize(cpu->dataSize)
 	{
 		memcpy_s(samplers, sizeof(samplers), hdr->samplers, sizeof(hdr->samplers));
@@ -586,6 +655,20 @@ public:
 
 		numRenderTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
 	};
+
+	MaterialAsset(MaterialAssetHeader_v23_1_t* const hdr, MaterialAssetCPU_t* const cpu) : snapshotMaterial(hdr->snapshotMaterial), guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
+		depthShadowMaterial(hdr->depthShadowMaterial), depthPrepassMaterial(hdr->depthPrepassMaterial), depthVSMMaterial(hdr->depthVSMMaterial), depthShadowTightMaterial(hdr->depthShadowTightMaterial), colpassMaterial(hdr->colpassMaterial), shaderSet(hdr->shaderSet),
+		numAnimationFrames(hdr->numAnimationFrames), textureAnimation(hdr->textureAnimation), textureHandles(hdr->textureHandles), streamingTextureHandles(hdr->streamingTextureHandles),
+		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr), snapshotAsset(nullptr),
+		cpuData(cpu->data), cpuDataSize(cpu->dataSize),
+		dxStates()
+	{
+		memcpy_s(samplers, sizeof(samplers), hdr->samplers, sizeof(hdr->samplers));
+
+		numRenderTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
+	};
+
+	uint64_t snapshotMaterial;
 
 	uint64_t guid; // guid of this material asset
 
@@ -633,20 +716,29 @@ public:
 	std::vector<TmpConstBufVar> cpuDataBuf; // should this be done on export?
 
 	CPakAsset* shaderSetAsset;
+	CPakAsset* snapshotAsset;
 	std::vector<TextureAssetEntry_t> txtrAssets;
 	std::map<uint32_t, ShaderResource> resourceBindings; // this is how we get suffixes, could have some reliabity issues
 
 	uint8_t numRenderTargets;
+
+	// parse snapshot
+	void ParseSnapshot();
 };
+
+void MatPreview_DXState(const MaterialDXState_t& dxState, const uint8_t dxStateId, const uint8_t numRenderTargets);
 
 struct MaterialTextureExportInfo_s
 {
-	MaterialTextureExportInfo_s()
-		: pTexture(nullptr)
-	{ }
+	MaterialTextureExportInfo_s() : pTexture(nullptr), isNormal(false) {}
+	MaterialTextureExportInfo_s(const std::filesystem::path& path, CPakAsset* const asset) : pTexture(asset), exportPath(path), isNormal(false) {}
 
 	CPakAsset* pTexture;
 	std::string exportName;
+	std::filesystem::path exportPath;
+
+	bool isNormal;
 };
 
-std::unordered_map<uint8_t, MaterialTextureExportInfo_s> ExportMaterialTextures(const int setting, const MaterialAsset* materialAsset, const std::filesystem::path& exportPath, const bool useSemanticNames);
+void ParseMaterialTextureExportInfo(std::unordered_map<uint32_t, MaterialTextureExportInfo_s>& textures, const MaterialAsset* materialAsset, const std::filesystem::path& exportPath, const eTextureExportName nameSetting, const bool useFullPaths);
+void ExportMaterialTextures(const int setting, const MaterialAsset* materialAsset, const std::unordered_map<uint32_t, MaterialTextureExportInfo_s>& textureInfo);

@@ -5,7 +5,7 @@
 #include <core/mdl/rmax.h>
 #include <core/mdl/stringtable.h>
 #include <core/mdl/cast.h>
-#include <core/mdl/compdata.h>
+#include <core/mdl/modeldata.h>
 
 extern CBufferManager* g_BufferManager;
 extern ExportSettings_t g_ExportSettings;
@@ -30,6 +30,8 @@ void LoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	}
 	case eSeqVersion::VERSION_7_1:
 	{
+		asset->SetAssetVersion({ 7, 1 });
+
 		AnimSeqAssetHeader_v7_1_t* hdr = reinterpret_cast<AnimSeqAssetHeader_v7_1_t*>(pakAsset->header());
 		seqAsset = new AnimSeqAsset(hdr, streamEntry, ver);
 		break;
@@ -69,7 +71,7 @@ void PostLoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 
 	if (seqAsset->parentModel)
 	{
-		bones = &seqAsset->parentModel->bones;
+		bones = seqAsset->parentModel->GetRig();
 	}
 	else if (seqAsset->parentRig)
 	{
@@ -80,6 +82,10 @@ void PostLoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	// ramen here
 
 	const size_t boneCount = bones->size();
+
+	// [rika]: parse the animseq's raw data size in post load if we couldn't determine a bone count before.
+	if (seqAsset->dataSize == 0 && asset->GetAssetVersion().majorVer >= 12)
+		seqAsset->UpdateDataSizeNew(static_cast<int>(boneCount));
 
 	// check flags
 	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_POS) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_POS), "flag mismatch");
@@ -223,12 +229,21 @@ void PostLoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	seqAsset->animationParsed = true;
 }
 
-enum eAnimSeqExportSetting
+void* PreviewAnimSeqAsset(CAsset* const asset, const bool firstFrameForAsset)
 {
-	ASEQ_CAST,
-	ASEQ_RMAX,
-	ASEQ_RSEQ,
-};
+	UNUSED(firstFrameForAsset);
+
+	CPakAsset* const pakAsset = static_cast<CPakAsset*>(asset);
+
+	assertm(pakAsset->extraData(), "extra data should be valid");
+	const AnimSeqAsset* const animSeqAsset = reinterpret_cast<const AnimSeqAsset* const>(pakAsset->extraData());
+
+	// [rika]: todo, preview settings and model lists? or is this covered in linked assets? unsure.
+
+	PreviewSeqDesc(&animSeqAsset->seqdesc);
+
+	return nullptr;
+}
 
 static bool ExportRawAnimSeqAsset(CPakAsset* const asset, const AnimSeqAsset* const animSeqAsset, std::filesystem::path& exportPath)
 {
@@ -290,241 +305,26 @@ static bool ExportRawAnimSeqAsset(CPakAsset* const asset, const AnimSeqAsset* co
 	return true;
 }
 
-bool ExportSeqDescRMAX(const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones)
-{
-	const std::string fileNameBase = exportPath.stem().string();
-	const std::string skelNameBase = std::filesystem::path(skelName).stem().string();
-
-	const size_t boneCount = bones->size();
-
-	for (int animIdx = 0; animIdx < seqdesc->AnimCount(); animIdx++)
-	{
-		const std::string animName = std::format("{}{}", fileNameBase.c_str(), animIdx);
-
-		const std::string tmpName = std::format("{}.rmax", animName);
-		exportPath.replace_filename(tmpName);
-
-		rmax::RMAXExporter rmaxFile(exportPath, fileNameBase.c_str(), fileNameBase.c_str());
-
-		// do bones
-		rmaxFile.ReserveBones(boneCount);
-		for (auto& bone : *bones)
-			rmaxFile.AddBone(bone.name, bone.parentIndex, bone.pos, bone.quat, bone.scale);
-
-		const animdesc_t* const animdesc = &seqdesc->anims.at(animIdx); // check flag 0x20000
-
-		uint16_t animFlags = 0;
-
-		if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA) // delta flag
-			animFlags |= rmax::AnimFlags_t::ANIM_DELTA;
-
-		if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID) || animdesc->parsedBufferIndex == invalidNoodleIdx)
-			animFlags |= rmax::AnimFlags_t::ANIM_EMPTY;
-
-		rmaxFile.AddAnim(animName.c_str(), static_cast<uint16_t>(animdesc->numframes), animdesc->fps, animFlags, boneCount);
-		rmax::RMAXAnim* const anim = rmaxFile.GetAnimLast();
-
-		if (anim->GetFlags() & rmax::AnimFlags_t::ANIM_EMPTY)
-		{
-			rmaxFile.ToFile();
-
-			continue;
-		}
-
-		const std::unique_ptr<char[]> noodle = seqdesc->parsedData.getIdx(animdesc->parsedBufferIndex);
-		CAnimData animData(noodle.get());
-
-		for (size_t i = 0; i < boneCount; i++)
-		{
-			const uint8_t flags = animData.GetFlag(i);
-
-			const char* dataPtr = animData.GetData(i);
-
-			anim->SetTrack(flags, static_cast<uint16_t>(i));
-			rmax::RMAXAnimTrack* const track = anim->GetTrack(i);
-
-			const Vector* pos = nullptr;
-			const Quaternion* q = nullptr;
-			const Vector* scale = nullptr;
-
-			if (flags & CAnimDataBone::ANIMDATA_POS)
-			{
-				pos = reinterpret_cast<const Vector*>(dataPtr);
-
-				dataPtr += (sizeof(Vector) * animdesc->numframes);
-			}
-
-			if (flags & CAnimDataBone::ANIMDATA_ROT)
-			{
-				q = reinterpret_cast<const Quaternion*>(dataPtr);
-
-				dataPtr += (sizeof(Quaternion) * animdesc->numframes);
-			}
-
-			if (flags & CAnimDataBone::ANIMDATA_SCL)
-			{
-				scale = reinterpret_cast<const Vector*>(dataPtr);
-
-				dataPtr += (sizeof(Vector) * animdesc->numframes);
-			}
-
-			for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
-			{
-				track->AddFrame(frameIdx, &pos[frameIdx], &q[frameIdx], &scale[frameIdx]);
-			}
-		}
-
-		rmaxFile.ToFile();
-	}
-
-	return true;
-}
-
-bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones, const uint64_t guid)
-{
-	const std::string fileNameBase = exportPath.stem().string();
-	const std::string skelNameBase = std::filesystem::path(skelName).stem().string();
-
-	const size_t boneCount = bones->size();
-
-	for (int animIdx = 0; animIdx < seqdesc->AnimCount(); animIdx++)
-	{
-		const animdesc_t* const animdesc = &seqdesc->anims.at(animIdx);
-
-		const std::string tmpName(std::format("{}_{}.cast", fileNameBase, std::to_string(animIdx)));
-		exportPath.replace_filename(tmpName);
-
-		cast::CastExporter cast(exportPath.string());
-
-		// cast
-		cast::CastNode* const rootNode = cast.GetChild(0); // we only have one root node, no hash
-		cast::CastNode* const animNode = rootNode->AddChild(cast::CastId::Animation, guid);
-
-		// [rika]: we can predict how big this vector needs to be, however resizing it will make adding new members a pain.
-		const size_t animChildrenCount = 1 + (boneCount * 7); // skeleton (one), curve per bone per data type
-		animNode->ReserveChildren(animChildrenCount);
-		animNode->ReserveProperties(2); // framerate, looping
-
-		animNode->AddProperty(cast::CastPropertyId::Float, static_cast<int>(cast::CastPropsAnimation::Framerate), FLOAT_AS_UINT(animdesc->fps));
-		animNode->AddProperty(cast::CastPropertyId::Byte, static_cast<int>(cast::CastPropsAnimation::Looping), animdesc->flags & eStudioAnimFlags::ANIM_LOOPING ? true : false);
-
-		// do skeleton
-		{
-			// it would be more ideal to just feed it bones, but I don't want to deal with that mess of functions currently
-			cast::CastNode* const skelNode = animNode->AddChild(cast::CastId::Skeleton, RTech::StringToGuid(fileNameBase.c_str()));
-			skelNode->ReserveChildren(boneCount);
-
-			// uses hashes for lookup, still gets bone parents by index :clown:
-			for (size_t i = 0; i < boneCount; i++)
-			{
-				const ModelBone_t* const boneData = &bones->at(i);
-				
-				cast::CastNodeBone boneNode(skelNode);
-				boneNode.MakeBone(boneData->name, boneData->parentIndex, &boneData->pos, &boneData->quat, false);
-			}
-		}
-
-		if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID) || animdesc->parsedBufferIndex == invalidNoodleIdx)
-		{
-			cast.ToFile();
-
-			continue;
-		}
-
-		const std::unique_ptr<char[]> noodle = seqdesc->parsedData.getIdx(animdesc->parsedBufferIndex);
-		CAnimData animData(noodle.get());
-
-		const cast::CastPropsCurveMode curveMode = animdesc->flags & eStudioAnimFlags::ANIM_DELTA ? cast::CastPropsCurveMode::MODE_ADDITIVE : cast::CastPropsCurveMode::MODE_ABSOLUTE;
-
-		// setup the stupid key frame buffer thing that cast curves use
-		cast::CastPropertyId frameBufferId;
-		void* const frameBuffer = cast::CastNodeCurve::MakeCurveKeyFrameBuffer(static_cast<size_t>(animdesc->numframes), frameBufferId);
-
-		Vector deltaPos(0.0f, 0.0f, 0.0f);
-		Quaternion deltaQuat(0.0f, 0.0f, 0.0f, 1.0f);
-		Vector deltaScale(1.0f, 1.0f, 1.0f);
-
-		for (size_t i = 0; i < boneCount; i++)
-		{
-			const ModelBone_t* const boneData = &bones->at(i);
-
-			// parsed data
-			const uint8_t flags = animData.GetFlag(i);
-			const char* dataPtr = animData.GetData(i);
-
-			// weight for delta anims
-			const float animWeight = seqdesc->Weight(static_cast<int>(i));
-
-			if (flags & CAnimDataBone::ANIMDATA_POS)
-			{
-				cast::CastNodeCurve curveNode(animNode);
-				curveNode.MakeCurveVector(boneData->name, reinterpret_cast<const Vector*>(dataPtr), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), cast::CastPropsCurveValue::POS_X, curveMode, animWeight);
-				
-				dataPtr += (sizeof(Vector) * animdesc->numframes);
-			}
-			else
-			{
-				const Vector* const track = animdesc->flags & eStudioAnimFlags::ANIM_DELTA ? &deltaPos : &boneData->pos;
-
-				cast::CastNodeCurve curveNode(animNode);
-				curveNode.MakeCurveVector(boneData->name, track, 1ull, frameBuffer, static_cast<size_t>(animdesc->numframes), cast::CastPropsCurveValue::POS_X, curveMode, animWeight);
-			}
-
-			if (flags & CAnimDataBone::ANIMDATA_ROT)
-			{
-				cast::CastNodeCurve curveNode(animNode);
-				curveNode.MakeCurveQuaternion(boneData->name, reinterpret_cast<const Quaternion*>(dataPtr), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), curveMode, animWeight);
-
-				dataPtr += (sizeof(Quaternion) * animdesc->numframes);
-			}
-			else
-			{
-				const Quaternion* const track = animdesc->flags & eStudioAnimFlags::ANIM_DELTA ? &deltaQuat : &boneData->quat;
-
-				cast::CastNodeCurve curveNode(animNode);
-				curveNode.MakeCurveQuaternion(boneData->name, track, 1ull, frameBuffer, static_cast<size_t>(animdesc->numframes), curveMode, animWeight);
-			}
-
-			// check if the sequence has scale data.
-			if (seqdesc->flags & 0x20000)
-			{
-				if (flags & CAnimDataBone::ANIMDATA_SCL)
-				{
-					cast::CastNodeCurve curveNode(animNode);
-					curveNode.MakeCurveVector(boneData->name, reinterpret_cast<const Vector*>(dataPtr), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), cast::CastPropsCurveValue::SCL_X, curveMode, animWeight);
-				}
-				else
-				{
-					const Vector* track = animdesc->flags & eStudioAnimFlags::ANIM_DELTA ? &deltaScale : &boneData->scale;
-
-					cast::CastNodeCurve curveNode(animNode);
-					curveNode.MakeCurveVector(boneData->name, track, 1ull, frameBuffer, static_cast<size_t>(animdesc->numframes), cast::CastPropsCurveValue::SCL_X, curveMode, animWeight);
-				}
-			}
-		}
-
-		cast.ToFile();
-		
-		delete[] frameBuffer;
-	}
-
-	return true;
-}
-
 bool ExportAnimSeqAsset(CPakAsset* const asset, const int setting, const AnimSeqAsset* const animSeqAsset, const std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones)
 {
 	std::filesystem::path exportPathCop = exportPath;
 
+	// [rika]: please DO NOT remove the 'eAnimSeqExportSetting::ANIMSEQ_RSEQ' case from here, this function can be called elsewhere (MDL & ARIG)
+	// with this export setting and will cause issues!
 	switch (setting)
 	{
 
-	case eAnimSeqExportSetting::ASEQ_CAST:
+	case eAnimSeqExportSetting::ANIMSEQ_CAST:
 	{
 		return ExportSeqDescCast(&animSeqAsset->seqdesc, exportPathCop, skelName, bones, asset->GetAssetGUID());
 	}
-	case eAnimSeqExportSetting::ASEQ_RMAX:
+	case eAnimSeqExportSetting::ANIMSEQ_RMAX:
 	{
 		return ExportSeqDescRMAX(&animSeqAsset->seqdesc, exportPathCop, skelName, bones);
+	}
+	case eAnimSeqExportSetting::ANIMSEQ_RSEQ:
+	{
+		return ExportRawAnimSeqAsset(asset, animSeqAsset, exportPathCop);
 	}
 	default:
 	{
@@ -543,11 +343,12 @@ bool ExportAnimSeqAsset(CAsset* const asset, const int setting)
 	assertm(animSeqAsset, "Extra data should be valid at this point.");
 	assertm(animSeqAsset->name, "No name for anim rig.");
 
-	const bool exportAsRaw = setting == eAnimSeqExportSetting::ASEQ_RSEQ;
+	const bool exportAsRaw = setting == eAnimSeqExportSetting::ANIMSEQ_RSEQ;
 
 	if (!exportAsRaw && !animSeqAsset->animationParsed)
 	{
 		// no skeleton while trying to export it as a format that requires it.
+		assertm(false, "animseq was not parsed (likely invalid rig)");
 		return false;
 	}
 
@@ -570,44 +371,39 @@ bool ExportAnimSeqAsset(CAsset* const asset, const int setting)
 
 	exportPath.append(std::format("{}.rseq", seqStem));
 
-	if (exportAsRaw)
-	{
-		// [amos]: eAnimSeqExportSetting::RSEQ is handled here because we do
-		// not need the skeleton data when exporting the raw sequence data.
-		// Some of these animation sequences are dependents of settings assets
-		// and appear to be used in some way or another, so we must do it here.
-		return ExportRawAnimSeqAsset(pakAsset, animSeqAsset, exportPath);
-	}
-
+	// [rika]: get our rig if there is one available
 	const std::vector<ModelBone_t>* bones = nullptr;
 	char* skeletonName = nullptr;
 
-	if (animSeqAsset->parentModel)
+	// [rika]: only bother with this if we are going to use it!
+	if (!exportAsRaw)
 	{
-		bones = &animSeqAsset->parentModel->bones;
-		skeletonName = animSeqAsset->parentModel->name;
+		if (animSeqAsset->parentModel)
+		{
+			bones = animSeqAsset->parentModel->GetRig();
+			skeletonName = animSeqAsset->parentModel->name;
+		}
+		else if (animSeqAsset->parentRig)
+		{
+			bones = &animSeqAsset->parentRig->bones;
+			skeletonName = animSeqAsset->parentRig->name;
+		}
+		assertm(bones && !bones->empty(), "we should have bones at this point.");
 	}
-	else if (animSeqAsset->parentRig)
-	{
-		bones = &animSeqAsset->parentRig->bones;
-		skeletonName = animSeqAsset->parentRig->name;
-	}
-	assertm(bones && !bones->empty(), "we should have bones at this point.");
 
 	return ExportAnimSeqAsset(pakAsset, setting, animSeqAsset, exportPath, skeletonName, bones);
 }
 
 void InitAnimSeqAssetType()
 {
-	static const char* settings[] = { "CAST", "RMAX", "RSEQ",  };
 	AssetTypeBinding_t type =
 	{
 		.type = 'qesa',
 		.headerAlignment = 8,
 		.loadFunc = LoadAnimSeqAsset,
 		.postLoadFunc = PostLoadAnimSeqAsset,
-		.previewFunc = nullptr,
-		.e = { ExportAnimSeqAsset, 0, settings, ARRSIZE(settings) },
+		.previewFunc = PreviewAnimSeqAsset,
+		.e = { ExportAnimSeqAsset, 0, s_AnimSeqExportSettingNames, ARRSIZE(s_AnimSeqExportSettingNames) },
 	};
 
 	REGISTER_TYPE(type);

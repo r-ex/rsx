@@ -327,9 +327,6 @@
     <ClInclude Include="game\rtech\utils\studio\studio_r2.h">
       <Filter>game\rtech\utils\studio</Filter>
     </ClInclude>
-    <ClInclude Include="core\mdl\compdata.h">
-      <Filter>core\mdl</Filter>
-    </ClInclude>
     <ClInclude Include="game\rtech\utils\studio\studio_r5_v8.h">
       <Filter>game\rtech\utils\studio</Filter>
     </ClInclude>
@@ -344,6 +341,18 @@
     </ClInclude>
     <ClInclude Include="core\utils\utils_general.h">
       <Filter>core\utils</Filter>
+    </ClInclude>
+    <ClInclude Include="core\mdl\modeldata.h">
+      <Filter>core\mdl</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\material_snapshot.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\texture_list.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\map.h">
+      <Filter>game\rtech\assets</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -566,9 +575,6 @@
     <ClCompile Include="game\rtech\utils\studio\studio_r5.cpp">
       <Filter>game\rtech\utils\studio</Filter>
     </ClCompile>
-    <ClCompile Include="core\mdl\compdata.cpp">
-      <Filter>core\mdl</Filter>
-    </ClCompile>
     <ClCompile Include="game\rtech\utils\utils.cpp">
       <Filter>game\rtech\utils</Filter>
     </ClCompile>
@@ -580,6 +586,18 @@
     </ClCompile>
     <ClCompile Include="game\rtech\utils\studio\studio_r1.cpp">
       <Filter>game\rtech\utils\studio</Filter>
+    </ClCompile>
+    <ClCompile Include="core\mdl\modeldata.cpp">
+      <Filter>core\mdl</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\material_snapshot.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\texture_list.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\map.cpp">
+      <Filter>game\rtech\assets</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

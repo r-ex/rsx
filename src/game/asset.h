@@ -17,10 +17,12 @@ enum class AssetType_t
 
 	// texture/material
 	MATL = MAKEFOURCC('m', 'a', 't', 'l'),
+	MSNP = MAKEFOURCC('m', 's', 'n', 'p'),
 	MT4A = MAKEFOURCC('m', 't', '4', 'a'),
 	TXTR = MAKEFOURCC('t', 'x', 't', 'r'),
 	TXAN = MAKEFOURCC('t', 'x', 'a', 'n'),
 	TXLS = MAKEFOURCC('t', 'x', 'l', 's'),
+	TXTX = MAKEFOURCC('t', 'x', 't', 'x'),
 	UIMG = MAKEFOURCC('u', 'i', 'm', 'g'),
 	UIIA = MAKEFOURCC('u', 'i', 'i', 'a'),
 	FONT = MAKEFOURCC('f', 'o', 'n', 't'),
@@ -41,14 +43,14 @@ enum class AssetType_t
 
 	// pak
 	PTCH = MAKEFOURCC('P', 't', 'c', 'h'),
-	VERS = MAKEFOURCC('v', 'e', 'r', 's'),
+	VERS = MAKEFOURCC('v', 'e', 'r', 's'), // patch version
 
 	// descriptors (stats, specs, etc)
 	DTBL = MAKEFOURCC('d', 't', 'b', 'l'),
 	STGS = MAKEFOURCC('s', 't', 'g', 's'),
 	STLT = MAKEFOURCC('s', 't', 'l', 't'),
-	SUBT = MAKEFOURCC('s', 'u', 'b', 't'),
 	RSON = MAKEFOURCC('r', 's', 'o', 'n'),
+	SUBT = MAKEFOURCC('s', 'u', 'b', 't'),
 	LOCL = MAKEFOURCC('l', 'o', 'c', 'l'),
 
 	// vpk
@@ -58,6 +60,12 @@ enum class AssetType_t
 
 	// map
 	RMAP = MAKEFOURCC('r', 'm', 'a', 'p'),
+	LLYR = MAKEFOURCC('l', 'l', 'y', 'r'),
+
+	// odl
+	ODLA = MAKEFOURCC('o', 'd', 'l', 'a'),
+	ODLC = MAKEFOURCC('o', 'd', 'l', 'c'),
+	ODLP = MAKEFOURCC('o', 'd', 'l', 'p'),
 
 	// audio
 	ASRC = MAKEFOURCC('a', 's', 'r', 'c'), // source
@@ -66,25 +74,33 @@ enum class AssetType_t
 
 static std::map<AssetType_t, Color4> s_AssetTypeColours =
 {
-	// only color assets we support!
+	// only color assets we support (for export or preview)!
 
 	// model (reds)
 	// pak
 	{ AssetType_t::MDL_, Color4(240, 60,  50) },
 	{ AssetType_t::ARIG, Color4(220, 75,  10) },
 	{ AssetType_t::ASEQ, Color4(220, 75, 109) },
-	// TODO: ANIR color
+	{ AssetType_t::ANIR, Color4(200, 100, 130) },
 	// non pak
 	{ AssetType_t::MDL,  Color4(240, 60,  50) },
 	{ AssetType_t::SEQ,	 Color4(220, 75, 109) },
 
 	// texture/ui (blues)
 	{ AssetType_t::MATL, Color4(26,  122, 138) },
+	{ AssetType_t::MSNP, Color4(70,  120, 180) },
+	// mt4a
 	{ AssetType_t::TXTR, Color4(0,   106, 255) },
+	{ AssetType_t::TXAN, Color4(100, 175, 200) },
+	{ AssetType_t::TXLS, Color4(75,  140, 240) },
+	// txtx
 	{ AssetType_t::UIMG, Color4(114, 142, 230) },
 	{ AssetType_t::UIIA, Color4(114, 142, 230) },
 	{ AssetType_t::FONT, Color4(100, 130, 200) },
-	{ AssetType_t::EFCT, Color4(9,   222, 192) },
+
+	// particle (texture)
+	//{ AssetType_t::EFCT, Color4(9,   222, 192) },
+	// rpsk
 
 	// dx/shader (orples)
 	{ AssetType_t::SHDS, Color4(130, 111, 151) },
@@ -92,7 +108,13 @@ static std::map<AssetType_t, Color4> s_AssetTypeColours =
 
 	// ui (greens)
 	{ AssetType_t::UI,   Color4(25,  180,  25) },
+	// hsys
+	// rlcd
 	{ AssetType_t::RTK,  Color4(114, 197, 130) },
+
+	// pak
+	// Ptch
+	// vers
 
 	// descriptors (yellows)
 	{ AssetType_t::DTBL, Color4(220, 196, 0) },
@@ -107,7 +129,14 @@ static std::map<AssetType_t, Color4> s_AssetTypeColours =
 	{ AssetType_t::WEPN, Color4(255, 122, 204) },
 	{ AssetType_t::IMPA, Color4(255,  50, 220) },
 
+	// map
 	//{ PakAssetType_t::RMAP, Color4(131 ,69, 255) },
+	// llyr
+
+	// odl
+	// odla
+	// odlc
+	// odlp
 
 	// audio
 	{ AssetType_t::ASRC, Color4(91,  52, 252) },
@@ -116,29 +145,43 @@ static std::map<AssetType_t, Color4> s_AssetTypeColours =
 
 static const std::map<AssetType_t, const char*> s_AssetTypePaths =
 {
-	// model (reds)
+	// model
 	{ AssetType_t::MDL_, "mdl" },
 	{ AssetType_t::ARIG, "animrig" },
 	{ AssetType_t::ASEQ, "animseq" },
 	{ AssetType_t::ANIR, "anim_recording" },
+	{ AssetType_t::MDL, "models" },
+	{ AssetType_t::SEQ, "models" },
 
-	// texture/ui (blues)
+	// texture/ui
 	{ AssetType_t::MATL, "material" },
+	{ AssetType_t::MSNP, "material_snapshot" }, // "material snapshot" 
+	// mt4a "material for aspect"
 	{ AssetType_t::TXTR, "texture" },
 	{ AssetType_t::TXAN, "texture_anim" },
+	{ AssetType_t::TXLS, "texture_list" },
+	{ AssetType_t::TXLS, "texture_extension" },
 	{ AssetType_t::UIMG, "ui_image_atlas" },
 	{ AssetType_t::UIIA, "ui_image" },
 	{ AssetType_t::FONT, "ui_font_atlas" },
+
+	// particle (texture)
 	{ AssetType_t::EFCT, "effect" },
+	// rpsk
 
-
-	// dx/shader (orples)
+	// dx/shader
 	{ AssetType_t::SHDS, "shaderset" },
 	{ AssetType_t::SHDR, "shader" },
 
-	// ui (greens)
+	// ui
 	{ AssetType_t::RTK,  "ui_rtk" },
+	// hsys
+	// rlcd
 	{ AssetType_t::UI,   "ui" },
+
+	// pak
+	// Ptch "Pak Patch"
+	// vers "Pak Version"
 
 	// descriptors
 	{ AssetType_t::DTBL, "datatable" },
@@ -152,6 +195,15 @@ static const std::map<AssetType_t, const char*> s_AssetTypePaths =
 	//{ AssetType_t::WRAP, nullptr },
 	{ AssetType_t::WEPN, "weapon_definition" },
 	{ AssetType_t::IMPA, "impact" },
+	
+	// map
+	{ AssetType_t::RMAP, "map" },
+	{ AssetType_t::LLYR, "llayer" },
+
+	// odl
+	// odla "odl asset"
+	// odlc "odl ctx"
+	// odlp "odl pak"
 };
 
 struct AssetVersion_t

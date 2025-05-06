@@ -1,10 +1,10 @@
 #include <pch.h>
-#include <game/rtech/assets/animrig.h>
 #include <game/rtech/assets/rson.h>
+#include <game/rtech/assets/animrig.h>
 #include <game/rtech/assets/animseq.h>
 
-#include <core/mdl/rmax.h>
 #include <core/mdl/stringtable.h>
+#include <core/mdl/rmax.h>
 #include <core/mdl/cast.h>
 
 #include <thirdparty/imgui/imgui.h>
@@ -195,13 +195,6 @@ void PostLoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
     }
 }
 
-enum eAnimRigExportSetting
-{
-    CAST,
-    RMAX,
-    RRIG,
-};
-
 static bool ExportRawAnimRigAsset(CPakAsset* const asset, const AnimRigAsset* const animRigAsset, std::filesystem::path& exportPath)
 {
     UNUSED(asset);
@@ -305,7 +298,7 @@ bool ExportAnimRigAsset(CAsset* const asset, const int setting)
     }
 
     // [rika]: needs setting to toggle this
-    if (g_ExportSettings.exportSeqsWithRig && animRigAsset->numAnimSeqs > 0)
+    if (g_ExportSettings.exportRigSequences && animRigAsset->numAnimSeqs > 0)
     {
         auto aseqAssetBinding = g_assetData.m_assetTypeBindings.find('qesa');
 
@@ -359,15 +352,15 @@ bool ExportAnimRigAsset(CAsset* const asset, const int setting)
 
     switch (setting)
     {
-    case eAnimRigExportSetting::CAST:
+    case eAnimRigExportSetting::ANIMRIG_CAST:
     {
         return ExportCastAnimRigAsset(pakAsset, animRigAsset, exportPath);
     }
-    case eAnimRigExportSetting::RMAX:
+    case eAnimRigExportSetting::ANIMRIG_RMAX:
     {
         return ExportRMAXAnimRigAsset(pakAsset, animRigAsset, exportPath);
     }
-    case eAnimRigExportSetting::RRIG:
+    case eAnimRigExportSetting::ANIMRIG_RRIG:
     {
         return ExportRawAnimRigAsset(pakAsset, animRigAsset, exportPath);
     }
@@ -383,7 +376,6 @@ bool ExportAnimRigAsset(CAsset* const asset, const int setting)
 
 void InitAnimRigAssetType()
 {
-    static const char* settings[] = { "CAST", "RMAX", "RRIG", };
     AssetTypeBinding_t type =
     {
         .type = 'gira',
@@ -391,7 +383,7 @@ void InitAnimRigAssetType()
         .loadFunc = LoadAnimRigAsset,
         .postLoadFunc = PostLoadAnimRigAsset,
         .previewFunc = nullptr,
-        .e = { ExportAnimRigAsset, 0, settings, ARRSIZE(settings) },
+        .e = { ExportAnimRigAsset, 0, s_AnimRigExportSettingNames, ARRSIZE(s_AnimRigExportSettingNames) },
     };
 
     REGISTER_TYPE(type);

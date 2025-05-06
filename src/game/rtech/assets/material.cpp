@@ -1,5 +1,6 @@
 #include <pch.h>
 #include <game/rtech/assets/material.h>
+#include <game/rtech/assets/material_snapshot.h>
 #include <game/rtech/assets/texture.h>
 
 #include <thirdparty/imgui/imgui.h>
@@ -9,6 +10,28 @@
 
 extern CDXParentHandler* g_dxHandler;
 extern ExportSettings_t g_ExportSettings;
+
+static const char* const s_PathPrefixTXTR = s_AssetTypePaths.find(AssetType_t::TXTR)->second;
+static const size_t s_PathPrefixTXTRSize = sizeof(s_PathPrefixTXTR) - 1; // [rika]: sizeof() includes the null terminator, which we don't need
+
+void MaterialAsset::ParseSnapshot()
+{
+    // [rika]: does this use material snapshots? do post load so we can get parsed asset.
+    if (snapshotMaterial != 0)
+    {
+        CPakAsset* const asset = g_assetData.FindAssetByGUID<CPakAsset>(snapshotMaterial);
+
+        if (asset)
+        {
+            snapshotAsset = asset;
+
+            assertm(asset->extraData(), "extra data should be valid");
+            const MaterialSnapshotAsset* const materialSnapshot = reinterpret_cast<const MaterialSnapshotAsset* const>(asset->extraData());
+
+            memcpy_s(&dxStates, sizeof(MaterialDXState_t), &materialSnapshot->dxStates, sizeof(MaterialDXState_t));
+        }
+    }
+}
 
 const MaterialShaderType_t GetTypeFromLegacyMaterial(std::filesystem::path& materialPath, const uint64_t guid)
 {
@@ -32,61 +55,45 @@ const MaterialShaderType_t GetTypeFromLegacyMaterial(std::filesystem::path& mate
     return MaterialShaderType_t::_TYPE_LEGACY;
 }
 
-#undef max
-void LoadMaterialAsset(CAssetContainer* const pak, CAsset* const asset)
+const MaterialShaderType_t GetTypeFromMaterialName(const std::filesystem::path& materialPath)
 {
-    UNUSED(pak);
-    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+    const std::string stem(materialPath.stem().string());
 
+    for (uint8_t i = 0; i < MaterialShaderType_t::_TYPE_LEGACY_COUNT; i++)
+    {
+        const MaterialShaderType_t type = static_cast<MaterialShaderType_t>(MaterialShaderType_t::SKN + i);
 
-    MaterialAsset* materialAsset = nullptr;
+        if (!stem.ends_with(s_MaterialShaderTypeSuffixes[type]))
+            continue;
 
-    switch (pakAsset->version())
-    {
-    case 12:
-    {
-        MaterialAssetHeader_v12_t* v12 = reinterpret_cast<MaterialAssetHeader_v12_t*>(pakAsset->header());
-        materialAsset = new MaterialAsset(v12, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
-        break;
-    }
-    case 15:
-    {
-        MaterialAssetHeader_v15_t* v15 = reinterpret_cast<MaterialAssetHeader_v15_t*>(pakAsset->header());
-        materialAsset = new MaterialAsset(v15, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
-        break;
-    }
-    case 16:
-    case 17:
-    case 18:
-    case 19:
-    case 20:
-    case 21:
-    {
-        MaterialAssetHeader_v16_t* v16 = reinterpret_cast<MaterialAssetHeader_v16_t*>(pakAsset->header());
-        materialAsset = new MaterialAsset(v16, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
-        break;
-    }
-    case 22:
-    case 23:
-    {
-        MaterialAssetHeader_v22_t* v22 = reinterpret_cast<MaterialAssetHeader_v22_t*>(pakAsset->header());
-        materialAsset = new MaterialAsset(v22, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
-        break;
-    }
-    default:
-        return;
+        return type;
     }
 
-    std::string materialName = materialAsset->name;
+    Log("** failed to find type for material %s\n", materialPath.string().c_str());
 
+    return MaterialShaderType_t::_TYPE_LEGACY;
+}
+
+// [rika]: handle name and type parsing
+inline std::string ParseMaterialAssetName(MaterialAsset* const materialAsset)
+{
+    std::string materialName(materialAsset->name);
+
+    // valid should have a valid name
+    if (materialName.ends_with(".rpak") && materialAsset->materialType != MaterialShaderType_t::_TYPE_LEGACY)
+        return materialName;
+
+    // our material name isn't the full path
     if (!materialName.ends_with(".rpak"))
     {
         std::filesystem::path materialPath = "material/" + materialName;
 
+        // we have the proper type, but the path is not correct
         if (materialAsset->materialType != _TYPE_LEGACY)
         {
             materialPath.replace_filename(std::format("{}{}.rpak", materialPath.stem().string(), GetMaterialShaderSuffixByType(materialAsset->materialType)));
         }
+        // we need to get the correct path from hashing
         else
         {
             materialAsset->materialType = GetTypeFromLegacyMaterial(materialPath, materialAsset->guid);
@@ -96,15 +103,87 @@ void LoadMaterialAsset(CAssetContainer* const pak, CAsset* const asset)
         }
 
         materialName = materialPath.string();
+        return materialName;
     }
+
+    // our material ends in .rpak and has an incorrect type (get type from name)
+    const std::filesystem::path materialPath(materialName);
+    materialAsset->materialType = GetTypeFromMaterialName(materialPath);
+    return materialName;
+}
+
+#undef max
+void LoadMaterialAsset(CAssetContainer* const container, CAsset* const asset)
+{
+    UNUSED(container);
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    const PakAsset_t* const internalAsset = pakAsset->data();
+    UNUSED(internalAsset);
+
+    MaterialAsset* materialAsset = nullptr;
+
+    switch (pakAsset->version())
+    {
+    case 12:
+    {
+        MaterialAssetHeader_v12_t* hdr = reinterpret_cast<MaterialAssetHeader_v12_t*>(pakAsset->header());
+        materialAsset = new MaterialAsset(hdr, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
+        break;
+    }
+    case 15:
+    {
+        MaterialAssetHeader_v15_t* hdr = reinterpret_cast<MaterialAssetHeader_v15_t*>(pakAsset->header());
+        materialAsset = new MaterialAsset(hdr, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
+        break;
+    }
+    case 16:
+    case 17:
+    case 18:
+    case 19:
+    case 20:
+    case 21:
+    {
+        MaterialAssetHeader_v16_t* hdr = reinterpret_cast<MaterialAssetHeader_v16_t*>(pakAsset->header());
+        materialAsset = new MaterialAsset(hdr, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
+        break;
+    }
+    case 22:
+    case 23:
+    {
+        if (pakAsset->data()->headerStructSize != sizeof(MaterialAssetHeader_v22_t) && pakAsset->version() == 23)
+        {
+            pakAsset->SetAssetVersion({ 23, 1 }); // [rika]: set minor version
+
+            assertm(pakAsset->data()->headerStructSize == sizeof(sizeof(MaterialAssetHeader_v23_1_t)), "incorrect header");
+
+            MaterialAssetHeader_v23_1_t* hdr = reinterpret_cast<MaterialAssetHeader_v23_1_t*>(pakAsset->header());
+            MaterialAssetCPU_t* const cpu = pakAsset->cpu() ? reinterpret_cast<MaterialAssetCPU_t* const>(pakAsset->cpu()) : hdr->cpuDataPtr;
+            materialAsset = new MaterialAsset(hdr, cpu);
+
+            break;
+        }
+
+        MaterialAssetHeader_v22_t* hdr = reinterpret_cast<MaterialAssetHeader_v22_t*>(pakAsset->header());
+        materialAsset = new MaterialAsset(hdr, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
+
+        break;
+    }
+    default:
+        return;
+    }
+
+    std::string materialName = ParseMaterialAssetName(materialAsset);    
  
+    assertm(materialAsset->materialType != MaterialShaderType_t::_TYPE_LEGACY, "unable to parse material shader type");
+
     pakAsset->SetAssetName(materialName);
     pakAsset->setExtraData(materialAsset);
 }
 
-void PostLoadMaterialAsset(CAssetContainer* const pak, CAsset* const asset)
+void PostLoadMaterialAsset(CAssetContainer* const container, CAsset* const asset)
 {
-    UNUSED(pak);
+    UNUSED(container);
 
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
 
@@ -127,6 +206,9 @@ void PostLoadMaterialAsset(CAssetContainer* const pak, CAsset* const asset)
 
     MaterialAsset* const materialAsset = reinterpret_cast<MaterialAsset*>(pakAsset->extraData());
     assertm(materialAsset, "Extra data should be valid at this point.");
+
+    // [rika]: parse our snapshot here!
+    materialAsset->ParseSnapshot();
 
     materialAsset->shaderSetAsset = g_assetData.FindAssetByGUID<CPakAsset>(materialAsset->shaderSet);
 
@@ -264,8 +346,6 @@ void MatPreview_DXState(const MaterialDXState_t& dxState, const uint8_t dxStateI
 {
 
     ImGui::SeparatorText(std::to_string(dxStateId).c_str());
-    UNUSED(dxState);
-    UNUSED(numRenderTargets);
     if (ImGui::TreeNodeEx(ITEMID("Blend States", dxStateId), ImGuiTreeNodeFlags_SpanAvailWidth))
     {
         for (int i = 0; i < numRenderTargets; ++i)
@@ -384,7 +464,16 @@ void* PreviewMaterialAsset(CAsset* const asset, const bool firstFrameForAsset)
 
     ImGui::Text("Shaderset: %s (0x%llx)", materialAsset->shaderSetAsset ? materialAsset->shaderSetAsset->GetAssetName().c_str() : "unloaded", materialAsset->shaderSet);
 
+    // [rika]: does this material use a snapshot?
+    if (materialAsset->snapshotMaterial != 0)
+    {
+        ImGui::Text("Material Snapshot: %s (0x%llx)", materialAsset->snapshotAsset ? materialAsset->snapshotAsset->GetAssetName().c_str() : "unloaded", materialAsset->snapshotMaterial);
+        ImGui::SameLine();
+        g_pImGuiHandler->HelpMarker("If a material uses a snapshot, the snapshot needs to be loaded for DX States preview to be accurate.\n");
+    }
+
     // [rika]: depth materials here
+    // [rika]: eventually we will get here
 
     if (ImGui::BeginTabBar("##MaterialTabs"))
     {
@@ -670,101 +759,187 @@ static void RemoveRenderPassSuffix(std::string& textureName)
         return;
 }
 
-std::unordered_map<uint8_t, MaterialTextureExportInfo_s> ExportMaterialTextures(const int setting, const MaterialAsset* materialAsset, const std::filesystem::path& exportPath, const bool semanticNames)
+// [rika]: generate the best possible texture name from the provided data
+static inline void TextureNameGenerated(MaterialTextureExportInfo_s& info, const MaterialAsset* const materialAsset, const std::string& materialStem, const uint32_t entryIdx, const eTextureType txtrType)
 {
-    std::filesystem::path exportPathCop = exportPath;
-    std::filesystem::path matlPath(materialAsset->name);
-
-    std::unordered_map<uint8_t, MaterialTextureExportInfo_s> textureNames;
-
-    uint8_t nextSlotIdx = 0;
-    for (auto& entry : materialAsset->txtrAssets)
+    if (materialAsset->resourceBindings.count(entryIdx))
     {
-        nextSlotIdx++;
+        info.exportName = std::format("{}_{}", materialStem, materialAsset->resourceBindings.at(entryIdx).name);
+        return;
+    }
 
+    if (txtrType != eTextureType::_UNUSED)
+    {
+        info.exportName = std::format("{}{}", materialStem, GetTextureSuffixByType(txtrType));
+        return;
+    }
+    
+    info.exportName = std::format("{}_{}", materialStem, entryIdx);
+    return;
+}
+
+// [rika]: handle parsing a valid texture path
+static inline void TextureNameReal(MaterialTextureExportInfo_s& info, const std::string& name, const bool useFullPaths)
+{
+    const std::filesystem::path tmp(name);
+
+    info.exportName = tmp.stem().string();
+
+    // [rika]: use texture's actual path for full export (since we are exporting to the directory anyway)
+    // fine for local (model) export since we will force generated names. bleeeeh ;p
+    if (useFullPaths)
+        info.exportPath = tmp.parent_path();
+}
+
+void ParseMaterialTextureExportInfo(std::unordered_map<uint32_t, MaterialTextureExportInfo_s>& textures, const MaterialAsset* materialAsset, const std::filesystem::path& exportPath, const eTextureExportName nameSetting, const bool useFullPaths)
+{
+    textures.clear();
+
+    // [rika]: generate our material stem here
+    std::string materialStem;
+
+    // [rika]: but don't parse it if it's not used (TXTR_NAME_REAL will never hit TextureNameGenerated)
+    if (nameSetting != eTextureExportName::TXTR_NAME_REAL && nameSetting != eTextureExportName::TXTR_NAME_GUID)
+    {
+        const std::filesystem::path materialPath(materialAsset->name);
+        materialStem = materialPath.stem().string();
+        RemoveRenderPassSuffix(materialStem);
+    }
+
+    for (const TextureAssetEntry_t& entry : materialAsset->txtrAssets)
+    {
         CPakAsset* const txtrAsset = entry.asset;
-        MaterialTextureExportInfo_s textureExportInfo;
 
         if (!txtrAsset)
-        {
-            textureNames.emplace(static_cast<uint8_t>(nextSlotIdx - 1), textureExportInfo);
             continue;
-        }
 
-        textureExportInfo.pTexture = txtrAsset;
+        MaterialTextureExportInfo_s info(exportPath, txtrAsset);
         TextureAsset* thisTexture = reinterpret_cast<TextureAsset*>(txtrAsset->extraData());
 
-        if (semanticNames)
+        // [rika]: when model export uses this function it can't it TextureNameReal as it could change the export path so that it's not local
+        // to the model, which for the time being is not supported. modeled currently calls this with nameSetting as eTextureExportName::TXTR_NAME_SMTC so it's a non issue.
+        switch (nameSetting)
         {
-            if (!thisTexture->name)
-            {
-                std::string materialNameStem = matlPath.stem().string();
-                RemoveRenderPassSuffix(materialNameStem);
-
-                if (materialAsset->resourceBindings.count(entry.index))
-                    textureExportInfo.exportName = std::format("{}_{}", materialNameStem, materialAsset->resourceBindings.at(entry.index).name);
-                else if (thisTexture->type != eTextureType::_UNUSED)
-                    textureExportInfo.exportName = std::format("{}{}", materialNameStem, GetTextureSuffixByType(thisTexture->type));
-                else
-                    textureExportInfo.exportName = std::format("{}_{}", materialNameStem, entry.index);
-            }
-            else
-            {
-                textureExportInfo.exportName = keepAfterLastSlashOrBackslash(thisTexture->name);
-            }
-
-            textureNames.emplace(static_cast<uint8_t>(nextSlotIdx - 1), textureExportInfo);
-        }
-        else
+        case eTextureExportName::TXTR_NAME_GUID:
         {
-            textureExportInfo.exportName = std::format("0x{:X}", thisTexture->guid);
+            info.exportName = std::format("0x{:X}", thisTexture->guid);
 
-
-            textureNames.emplace(static_cast<uint8_t>(nextSlotIdx - 1), textureExportInfo);
+            break;
         }
+        case eTextureExportName::TXTR_NAME_REAL:
+        {
+            if (thisTexture->name)
+            {
+                TextureNameReal(info, txtrAsset->GetAssetName(), useFullPaths);
 
-        exportPathCop.append(textureExportInfo.exportName);
+                break;
+            }
+
+            info.exportName = std::format("0x{:X}", thisTexture->guid);
+
+            break;
+        }
+        case eTextureExportName::TXTR_NAME_TEXT:
+        {
+            if (thisTexture->name)
+            {
+                TextureNameReal(info, txtrAsset->GetAssetName(), useFullPaths);
+
+                break;
+            }
+
+            TextureNameGenerated(info, materialAsset, materialStem, entry.index, thisTexture->type);
+
+            break;
+        }
+        case eTextureExportName::TXTR_NAME_SMTC:
+        {
+            TextureNameGenerated(info, materialAsset, materialStem, entry.index, thisTexture->type);
+
+            break;
+        }
+        default:
+        {
+            assertm(false, "name setting invalid (somehow)");
+
+            break;
+        }
+        }
 
         // check if this texture is a normal
         const DXGI_FORMAT fmt = s_PakToDxgiFormat[thisTexture->imgFormat];
-        bool txtrIsNormal = false;
-
         if (fmt == DXGI_FORMAT::DXGI_FORMAT_BC5_TYPELESS || fmt == DXGI_FORMAT::DXGI_FORMAT_BC5_UNORM || fmt == DXGI_FORMAT::DXGI_FORMAT_BC5_SNORM)
         {
-            if (textureExportInfo.exportName.find("normalTexture") != std::string::npos)
-                txtrIsNormal = true;
+            // [rika]: for semantic textures
+            if (info.exportName.find("normalTexture") != std::string::npos)
+                info.isNormal = true;
+
+            // [rika]: for textures with a valid name
+            if (info.exportName.find("_nml") != std::string::npos)
+                info.isNormal = true;
         }
+
+        textures.emplace(entry.index, info);
+    }
+}
+
+void ExportMaterialTextures(const int setting, const MaterialAsset* materialAsset, const std::unordered_map<uint32_t, MaterialTextureExportInfo_s>& textureInfo)
+{
+    for (auto& entry : materialAsset->txtrAssets)
+    {
+        CPakAsset* const asset = entry.asset;
+
+        if (!asset)
+            continue;
+
+        assertm(textureInfo.contains(entry.index), "we should have this entry as it's a loaded texture");
+        const MaterialTextureExportInfo_s* const info = &textureInfo.find(entry.index)->second;
+
+        std::filesystem::path exportPath = EXPORT_DIRECTORY_NAME;
+        exportPath /= info->exportPath;
+
+        // [rika]: create actual export path as it could've changed.
+        if (!CreateDirectories(exportPath))
+            assertm(false, "Failed to create asset's directory.");
+
+        exportPath.append(info->exportName);
+
+        TextureAsset* const textureAsset = reinterpret_cast<TextureAsset* const>(asset->extraData());
+        assertm(textureAsset, "Extra data was not valid");
 
         switch (setting)
         {
         case eTextureExportSetting::PNG_HM:
         case eTextureExportSetting::PNG_AM:
         {
-            ExportPngTextureAsset(txtrAsset, thisTexture, exportPathCop, setting, txtrIsNormal);
+            ExportPngTextureAsset(asset, textureAsset, exportPath, setting, info->isNormal);
             break;
         }
         case eTextureExportSetting::DDS_HM:
         case eTextureExportSetting::DDS_AM:
         case eTextureExportSetting::DDS_MM:
         {
-            ExportDdsTextureAsset(txtrAsset, thisTexture, exportPathCop, setting, txtrIsNormal);
+            ExportDdsTextureAsset(asset, textureAsset, exportPath, setting, info->isNormal);
             break;
         }
         default:
             assertm(false, "Export setting is not handled.");
             break;
         }
-
-        exportPathCop = exportPath;
     }
+}
 
-    return textureNames;
+// [rika]: for ExportMaterialStruct
+FORCEINLINE void ExportMaterialStructWriteGUID(const TextureAssetEntry_t& tex, std::ofstream& ofs, const uint64_t* const textureHandles, const size_t idxCur, const size_t idxLast)
+{
+    const char* const commaChar = idxCur != idxLast ? "," : "";
+
+    ofs << "\t\t\"" << std::dec << tex.index << "\": \"0x" << std::hex << textureHandles[tex.index] << "\"" << commaChar << "\n";
 }
 
 // [amos]: when the rson parser is finished, we should make both rsx and repak use rson.
 bool ExportMaterialStruct(const MaterialAsset* const materialAsset, 
-    std::filesystem::path& exportPath, const std::filesystem::path& texturePath, 
-    const std::unordered_map<uint8_t, MaterialTextureExportInfo_s>& textureInfo, const bool useSemanticNames)
+    std::filesystem::path& exportPath, const std::unordered_map<uint32_t, MaterialTextureExportInfo_s>& textureInfo)
 {
     if (materialAsset->materialType == _TYPE_LEGACY)
         return false;
@@ -772,9 +947,13 @@ bool ExportMaterialStruct(const MaterialAsset* const materialAsset,
     exportPath.replace_extension(".json");
     std::ofstream ofs(exportPath, std::ios::out);
 
+    // [rika]: some material names (notably r2 materials) use '\\' instead of '/'
+    std::string materialName(materialAsset->name);
+    FixSlashes(materialName);
+
     ofs << "{\n";
 
-    ofs << "\t\"name\": \"" << materialAsset->name << "\",\n";
+    ofs << "\t\"name\": \"" << materialName.c_str() << "\",\n";
 
     ofs << "\t\"width\": " << std::dec << materialAsset->width << ",\n";
     ofs << "\t\"height\": " << std::dec << materialAsset->height << ",\n";
@@ -807,36 +986,48 @@ bool ExportMaterialStruct(const MaterialAsset* const materialAsset,
     ofs << "\t\"surfaceProp2\": \"" << surfaceProp2 << "\",\n";
 
     ofs << "\t\"shaderType\": \"" << &s_MaterialShaderTypeSuffixes[materialAsset->materialType][1] << "\",\n"; // skip the underscore
-    ofs << "\t\"shaderSet\": \"0x" << std::uppercase << std::hex << materialAsset->shaderSet << "\",\n";
+    ofs << "\t\"shaderSet\": \"0x" << std::uppercase << std::hex << materialAsset->shaderSet << "\",\n"; // [rika]: prefer guid setting ?
 
     ofs << "\t\"$textures\": {\n";
 
-    if (useSemanticNames && !textureInfo.empty())
+    // [rika]: force guid ?
+    if (!textureInfo.empty() && g_ExportSettings.exportTextureNameSetting != eTextureExportName::TXTR_NAME_GUID)
     {
-        const size_t size = textureInfo.size();
         size_t i = 0;
-
-        for (auto& it : textureInfo)
+        const size_t size = materialAsset->txtrAssets.size();
+        for (const TextureAssetEntry_t& entry : materialAsset->txtrAssets)
         {
-            std::string fullTexturePath = texturePath.string() + "/" + it.second.exportName + ".rpak";
+            // [rika]: write a guid if our texture was not loaded (and by extension not exported)
+            if (!textureInfo.count(entry.index))
+            {
+                ExportMaterialStructWriteGUID(entry, ofs, reinterpret_cast<const uint64_t* const>(materialAsset->textureHandles), i, size - 1);
+
+                i++;
+
+                continue;
+            }
+
+            const MaterialTextureExportInfo_s& info = textureInfo.find(entry.index)->second;
+
+            std::string fullTexturePath = info.exportPath.string() + "/" + info.exportName + ".rpak";
             FixSlashes(fullTexturePath);
 
-            const char* const commaChar = i != (size-1) ? "," : "";
-            const TextureAssetEntry_t& tex = materialAsset->txtrAssets[i];
+            const char* const commaChar = i != (size - 1) ? "," : "";
 
-            ofs << "\t\t\"" << std::dec << static_cast<int>(tex.index) << "\": \"" << fullTexturePath << "\"" << commaChar << "\n";
+            ofs << "\t\t\"" << std::dec << static_cast<int>(entry.index) << "\": \"" << fullTexturePath << "\"" << commaChar << "\n";
 
             i++;
         }
     }
     else
     {
-        for (size_t i = 0, size = materialAsset->txtrAssets.size(); i < size; i++)
+        size_t i = 0;
+        const size_t size = materialAsset->txtrAssets.size();
+        for (const TextureAssetEntry_t& entry : materialAsset->txtrAssets)
         {
-            const TextureAssetEntry_t& tex = materialAsset->txtrAssets[i];
-            const char* const commaChar = i != (size - 1) ? "," : "";
+            ExportMaterialStructWriteGUID(entry, ofs, reinterpret_cast<const uint64_t* const>(materialAsset->textureHandles), i, size - 1);
 
-            ofs << "\t\t\"" << std::dec << tex.index << "\": \"0x" << std::hex << reinterpret_cast<const uint64_t*>(materialAsset->textureHandles)[tex.index] << "\"" << commaChar << "\n";
+            i++;
         }
     }
 
@@ -846,26 +1037,23 @@ bool ExportMaterialStruct(const MaterialAsset* const materialAsset,
     // Write out the texture types, so external tools can remap textures to other shaders.
     for (size_t i = 0, size = materialAsset->txtrAssets.size(); i < size; i++)
     {
-        const TextureAssetEntry_t& tex = materialAsset->txtrAssets[i];
+        const TextureAssetEntry_t& entry = materialAsset->txtrAssets[i];
         const char* const commaChar = i != (size - 1) ? "," : "";
 
-        ofs << "\t\t\"" << std::dec << tex.index << "\": \"";
+        ofs << "\t\t\"" << std::dec << entry.index << "\": \"";
 
         const char* toPrint = nullptr;
 
-        if (materialAsset->resourceBindings.count(tex.index))
-            toPrint = materialAsset->resourceBindings.at(tex.index).name;
-        else if (!textureInfo.empty())
+        if (materialAsset->resourceBindings.count(entry.index))
+            toPrint = materialAsset->resourceBindings.at(entry.index).name;
+        else if (!textureInfo.empty() && textureInfo.count(entry.index))
         {
-            const MaterialTextureExportInfo_s& info = textureInfo.at((uint8_t)i);
+            const MaterialTextureExportInfo_s& info = textureInfo.at(entry.index);
 
-            if (info.pTexture)
-            {
-                const TextureAsset* const textureAsset = reinterpret_cast<const TextureAsset*>(info.pTexture->extraData());
+            const TextureAsset* const textureAsset = reinterpret_cast<const TextureAsset*>(info.pTexture->extraData());
 
-                if (textureAsset->type != eTextureType::_UNUSED)
-                    toPrint = s_TextureTypeMap.at(textureAsset->type);
-            }
+            if (textureAsset->type != eTextureType::_UNUSED)
+                toPrint = s_TextureTypeMap.at(textureAsset->type);
         }
 
         ofs << (toPrint ? toPrint : "unavailable");
@@ -874,6 +1062,7 @@ bool ExportMaterialStruct(const MaterialAsset* const materialAsset,
 
     ofs << "\t},\n";
 
+    // [rika]: prefer guid setting ?
     ofs << "\t\"$depthShadowMaterial\": \"0x" << std::hex << materialAsset->depthShadowMaterial << "\",\n";
     ofs << "\t\"$depthPrepassMaterial\": \"0x" << std::hex << materialAsset->depthPrepassMaterial << "\",\n";
     ofs << "\t\"$depthVSMMaterial\": \"0x" << std::hex << materialAsset->depthVSMMaterial << "\",\n";
@@ -911,7 +1100,6 @@ bool ExportMaterialAsset(CAsset* const asset, const int setting)
     assertm(materialAsset, "Extra data should be valid at this point.");
 
     const std::filesystem::path materialPath(asset->GetAssetName());
-    const std::filesystem::path texturePath = ChangeFirstDirectory(materialPath.parent_path(), "texture");
 
     // Create exported path + asset path.
     std::filesystem::path exportPath = /*std::filesystem::current_path().append(*/EXPORT_DIRECTORY_NAME/*)*/; // 
@@ -934,29 +1122,32 @@ bool ExportMaterialAsset(CAsset* const asset, const int setting)
     // get texture binding if it exists
     auto txtrAssetBinding = g_assetData.m_assetTypeBindings.find('rtxt');
 
-    std::unordered_map<uint8_t, MaterialTextureExportInfo_s> textureNames;
-
-    // only parse textures if one has actually been loaded
-    if (g_ExportSettings.exportTxtrWithMat && txtrAssetBinding != g_assetData.m_assetTypeBindings.end() && materialAsset->txtrAssets.size())
+    // [rika]: grab our paths and names for textures
+    std::unordered_map<uint32_t, MaterialTextureExportInfo_s> textureNames;
     {
-        std::filesystem::path textureExportPath;
+        std::filesystem::path texturePath;
         // textures should be exported to 'texture/' instead
+        // [rika]: I understand this is for repackaging assets, but it is a bit messy unfortunately.
         if (g_ExportSettings.exportPathsFull)
         {
-            textureExportPath = /*std::filesystem::current_path().append(*/EXPORT_DIRECTORY_NAME/*)*/;
-            textureExportPath /= g_ExportSettings.useSemanticTextureNames ? texturePath : "texture";
+            // [rika]: when 'eTextureExportName::TXTR_NAME_REAL' or 'eTextureExportName::TXTR_NAME_GUID' setting use the short path so GUID textures to go into the base 'texture' folder.
+            const bool useShortPath = (g_ExportSettings.exportTextureNameSetting == eTextureExportName::TXTR_NAME_REAL) || (g_ExportSettings.exportTextureNameSetting == eTextureExportName::TXTR_NAME_GUID);
 
-            if (!CreateDirectories(textureExportPath))
-            {
-                assertm(false, "Failed to create texture directory.");
-                return false;
-            }
+            texturePath = useShortPath ? s_PathPrefixTXTR : ChangeFirstDirectory(materialPath.parent_path(), "texture");
         }
+        // materials will be local to the material folder.
         else
-            textureExportPath = exportPath;
+        {
+            constexpr int truncate = sizeof(EXPORT_DIRECTORY_NAME); // size includes nullterminator (covers '\' in this case)
+            texturePath = exportPath.string().c_str() + truncate;
+        }
 
-        textureNames = ExportMaterialTextures(txtrAssetBinding->second.e.exportSetting, materialAsset, textureExportPath, g_ExportSettings.useSemanticTextureNames);
+        ParseMaterialTextureExportInfo(textureNames, materialAsset, texturePath, static_cast<eTextureExportName>(g_ExportSettings.exportTextureNameSetting), g_ExportSettings.exportPathsFull);
     }
+
+    // [rika]: export the material's textures if we're doing that
+    if (g_ExportSettings.exportMaterialTextures && txtrAssetBinding != g_assetData.m_assetTypeBindings.end() && materialAsset->txtrAssets.size())
+        ExportMaterialTextures(txtrAssetBinding->second.e.exportSetting, materialAsset, textureNames);
 
     std::filesystem::path materialExportPath = exportPath;
     materialExportPath /= materialPath.stem();
@@ -971,11 +1162,11 @@ bool ExportMaterialAsset(CAsset* const asset, const int setting)
     {
         // [amos]: when exporting cpu we typically also want the material itself so
         // it can be used directly in repak
-        return ExportRawMaterialAsset(materialAsset, materialExportPath) && ExportMaterialStruct(materialAsset, materialExportPath, texturePath, textureNames, g_ExportSettings.useSemanticTextureNames);
+        return ExportRawMaterialAsset(materialAsset, materialExportPath) && ExportMaterialStruct(materialAsset, materialExportPath, textureNames);
     }
     case eMaterialExportSetting::MATL_UBER_S:
     {
-        return ExportStructMaterialAsset(materialAsset, materialExportPath) && ExportMaterialStruct(materialAsset, materialExportPath, texturePath, textureNames, g_ExportSettings.useSemanticTextureNames);
+        return ExportStructMaterialAsset(materialAsset, materialExportPath) && ExportMaterialStruct(materialAsset, materialExportPath, textureNames);
     }
     default:
     {
@@ -989,7 +1180,7 @@ bool ExportMaterialAsset(CAsset* const asset, const int setting)
 
 void InitMaterialAssetType()
 {
-    static const char* settings[] = { "Base (Textures)", "Uber (Raw)", "Uber (Struct)" };
+    static const char* settings[] = { "Base (Textures)", "Uber (Raw)", "Uber (Struct)" }; // [rika]: I'm not a super big fan of these setting names, especially since the first one can do nothing in some cases.
     AssetTypeBinding_t type =
     {
         .type = 'ltam',

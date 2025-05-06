@@ -652,6 +652,10 @@ namespace vg
 	}
 }
 
+//===================
+// STUDIO MODEL DATA
+//===================
+
 struct mstudio_meshvertexloddata_t
 {
 	int modelvertexdataUnusedPad; // likely has none of the funny stuff because unused
@@ -728,9 +732,13 @@ struct studiohdr_short_t
 };
 
 // for non pak models with loose data (r1)
-struct StudioLooseData_t
+class StudioLooseData_t
 {
-	enum LooseDataType
+public:
+	StudioLooseData_t(const std::filesystem::path& path, const char* name, char* buffer); // DO NOT call this without managing the allocated buffers.
+	StudioLooseData_t(char* file);
+
+	enum LooseDataType : int8_t
 	{
 		SLD_VTX,
 		SLD_VVD,
@@ -740,13 +748,28 @@ struct StudioLooseData_t
 		SLD_COUNT
 	};
 
+	inline char* const VertBuf() const { return vertexDataBuffer; }
+	inline const int VertOffset(const LooseDataType type) const { return vertexDataOffset[type]; }
+	inline const int VertSize(const LooseDataType type) const { return vertexDataSize[type]; }
+
+	inline char* const PhysBuf() const { return physicsDataBuffer; }
+	inline const int PhysOffset() const { return physicsDataOffset; }
+	inline const int PhysSize() const { return physicsDataSize; }
+
+	inline const OptimizedModel::FileHeader_t*				const GetVTX() const { return vertexDataSize[SLD_VTX] ? reinterpret_cast<const OptimizedModel::FileHeader_t*			const>(vertexDataBuffer + vertexDataOffset[SLD_VTX]) : nullptr; }
+	inline const vvd::vertexFileHeader_t*					const GetVVD() const { return vertexDataSize[SLD_VVD] ? reinterpret_cast<const vvd::vertexFileHeader_t*					const>(vertexDataBuffer + vertexDataOffset[SLD_VVD]) : nullptr; }
+	inline const vvc::vertexColorFileHeader_t*				const GetVVC() const { return vertexDataSize[SLD_VVC] ? reinterpret_cast<const vvc::vertexColorFileHeader_t*			const>(vertexDataBuffer + vertexDataOffset[SLD_VVC]) : nullptr; }
+	inline const vvw::vertexBoneWeightsExtraFileHeader_t*	const GetVVW() const { return vertexDataSize[SLD_VVW] ? reinterpret_cast<const vvw::vertexBoneWeightsExtraFileHeader_t*	const>(vertexDataBuffer + vertexDataOffset[SLD_VVW]) : nullptr; }
+
+private:
+
 	char* vertexDataBuffer;
 	int vertexDataOffset[LooseDataType::SLD_COUNT];
 	int vertexDataSize[LooseDataType::SLD_COUNT];
 
-	void* physicsDataBuffer;
-	int physicsDataSize;
+	char* physicsDataBuffer;
 	int physicsDataOffset;
+	int physicsDataSize;
 };
 
 static const char* s_StudioLooseDataExtensions[StudioLooseData_t::LooseDataType::SLD_COUNT] = {

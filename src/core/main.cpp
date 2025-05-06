@@ -35,10 +35,11 @@ static void HandleAssetRegistration(int argc, char* const argv[])
 
     // texture/material
     extern void InitMaterialAssetType();
+    extern void InitMaterialSnapshotAssetType();
     // mt4a
     extern void InitTextureAssetType();
     extern void InitTextureAnimationAssetType();
-    // txls
+    extern void InitTextureListAssetType();
     extern void InitUIImageAtlasAssetType();
     extern void InitUIImageAssetType(); 
     extern void InitUIFontAtlasAssetType();
@@ -65,8 +66,8 @@ static void HandleAssetRegistration(int argc, char* const argv[])
     extern void InitDatatableAssetType();
     extern void InitSettingsAssetType();
     extern void InitSettingsLayoutAssetType();
-    extern void InitSubtitlesAsset();
     extern void InitRSONAssetType();
+    extern void InitSubtitlesAsset();
     extern void InitLoclAssetType();
     
     // vpk
@@ -75,7 +76,8 @@ static void HandleAssetRegistration(int argc, char* const argv[])
     extern void InitImpactAssetType();
     
     // map
-    // rmap
+    extern void InitMapAssetType();
+    // llyr
     
     // audio
     extern void InitAudioSourceAssetType();
@@ -93,10 +95,11 @@ static void HandleAssetRegistration(int argc, char* const argv[])
 
     // texture/material
     InitMaterialAssetType();
+    InitMaterialSnapshotAssetType();
     // mt4a
     InitTextureAssetType();
     InitTextureAnimationAssetType();
-    // txls
+    InitTextureListAssetType();
     InitUIImageAtlasAssetType();
     InitUIImageAssetType();
     InitUIFontAtlasAssetType();
@@ -123,8 +126,8 @@ static void HandleAssetRegistration(int argc, char* const argv[])
     InitDatatableAssetType();
     InitSettingsAssetType();
     InitSettingsLayoutAssetType();
-    InitSubtitlesAsset();
     InitRSONAssetType();
+    InitSubtitlesAsset();
     InitLoclAssetType();
 
     // vpk
@@ -133,7 +136,8 @@ static void HandleAssetRegistration(int argc, char* const argv[])
     InitImpactAssetType();
 
     // map
-    // rmap
+    InitMapAssetType();
+    // llyr
 
     // audio
     InitAudioSourceAssetType();

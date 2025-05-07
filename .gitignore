@@ -353,5 +353,5 @@ MigrationBackup/
 .vscode/settings.json
 
 **/exported_files/*
-radaudio.lib
+radaudio_decoder_win64.lib
 imgui.ini

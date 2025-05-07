@@ -155,7 +155,7 @@ void LoadMaterialAsset(CAssetContainer* const container, CAsset* const asset)
         {
             pakAsset->SetAssetVersion({ 23, 1 }); // [rika]: set minor version
 
-            assertm(pakAsset->data()->headerStructSize == sizeof(sizeof(MaterialAssetHeader_v23_1_t)), "incorrect header");
+            assertm(pakAsset->data()->headerStructSize == sizeof(MaterialAssetHeader_v23_1_t), "incorrect header");
 
             MaterialAssetHeader_v23_1_t* hdr = reinterpret_cast<MaterialAssetHeader_v23_1_t*>(pakAsset->header());
             MaterialAssetCPU_t* const cpu = pakAsset->cpu() ? reinterpret_cast<MaterialAssetCPU_t* const>(pakAsset->cpu()) : hdr->cpuDataPtr;

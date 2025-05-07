@@ -40,7 +40,7 @@ void LoadShaderSetAsset(CAssetContainer* const pak, CAsset* const asset)
 		{
 			pakAsset->SetAssetVersion({ 13, 1 }); // [rika]: set minor version
 
-			assertm(pakAsset->data()->headerStructSize == sizeof(sizeof(ShaderSetAssetHeader_v12_t)), "incorrect header");
+			assertm(pakAsset->data()->headerStructSize == sizeof(ShaderSetAssetHeader_v12_t), "incorrect header");
 
 			ShaderSetAssetHeader_v12_t* hdr = reinterpret_cast<ShaderSetAssetHeader_v12_t*>(pakAsset->header());
 			shdsAsset = new ShaderSetAsset(hdr);

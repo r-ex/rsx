@@ -191,7 +191,9 @@ void* PreviewUIAsset(CAsset* const asset, const bool firstFrameForAsset)
 
             if (ImGui::TableSetColumnIndex(UIPreviewData_t::eColumnID::TPC_Name))
             {
-                if (item->name)
+                if(item->type == UIAssetArgType_t::UI_ARG_TYPE_NONE)
+                    ImGui::Text("");
+                else if (item->name)
                     ImGui::Text("%s", item->name);
                 else
                     ImGui::Text("%x", item->hash);

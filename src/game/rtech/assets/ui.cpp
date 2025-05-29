@@ -52,6 +52,7 @@ struct UIPreviewData_t
         TPC_Type,
         TPC_Name,
         TPC_DefaultVal,
+        TPC_Offset,
 
         _TPC_COUNT,
     };
@@ -66,7 +67,7 @@ struct UIPreviewData_t
     uint16_t hash;
 
     UIAssetArgType_t type;
-
+    uint16_t offset;
 
     const bool operator==(const UIPreviewData_t& in)
     {
@@ -96,6 +97,7 @@ struct UICompare_t
             {
             case UIPreviewData_t::eColumnID::TPC_Index:     delta = (a.index - b.index);                                                break;
             case UIPreviewData_t::eColumnID::TPC_Type:      delta = (static_cast<uint8_t>(a.type) - static_cast<uint8_t>(b.type));      break;
+            case UIPreviewData_t::eColumnID::TPC_Offset:    delta = (a.offset - b.offset);                                              break;
             }
             if (delta > 0)
                 return (sort_spec->SortDirection == ImGuiSortDirection_Ascending) ? false : true;
@@ -142,7 +144,7 @@ void* PreviewUIAsset(CAsset* const asset, const bool firstFrameForAsset)
             argPreviewData.value.rawptr = (reinterpret_cast<char*>(uiAsset->argDefaultValues) + argData->dataOffset);
             argPreviewData.type = argData->type;
             argPreviewData.typeStr = s_UIArgTypeNames[argData->type];
-
+            argPreviewData.offset = argData->type == UIAssetArgType_t::UI_ARG_TYPE_NONE? 0xFFFF :argData->dataOffset;
             argPreviewData.hash = argData->shortHash; // use if we have no name
         }
     }
@@ -161,6 +163,7 @@ void* PreviewUIAsset(CAsset* const asset, const bool firstFrameForAsset)
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed, 0.0f, UIPreviewData_t::eColumnID::TPC_Type);
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed, 0.0f, UIPreviewData_t::eColumnID::TPC_Name);
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed, 0.0f, UIPreviewData_t::eColumnID::TPC_DefaultVal);
+        ImGui::TableSetupColumn("Offset", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed, 0.0f, UIPreviewData_t::eColumnID::TPC_Offset);
         ImGui::TableSetupScrollFreeze(1, 1);
 
         ImGuiTableSortSpecs* sortSpecs = ImGui::TableGetSortSpecs(); // get the sorting settings from this table
@@ -188,7 +191,11 @@ void* PreviewUIAsset(CAsset* const asset, const bool firstFrameForAsset)
 
             if (ImGui::TableSetColumnIndex(UIPreviewData_t::eColumnID::TPC_Type))
                 ImGui::Text("%s", item->typeStr);
-
+            if(ImGui::TableSetColumnIndex(UIPreviewData_t::eColumnID::TPC_Offset))
+                if(item->type == UIAssetArgType_t::UI_ARG_TYPE_NONE)
+                    ImGui::Text("");
+                else
+                    ImGui::Text("0x%X",item->offset);
             if (ImGui::TableSetColumnIndex(UIPreviewData_t::eColumnID::TPC_Name))
             {
                 if(item->type == UIAssetArgType_t::UI_ARG_TYPE_NONE)

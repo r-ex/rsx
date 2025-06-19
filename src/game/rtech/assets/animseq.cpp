@@ -119,7 +119,7 @@ void* PreviewAnimSeqAsset(CAsset* const asset, const bool firstFrameForAsset)
 	assertm(pakAsset->extraData(), "extra data should be valid");
 	const AnimSeqAsset* const animSeqAsset = reinterpret_cast<const AnimSeqAsset* const>(pakAsset->extraData());
 	if (!animSeqAsset)
-		return;
+		return nullptr;
 
 	// [rika]: todo, preview settings and model lists? or is this covered in linked assets? unsure.
 

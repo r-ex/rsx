@@ -191,14 +191,41 @@ class ModelParsedData_t
 {
 public:
 	ModelParsedData_t() = default;
-	ModelParsedData_t(r1::studiohdr_t* const hdr, StudioLooseData_t* const data) : studiohdr(hdr, data) {};
-	ModelParsedData_t(r2::studiohdr_t* const hdr) : studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v8_t* const hdr) : studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v12_1_t* const hdr) : studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v12_2_t* const hdr) : studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v12_3_t* const hdr) : studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v14_t* const hdr) : studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v16_t* const hdr, const int dataSizePhys, const int dataSizeModel) : studiohdr(hdr, dataSizePhys, dataSizeModel) {};
+	ModelParsedData_t(r1::studiohdr_t* const hdr, StudioLooseData_t* const data) : sequences(nullptr), studiohdr(hdr, data) {};
+	ModelParsedData_t(r2::studiohdr_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
+	ModelParsedData_t(r5::studiohdr_v8_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
+	ModelParsedData_t(r5::studiohdr_v12_1_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
+	ModelParsedData_t(r5::studiohdr_v12_2_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
+	ModelParsedData_t(r5::studiohdr_v12_3_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
+	ModelParsedData_t(r5::studiohdr_v14_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
+	ModelParsedData_t(r5::studiohdr_v16_t* const hdr, const int dataSizePhys, const int dataSizeModel) : sequences(nullptr), studiohdr(hdr, dataSizePhys, dataSizeModel) {};
+
+	~ModelParsedData_t()
+	{
+		FreeAllocArray(sequences);
+	}
+
+	ModelParsedData_t& operator=(ModelParsedData_t&& parsed)
+	{
+		if (this != &parsed)
+		{
+			this->meshVertexData.move(parsed.meshVertexData);
+			this->bones.swap(parsed.bones);
+
+			this->lods.swap(parsed.lods);
+			this->materials.swap(parsed.materials);
+			this->skins.swap(parsed.skins);
+
+			this->bodyParts.swap(parsed.bodyParts);
+
+			this->sequences = parsed.sequences;
+			parsed.sequences = nullptr;
+
+			this->studiohdr = parsed.studiohdr;
+		}
+
+		return *this;
+	}
 
 	CRamen meshVertexData;
 
@@ -213,10 +240,13 @@ public:
 	// Resolved vector of animation sequences for use in model preview
 	// [rika]: unused, not quite sure why this was added
 	//std::vector<ModelAnimSequence_t> animSequences;
+	seqdesc_t* sequences;
 
 	studiohdr_generic_t studiohdr;
 
 	inline const studiohdr_generic_t* const pStudioHdr() const { return &studiohdr; }
+	inline const int NumLocalSeq() const { return studiohdr.localSequenceCount; }
+	inline const seqdesc_t* const LocalSeq(const int seq) const { return &sequences[seq]; }
 
 	FORCEINLINE void SetupBodyPart(int i, const char* partName, const int modelIndex, const int numModels)
 	{
@@ -230,7 +260,35 @@ public:
 	};
 };
 
+void ParseModelBoneData_v8(ModelParsedData_t* const parsedData);
+void ParseModelBoneData_v12_1(ModelParsedData_t* const parsedData);
+void ParseModelBoneData_v16(ModelParsedData_t* const parsedData);
+
 void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const drawData, const uint64_t lod);
+
+void ParseSeqDesc_R2_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr);
+void ParseSeqDesc_R5_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const bool useStall);
+
+void ParseModelSequenceData_NoStall(ModelParsedData_t* const parsedData, char* const baseptr);
+template<typename mstudioseqdesc_t> void ParseModelSequenceData_Stall(ModelParsedData_t* const parsedData, char* const baseptr)
+{
+	assertm(parsedData->bones.size() > 0, "should have bones");
+
+	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+
+	if (pStudioHdr->localSequenceCount == 0)
+		return;
+
+	parsedData->sequences = new seqdesc_t[pStudioHdr->localSequenceCount];
+
+	for (int i = 0; i < pStudioHdr->localSequenceCount; i++)
+	{
+		parsedData->sequences[i] = seqdesc_t(reinterpret_cast<mstudioseqdesc_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i, nullptr);
+
+		ParseSeqDesc_R5_RLE(&parsedData->sequences[i], &parsedData->bones, false);
+	}
+}
+
 
 // 
 // COMPDATA
@@ -345,6 +403,7 @@ enum eModelExportSetting : int
 	MODEL_CAST,
 	MODEL_RMAX,
 	MODEL_RMDL,
+	MODEL_SMD,
 
 	// rmdl only for now, but can support sourcemodelasset in the future
 	MODEL_STL_VALVE_PHYSICS,
@@ -358,6 +417,7 @@ static const char* s_ModelExportSettingNames[] =
 	"CAST",
 	"RMAX",
 	"RMDL",
+	"SMD",
 	"STL (Valve Physics)", 
 	"STL (Respawn Physics)"
 };
@@ -367,6 +427,7 @@ enum eAnimRigExportSetting : int
 	ANIMRIG_CAST,
 	ANIMRIG_RMAX,
 	ANIMRIG_RRIG,
+	ANIMRIG_SMD,
 
 	ANIMRIG_COUNT,
 };
@@ -376,6 +437,7 @@ static const char* s_AnimRigExportSettingNames[] =
 	"CAST",
 	"RMAX",
 	"RRIG",
+	"SMD",
 };
 
 enum eAnimSeqExportSetting : int
@@ -383,6 +445,7 @@ enum eAnimSeqExportSetting : int
 	ANIMSEQ_CAST,
 	ANIMSEQ_RMAX,
 	ANIMSEQ_RSEQ,
+	ANIMSEQ_SMD,
 
 	ANIMSEQ_COUNT,
 };
@@ -392,13 +455,14 @@ static const char* s_AnimSeqExportSettingNames[] =
 	"CAST",
 	"RMAX",
 	"RSEQ",
+	"SMD",
 };
 
 bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath);
 bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const uint64_t guid);
+bool ExportModelSMD(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath);
 
-bool ExportSeqDescRMAX(const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones);
-bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones, const uint64_t guid);
+bool ExportSeqDesc(const int setting, const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones, const uint64_t guid);
 
 void UpdateModelBoneMatrix(CDXDrawData* const drawData, const ModelParsedData_t* const parsedData);
 void InitModelBoneMatrix(CDXDrawData* const drawData, const ModelParsedData_t* const parsedData);

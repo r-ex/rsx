@@ -103,3 +103,69 @@ const char* studiohdr_short_t::pszName() const
 
 	return pStudioHdr->pszName();
 }
+
+namespace vg
+{
+    // rmdl v9 to rmdl v12.3
+    const int64_t VertexSizeFromFlags_V9(const uint64_t flags) // rmdl v9 to rmdl v12.3
+    {
+        int64_t vertexCacheSize =
+
+            // add the size of position values, hard to explain this but it's clever and overly complicated, takes advantage of how negative numbers work
+            ((-4 * flags) & 0xC)
+
+            // add size of Color32, max size of four, shifts flag down so when masked and set the result will be a value of 0x4
+            + ((flags >> 2) & 4)
+
+            // add size of unknown, max size of eight, shifts flag down so when masked and set the result will be a value of 0x8 (what data is this?)
+            + ((flags >> 3) & 8)
+
+            // add the size of normals & tangents, max size of 60 (result & 0x3C)(would have to have all normal/tangent flags set), skip first two bits of mirco lut, 4 bits for each flag combo ((0x4 = VERT_BLENDINDICES, 0x8 = VERT_BLENDWEIGHTS_UNPACKED, 0x10 = VERT_BLENDWEIGHTS_PACKED) = 0x1C)
+            + ((0x960174006301300u >> (((unsigned __int8)(flags >> 6) & 0x3Cu) + 2)) & 0x3C)
+
+            // add the size of weights, max size of 12 (result & 0xC)(indices and one weight, packed or unpacked), skip first two bits of mirco lut, 4 bits for each flag combo ((0x4 = VERT_BLENDINDICES, 0x8 = VERT_BLENDWEIGHTS_UNPACKED, 0x10 = VERT_BLENDWEIGHTS_PACKED) = 0x1C)
+            + ((0x2132100 >> (((flags >> 10) & 0x1C) + 2)) & 0xC);
+
+        // texcoord flags start at 24 bits, shift this along to get texcord flags, stop looping once there are no more texcoords
+        for (int64_t texcoordFlagShift = flags >> 24; texcoordFlagShift; texcoordFlagShift >>= VERT_TEXCOORD_BITS)
+        {
+            // three bits per texcoord format, one format per
+            const uint8_t texcoordFlags = static_cast<uint8_t>(texcoordFlagShift);
+            vertexCacheSize += (0x48A31A20 >> (3 * (texcoordFlags & VERT_TEXCOORD_MASK))) & 0x1C;
+        }
+
+        return vertexCacheSize;
+    }
+
+    // rmdl v13 to retail
+    const int64_t VertexSizeFromFlags_V13(const uint64_t flags)
+    {
+        int64_t vertexCacheSize =
+
+            // add the size of position values, mask to four bits per position type, two bits for a position enum (0-3).
+            // 0 = 0, 1 = 12, 2 = 8, 3 = 6
+            ((0x68C0 >> (4 * (flags & 3))) & 0xF)
+
+            // add size of Color32, max size of four, shifts flag down so when masked and set the result will be a value of 0x4
+            + ((flags >> 2) & 4)
+
+            // add size of unknown, max size of eight, shifts flag down so when masked and set the result will be a value of 0x8 (what data is this?)
+            + ((flags >> 3) & 8)
+
+            // add the size of normals & tangents, max size of 60 (result & 0x3C)(would have to have all normal/tangent flags set), skip first two bits of mirco lut, 4 bits for each flag combo ((0x4 = VERT_BLENDINDICES, 0x8 = VERT_BLENDWEIGHTS_UNPACKED, 0x10 = VERT_BLENDWEIGHTS_PACKED) = 0x1C)
+            + ((0x960174006301300u >> (((unsigned __int8)(flags >> 6) & 0x3Cu) + 2)) & 0x3C)
+
+            // add the size of weights, max size of 12 (result & 0xC)(indices and one weight, packed or unpacked), skip first two bits of mirco lut, 4 bits for each flag combo ((0x4 = VERT_BLENDINDICES, 0x8 = VERT_BLENDWEIGHTS_UNPACKED, 0x10 = VERT_BLENDWEIGHTS_PACKED) = 0x1C)
+            + ((0x2132100 >> (((flags >> 10) & 0x1C) + 2)) & 0xC);
+
+        // texcoord flags start at 24 bits, shift this along to get texcord flags, stop looping once there are no more texcoords
+        for (int64_t texcoordFlagShift = flags >> 24; texcoordFlagShift; texcoordFlagShift >>= VERT_TEXCOORD_BITS)
+        {
+            // three bits per texcoord format, one format per
+            const uint8_t texcoordFlags = static_cast<uint8_t>(texcoordFlagShift);
+            vertexCacheSize += (0x48A31A20 >> (3 * (texcoordFlags & VERT_TEXCOORD_MASK))) & 0x1C;
+        }
+
+        return vertexCacheSize;
+    }
+}

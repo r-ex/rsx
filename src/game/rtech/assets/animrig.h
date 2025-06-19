@@ -41,20 +41,67 @@ class AnimRigAsset
 {
 public:
 	AnimRigAsset() = default;
-	AnimRigAsset(AnimRigAssetHeader_v4_t* hdr) : data(hdr->data), name(hdr->name), numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), dataSize(reinterpret_cast<r5::studiohdr_v8_t*>(hdr->data)->length) {};
-	AnimRigAsset(AnimRigAssetHeader_v5_t* hdr) : data(hdr->data), name(hdr->name), numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), dataSize(-1) {};
+	AnimRigAsset(AnimRigAssetHeader_v4_t* hdr, const eMDLVersion ver) : data(hdr->data), name(hdr->name), numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), studioVersion(ver)
+	{
+		switch (ver)
+		{
+		case eMDLVersion::VERSION_8:
+		{
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v8_t*>(data));
+			break;
+		}
+		case eMDLVersion::VERSION_12_1:
+		{
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_1_t*>(data));
+			break;
+		}
+		case eMDLVersion::VERSION_12_2:
+		{
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_2_t*>(data));
+			break;
+		}
+		case eMDLVersion::VERSION_12_3:
+		case eMDLVersion::VERSION_12_4:
+		{
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
+			break;
+		}
+		case eMDLVersion::VERSION_14:
+		{
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v14_t*>(data));
+			break;
+		}
+		}
+	}
+	AnimRigAsset(AnimRigAssetHeader_v5_t* hdr, const eMDLVersion ver) : data(hdr->data), name(hdr->name), numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), studioVersion(ver)
+	{
+		const r5::studiohdr_v16_t* const tmp = reinterpret_cast<const r5::studiohdr_v16_t* const>(data);
+		const int studioDataSize = FIX_OFFSET(tmp->boneDataOffset) + (tmp->boneCount * sizeof(r5::mstudiobonedata_v16_t));
+
+		switch (ver)
+		{
+		case eMDLVersion::VERSION_16:
+		case eMDLVersion::VERSION_17:
+		case eMDLVersion::VERSION_18:
+		{
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v16_t*>(data), 0, studioDataSize);
+			break;
+		}
+		}
+	}
 
 	void* data; // ptr to studiohdr & rrig buffer
 	char* name;
 
-	int dataSize; // size of studio data
-
 	int numAnimSeqs;
 	AssetGuid_t* animSeqs;
 
-	std::vector<ModelBone_t> bones;
-
-	studiohdr_generic_t studiohdr;
+	ModelParsedData_t parsedData;
 
 	eMDLVersion studioVersion;
+
+	inline const studiohdr_generic_t& StudioHdr() const { return parsedData.studiohdr; }
+	inline const studiohdr_generic_t* const pStudioHdr() const { return &parsedData.studiohdr; }
+	inline ModelParsedData_t* const GetParsedData() { return &parsedData; }
+	inline const std::vector<ModelBone_t>* const GetRig() const { return &parsedData.bones; } // slerp them bones
 };

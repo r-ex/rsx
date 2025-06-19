@@ -9,9 +9,9 @@
 
 extern ExportSettings_t g_ExportSettings;
 
-void LoadUIAsset(CAssetContainer* const pak, CAsset* const asset)
+void LoadUIAsset(CAssetContainer* const container, CAsset* const asset)
 {
-    UNUSED(pak);
+    UNUSED(container);
 
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
 
@@ -19,11 +19,6 @@ void LoadUIAsset(CAssetContainer* const pak, CAsset* const asset)
 
     switch (pakAsset->version())
     {
-    /*case 29:
-    {
-        assertm(false, "R2TT unsupported at this time");
-        return;
-    }*/
     case 29:
     case 30:
     {
@@ -31,17 +26,44 @@ void LoadUIAsset(CAssetContainer* const pak, CAsset* const asset)
         uiAsset = new UIAsset(hdr);
         break;
     }
-    default:
+    case 39:
+    case 40:
+    case 42:
+    {
+        // r5 currently unsupported
         return;
+    }
+    default:
+    {
+        assertm(false, "unaccounted asset version, will cause major issues!");
+        return;
+    }
     }
 
     if (uiAsset->name)
     {
         const std::string uiName = "ui/" + std::string(uiAsset->name) + ".rpak";
-        pakAsset->SetAssetName(uiName);
+        pakAsset->SetAssetName(uiName, true);
     }
 
     pakAsset->setExtraData(uiAsset);
+}
+
+void PostLoadUIAsset(CAssetContainer* const container, CAsset* const asset)
+{
+    UNUSED(container);
+
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    // temp, remove once other versions are implemented
+    if (!pakAsset->extraData())
+        return;
+
+    assertm(pakAsset->extraData(), "extra data should be valid");
+    UIAsset* const uiAsset = reinterpret_cast<UIAsset*>(pakAsset->extraData());
+
+    if (!uiAsset->name)
+        pakAsset->SetAssetNameFromCache();
 }
 
 struct UIPreviewData_t
@@ -144,7 +166,7 @@ void* PreviewUIAsset(CAsset* const asset, const bool firstFrameForAsset)
             argPreviewData.value.rawptr = (reinterpret_cast<char*>(uiAsset->argDefaultValues) + argData->dataOffset);
             argPreviewData.type = argData->type;
             argPreviewData.typeStr = s_UIArgTypeNames[argData->type];
-            argPreviewData.offset = argData->type == UIAssetArgType_t::UI_ARG_TYPE_NONE? 0xFFFF :argData->dataOffset;
+            argPreviewData.offset = argData->dataOffset; // [rika]: dataOffset on 'none' type args is just 0
             argPreviewData.hash = argData->shortHash; // use if we have no name
         }
     }
@@ -191,16 +213,20 @@ void* PreviewUIAsset(CAsset* const asset, const bool firstFrameForAsset)
 
             if (ImGui::TableSetColumnIndex(UIPreviewData_t::eColumnID::TPC_Type))
                 ImGui::Text("%s", item->typeStr);
+
+            // [rika]: no valid data if none type, skip the rest
+            if (item->type == UIAssetArgType_t::UI_ARG_TYPE_NONE)
+            {
+                ImGui::PopID();
+                continue;
+            }
+
             if(ImGui::TableSetColumnIndex(UIPreviewData_t::eColumnID::TPC_Offset))
-                if(item->type == UIAssetArgType_t::UI_ARG_TYPE_NONE)
-                    ImGui::Text("");
-                else
-                    ImGui::Text("0x%X",item->offset);
+                ImGui::Text("0x%X", item->offset);
+
             if (ImGui::TableSetColumnIndex(UIPreviewData_t::eColumnID::TPC_Name))
             {
-                if(item->type == UIAssetArgType_t::UI_ARG_TYPE_NONE)
-                    ImGui::Text("");
-                else if (item->name)
+                if (item->name)
                     ImGui::Text("%s", item->name);
                 else
                     ImGui::Text("%x", item->hash);
@@ -284,7 +310,7 @@ void* PreviewUIAsset(CAsset* const asset, const bool firstFrameForAsset)
                 default:
                 {
                     ImGui::Text("UNSUPPORTED");
-
+                    assertm(false, "unsupported arg type!");
                     break;
                 }
                 }
@@ -457,7 +483,7 @@ void InitUIAssetType()
         .type = '\0iu',
         .headerAlignment = 8,
         .loadFunc = LoadUIAsset,
-        .postLoadFunc = nullptr,
+        .postLoadFunc = PostLoadUIAsset,
         .previewFunc = PreviewUIAsset,
         .e = { ExportUIAsset, 0, settings, ARRAYSIZE(settings) },
     };

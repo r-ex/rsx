@@ -41,7 +41,7 @@ animmovement_t::animmovement_t(r5::mstudioframemovement_t* movement, const int f
 
 // animdesc
 animdesc_t::animdesc_t(const animdesc_t& animdesc) : baseptr(animdesc.baseptr), name(animdesc.name), fps(animdesc.fps), flags(animdesc.flags), numframes(animdesc.numframes), animindex(animdesc.animindex),
-sectionindex(animdesc.sectionindex), sectionframes(animdesc.sectionframes), sectionstallframes(animdesc.sectionstallframes), extraData(animdesc.extraData), nummovements(animdesc.nummovements), movementindex(animdesc.movementindex), framemovementindex(animdesc.framemovementindex), movement(nullptr), parsedBufferIndex(animdesc.parsedBufferIndex)
+sectionindex(animdesc.sectionindex), sectionframes(animdesc.sectionframes), sectionstallframes(animdesc.sectionstallframes), sectionDataExtra(animdesc.sectionDataExtra), nummovements(animdesc.nummovements), movementindex(animdesc.movementindex), framemovementindex(animdesc.framemovementindex), movement(nullptr), parsedBufferIndex(animdesc.parsedBufferIndex)
 {
 	if (animdesc.sections.size() > 0)
 	{
@@ -54,7 +54,7 @@ sectionindex(animdesc.sectionindex), sectionframes(animdesc.sectionframes), sect
 }
 
 animdesc_t::animdesc_t(r2::mstudioanimdesc_t* animdesc) : baseptr(reinterpret_cast<void*>(animdesc)), name(animdesc->pszName()), fps(animdesc->fps), flags(animdesc->flags), numframes(animdesc->numframes), animindex(animdesc->animindex),
-sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(0), extraData(nullptr), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
+sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(0), sectionDataExtra(nullptr), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
 {
 	flags |= eStudioAnimFlags::ANIM_VALID;
 
@@ -75,7 +75,7 @@ sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), se
 };
 
 animdesc_t::animdesc_t(r5::mstudioanimdesc_v8_t* animdesc) : baseptr(reinterpret_cast<void*>(animdesc)), name(animdesc->pszName()), fps(animdesc->fps), flags(animdesc->flags), numframes(animdesc->numframes), animindex(animdesc->animindex),
-sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(0), extraData(nullptr), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
+sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(0), sectionDataExtra(nullptr), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
 {
 	if (sectionframes)
 	{
@@ -94,7 +94,7 @@ sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), se
 };
 
 animdesc_t::animdesc_t(r5::mstudioanimdesc_v12_1_t* animdesc, char* ext) : baseptr(reinterpret_cast<void*>(animdesc)), name(animdesc->pszName()), fps(animdesc->fps), flags(animdesc->flags), numframes(animdesc->numframes), animindex(animdesc->animindex),
-sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(animdesc->sectionstallframes), extraData(ext), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
+sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), sectionstallframes(animdesc->sectionstallframes), sectionDataExtra(ext), nummovements(animdesc->nummovements), movementindex(animdesc->movementindex), framemovementindex(animdesc->framemovementindex), movement(nullptr), parsedBufferIndex(0ull)
 {
 	if (sectionframes)
 	{
@@ -113,7 +113,7 @@ sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), se
 };
 
 animdesc_t::animdesc_t(r5::mstudioanimdesc_v16_t* animdesc, char* ext) : baseptr(reinterpret_cast<void*>(animdesc)), name(animdesc->pszName()), fps(animdesc->fps), flags(animdesc->flags), numframes(animdesc->numframes), animindex(animdesc->animindex),
-sectionindex(static_cast<int>(FIX_OFFSET(animdesc->sectionindex))), sectionframes(static_cast<int>(animdesc->sectionframes)), sectionstallframes(static_cast<int>(animdesc->sectionstallframes)), extraData(ext), nummovements(0), movementindex(0), framemovementindex(FIX_OFFSET(animdesc->framemovementindex)), movement(nullptr), parsedBufferIndex(0ull)
+sectionindex(static_cast<int>(FIX_OFFSET(animdesc->sectionindex))), sectionframes(static_cast<int>(animdesc->sectionframes)), sectionstallframes(static_cast<int>(animdesc->sectionstallframes)), sectionDataExtra(ext), nummovements(0), movementindex(0), framemovementindex(FIX_OFFSET(animdesc->framemovementindex)), movement(nullptr), parsedBufferIndex(0ull)
 {
 	if (sectionframes)
 	{
@@ -156,8 +156,8 @@ char* animdesc_t::pAnimdataStall(int* piFrame) const
 
 		if (pSection(section)->isExternal) // checks if it is external
 		{
-			if (extraData)
-				return (extraData + index);
+			if (sectionDataExtra)
+				return (sectionDataExtra + index);
 
 			// we will stall if this is not loaded, for whatever reason
 			index = pSection(0)->animindex;
@@ -263,6 +263,27 @@ seqdesc_t::seqdesc_t(r5::mstudioseqdesc_v16_t* seqdesc, char* ext) : baseptr(rei
 		anims.emplace_back(pAnimdesc, ext);
 	}
 };
+
+seqdesc_t::seqdesc_t(r5::mstudioseqdesc_v18_t* seqdesc, char* ext) : baseptr(reinterpret_cast<void*>(seqdesc)), szlabel(seqdesc->pszLabel()), szactivityname(seqdesc->pszActivity()), flags(seqdesc->flags), weightlistindex(seqdesc->weightlistindex), parsedData(seqdesc->AnimCount())
+{
+	if (weightlistindex != 1 && weightlistindex != 3)
+		weightlistindex = FIX_OFFSET(weightlistindex);
+
+	for (int i = 0; i < seqdesc->AnimCount(); i++)
+	{
+		r5::mstudioanimdesc_v16_t* const pAnimdesc = seqdesc->pAnimDesc(i);
+
+		// sanity checks, there are sequences that have animations, but no data for the anim descriptions, and I am unsure how the game checks them.
+		// fps can't be negative, fps practically shouldn't be more than 2048, 128k frames is an absurd amount, so this is a very good check, since the number (int) should never have those last bits filled.
+		if (ANIMDESC_SANITY_CHECK(pAnimdesc))
+		{
+			Log("Sequence %s had animation(s) (index %i), but no animation description, skipping...\n", seqdesc->pszLabel(), i);
+			break;
+		}
+
+		anims.emplace_back(pAnimdesc, ext);
+	}
+};
 #undef ANIMDESC_SANITY_CHECK // remove if needed in other files
 
 // studio hw group
@@ -283,28 +304,32 @@ lodIndex(static_cast<uint8_t>(group->lodIndex)), lodCount(static_cast<uint8_t>(g
 #define FIX_FILE_OFFSET(offset) (offset < 0 ? 0 : offset)
 studiohdr_generic_t::studiohdr_generic_t(const r1::studiohdr_t* const pHdr, StudioLooseData_t* const pData) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(pData->VertOffset(StudioLooseData_t::SLD_VTX)), vvdOffset(pData->VertOffset(StudioLooseData_t::SLD_VVD)), vvcOffset(pData->VertOffset(StudioLooseData_t::SLD_VVC)), vvwOffset(0), phyOffset(pData->PhysOffset()),
 vtxSize(pData->VertSize(StudioLooseData_t::SLD_VTX)), vvdSize(pData->VertSize(StudioLooseData_t::SLD_VVD)), vvcSize(pData->VertSize(StudioLooseData_t::SLD_VVC)), vvwSize(0), phySize(pData->PhysSize()), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), groupCount(), groups(), /*bvhOffset(pHdr->bvhOffset), TODO, moved?*/ baseptr(reinterpret_cast<const char*>(pHdr))
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+groupCount(0), groups(), bvhOffset(-1), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 
 };
 
 studiohdr_generic_t::studiohdr_generic_t(const r2::studiohdr_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(0), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(0), phySize(pHdr->phySize), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), groupCount(), groups(), /*bvhOffset(pHdr->bvhOffset), TODO, moved?*/ baseptr(reinterpret_cast<const char*>(pHdr))
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+groupCount(0), groups(), bvhOffset(-1), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 
 };
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v8_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(0)/*set in vertex parsing*/, textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), groupCount(1), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+groupCount(1), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 
 };
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_1_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_1_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), groupCount(pHdr->groupHeaderCount), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_1_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 
@@ -319,7 +344,8 @@ boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), bone
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_2_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_2_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), groupCount(pHdr->groupHeaderCount), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_2_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 
@@ -334,7 +360,8 @@ boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), bone
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_3_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_3_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), groupCount(pHdr->groupHeaderCount), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_3_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 
@@ -349,7 +376,8 @@ boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), bone
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v14_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v14_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), groupCount(pHdr->groupHeaderCount), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v14_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 
@@ -364,7 +392,8 @@ boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), bone
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v16_t* const pHdr, int dataSizePhys, int dataSizeModel) : length(dataSizeModel), flags(pHdr->flags), contents(0 /*TODO, where is this?*/), vtxOffset(-1), vvdOffset(-1), vvcOffset(-1), vvwOffset(-1), phyOffset(-1),
 vtxSize(-1), vvdSize(-1), vvcSize(-1), vvwSize(-1), phySize(dataSizePhys), hwDataSize(0), textureOffset(FIX_OFFSET(pHdr->textureindex)), textureCount(static_cast<int>(pHdr->numtextures)), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(FIX_OFFSET(pHdr->skinindex)),
-boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), boneCount(static_cast<int>(pHdr->boneCount)), boneStateOffset(offsetof(r5::studiohdr_v16_t, boneStateOffset) + FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), groupCount(pHdr->groupHeaderCount), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), boneCount(static_cast<int>(pHdr->boneCount)), boneStateOffset(offsetof(r5::studiohdr_v16_t, boneStateOffset) + FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), localSequenceOffset(FIX_OFFSET(pHdr->localseqindex)), localSequenceCount(pHdr->numlocalseq),
+groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(FIX_OFFSET(pHdr->bvhOffset)), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 

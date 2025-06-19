@@ -40,6 +40,8 @@
 
 #include <core/logging/logger.h>
 
+#include <core/cache/cachedb.h>
+
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -100,6 +102,7 @@
 #endif
 
 #define MILES_RADAUDIO
-
+//#define XB_XECRPYT
+//#define XB_XCOMPRESS
+#define SWITCH_SWIZZLE
 //#define ADVANCED_MODEL_PREVIEW
-//#define SUPPORT_SWITCH

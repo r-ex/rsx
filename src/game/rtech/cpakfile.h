@@ -6,6 +6,11 @@
 #define PAK_MAX_ASSET_TYPES 64
 #define PAK_ASSET_TYPE_MASK (PAK_MAX_ASSET_TYPES - 1)
 
+#define PAK_HEADER_FLAGS_RTECH_ENCODED (1<<8)
+#define PAK_HEADER_FLAGS_OODLE_ENCODED (1<<9)
+#define PAK_HEADER_FLAGS_ZSTD_ENCODED (1<<15)
+#define PAK_HEADER_FLAGS_COMPRESSED (PAK_HEADER_FLAGS_RTECH_ENCODED | PAK_HEADER_FLAGS_OODLE_ENCODED | PAK_HEADER_FLAGS_ZSTD_ENCODED)
+
 // maximum number of "segments" that can be present in a pak
 #define PAK_MAX_SEGMENTS 20
 
@@ -73,7 +78,6 @@ static_assert(sizeof(PakPageHdr_t) == 0xC, "Invalid PakPageHdr_t struct");
 #define IS_PAGE_PTR_INVALID(pagePtr) (!pagePtr.ptr)
 #define READ_DEREF_OFFSET(pagePtr, type) *reinterpret_cast<type*>(pagePtr.ptr); pagePtr.ptr += sizeof(type)
 #define READ_OFFSET(pagePtr, type) reinterpret_cast<type*>(pagePtr.ptr); pagePtr.ptr += sizeof(type)
-#define READ_OFFSET_STRING(pagePtr) pagePtr.ptr; pagePtr.ptr += strnlen(pagePtr.ptr, 260) + 1 // 260 is max path.
 // represents a pointer to data in an RPak data page
 // in file, this is index/offset
 // when loaded, this is converted to an actual pointer to be used by the engine

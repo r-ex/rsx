@@ -263,30 +263,30 @@ namespace vvw
 
 namespace vg
 {
-	// add func for this unless I have it somewhere, sort vertex struct
 	// mesh flags, these are the same across all versions
 	// mimics shader input flags
-	#define VERT_POSITION_UNPACKED	0x1 // size of 12
-	#define VERT_POSITION_PACKED	0x2 // size of 8
-	// 0x4 size of 0
-	// 0x8 size of 0
-	#define VERT_COLOR				0x10 // size of 4
-	// 0x20 size of 0
-	#define VERT_UNK				0x40 // size of 8??? flag gets ignored, is this flag for having mesh data? color2?
-	// 0x80 size of 0
-	#define VERT_NORMAL_UNPACKED		0x100 // size of 12
-	#define VERT_NORMAL_PACKED			0x200 // size of 4
-	#define VERT_TANGENT_FLOAT3			0x400 // size of 12
-	#define VERT_TANGENT_FLOAT4			0x800 // size of 16, size is ignored for vertex size calculation
-	#define VERT_BLENDINDICES			0x1000 // size of 4, bone indices and count
-	#define VERT_BLENDWEIGHTS_UNPACKED	0x2000 // size of 8, two floats, presumably weights
-	#define VERT_BLENDWEIGHTS_PACKED	0x4000 // size of 4, two uint16_ts packed with a weight
+	#define VERT_POSITION_UNPACKED		0x1		// size of 12
+	#define VERT_POSITION_PACKED		0x2		// size of 8
+	#define VERT_POSITION				0x3		// starting with rmdl 13 position is treated more like an enum, thankfully reverse compatible
+
+	#define VERT_COLOR					0x10	// size of 4
+
+	#define VERT_UNK					0x40	// size of 8??? flag gets ignored, is this flag for having mesh data? color2?
+
+	#define VERT_NORMAL_UNPACKED		0x100	// size of 12
+	#define VERT_NORMAL_PACKED			0x200	// size of 4
+	#define VERT_TANGENT_FLOAT3			0x400	// size of 12
+	#define VERT_TANGENT_FLOAT4			0x800	// size of 16, size is ignored for vertex size calculation
+
+	#define VERT_BLENDINDICES			0x1000	// size of 4, bone indices and count
+	#define VERT_BLENDWEIGHTS_UNPACKED	0x2000	// size of 8, two floats, presumably weights
+	#define VERT_BLENDWEIGHTS_PACKED	0x4000	// size of 4, two uint16_ts packed with a weight
 
 	// thanks rexx
-	#define VERT_TEXCOORD_BITS 4 // nibble
-	#define VERT_TEXCOORD_MASK ((1 << VERT_TEXCOORD_BITS) - 1)
-	#define VERT_TEXCOORD_SHIFT(n) (24 + (n * VERT_TEXCOORD_BITS))
-	#define VERT_TEXCOORDn(n) (static_cast<uint64_t>(VERT_TEXCOORD_MASK) << VERT_TEXCOORD_SHIFT(n))
+	#define VERT_TEXCOORD_BITS			4 // nibble
+	#define VERT_TEXCOORD_MASK			((1 << VERT_TEXCOORD_BITS) - 1)
+	#define VERT_TEXCOORD_SHIFT(n)		(24 + (n * VERT_TEXCOORD_BITS))
+	#define VERT_TEXCOORDn(n)			(static_cast<uint64_t>(VERT_TEXCOORD_MASK) << VERT_TEXCOORD_SHIFT(n))
 	#define VERT_TEXCOORDn_FMT(n, fmt)	(static_cast<uint64_t>(fmt) << VERT_TEXCOORD_SHIFT(n))
 
 	// size depends on format, probably can only be certain formats (limited by size lookup micro lut)
@@ -296,6 +296,17 @@ namespace vg
 	
 	// for vtx based models
 	#define VERT_LEGACY (VERT_POSITION_UNPACKED | VERT_NORMAL_UNPACKED | VERT_TANGENT_FLOAT4 | VERT_BLENDINDICES | VERT_BLENDWEIGHTS_UNPACKED | VERT_TEXCOORDn_FMT(0, 0x2))
+
+	enum eVertPositionType
+	{
+		VG_POS_NONE,
+		VG_POS_UNPACKED,	// Vector
+		VG_POS_PACKED64,	// Vector64
+		VG_POS_PACKED48,	// UNKNOWN
+	};
+
+	const int64_t VertexSizeFromFlags_V9(const uint64_t flags);
+	const int64_t VertexSizeFromFlags_V13(const uint64_t flags);
 
 	struct BlendWeightsPacked_s
 	{
@@ -705,6 +716,10 @@ enum eStudioAnimFlags
 	ANIM_VALID			= 0x20000,	// if not set this anim has no data
 	ANIM_FRAMEMOVEMENT	= 0x40000,
 };
+
+// This is set any time the .qc files has $staticprop in it
+// Means there's no bones and no transforms
+#define STUDIOHDR_FLAGS_STATIC_PROP				0x10
 
 // If this flag is present the model has vertex color, and by extension a VVC (IDVC) file.
 #define STUDIOHDR_FLAGS_USES_VERTEX_COLOR	        0x1000000

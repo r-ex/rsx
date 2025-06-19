@@ -71,6 +71,12 @@ const MaterialShaderType_t GetTypeFromMaterialName(const std::filesystem::path& 
 
     Log("** failed to find type for material %s\n", materialPath.string().c_str());
 
+    // [rika]: bad! bad! these materials should(should) be 'gen' but we can't really check that!
+    // material\code_private\ui_mrt.rpak
+    // material\code_private\ui.rpak
+    if (stem.starts_with("ui"))
+        return MaterialShaderType_t::GEN;
+
     return MaterialShaderType_t::_TYPE_LEGACY;
 }
 
@@ -151,11 +157,9 @@ void LoadMaterialAsset(CAssetContainer* const container, CAsset* const asset)
     case 22:
     case 23:
     {
-        if (pakAsset->data()->headerStructSize != sizeof(MaterialAssetHeader_v22_t) && pakAsset->version() == 23)
+        if (pakAsset->data()->headerStructSize == sizeof(MaterialAssetHeader_v23_1_t) && pakAsset->version() == 23)
         {
             pakAsset->SetAssetVersion({ 23, 1 }); // [rika]: set minor version
-
-            assertm(pakAsset->data()->headerStructSize == sizeof(MaterialAssetHeader_v23_1_t), "incorrect header");
 
             MaterialAssetHeader_v23_1_t* hdr = reinterpret_cast<MaterialAssetHeader_v23_1_t*>(pakAsset->header());
             MaterialAssetCPU_t* const cpu = pakAsset->cpu() ? reinterpret_cast<MaterialAssetCPU_t* const>(pakAsset->cpu()) : hdr->cpuDataPtr;
@@ -164,13 +168,18 @@ void LoadMaterialAsset(CAssetContainer* const container, CAsset* const asset)
             break;
         }
 
+        assertm(pakAsset->data()->headerStructSize == sizeof(MaterialAssetHeader_v22_t), "incorrect header");
+
         MaterialAssetHeader_v22_t* hdr = reinterpret_cast<MaterialAssetHeader_v22_t*>(pakAsset->header());
         materialAsset = new MaterialAsset(hdr, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
 
         break;
     }
     default:
+    {
+        assertm(false, "unaccounted asset version, will cause major issues!");
         return;
+    }
     }
 
     std::string materialName = ParseMaterialAssetName(materialAsset);    

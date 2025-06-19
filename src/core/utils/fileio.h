@@ -275,7 +275,8 @@ private:
     eStreamIOMode currentMode;
 };
 
-extern bool CreateDirectories(const std::filesystem::path& exportPath);
+bool CreateDirectories(const std::filesystem::path& exportPath);
+bool RestoreCurrentWorkingDirectory();
 
 namespace FileSystem
 {

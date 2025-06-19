@@ -229,6 +229,11 @@ namespace cast
 		return &children.emplace_back(node);
 	}
 
+	CastNode* CastNode::AddChild(const CastNode& node)
+	{
+		return &children.emplace_back(node);
+	}
+
 	// set children
 	void CastNode::SetChild(const uint64_t hashIn, CastNode& node)
 	{

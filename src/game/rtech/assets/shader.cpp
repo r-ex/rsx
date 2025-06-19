@@ -43,6 +43,9 @@ void LoadShaderAsset(CAssetContainer* pak, CAsset* asset)
 	}
 	case 15:
 	{
+		// [rika]: switch headerStructSize == 48, switch shaders in general are very odd
+		assertm(pakAsset->data()->headerStructSize == sizeof(ShaderAssetHeader_v15_t), "incorrect header");
+
 		// [rika]: there's some where shaders in newer versions that don't have cpu data, and point to places that don't really have a shader header
 		ShaderAssetHeader_v15_t* hdr = reinterpret_cast<ShaderAssetHeader_v15_t*>(pakAsset->header());
 
@@ -85,7 +88,7 @@ void LoadShaderAsset(CAssetContainer* pak, CAsset* asset)
 		if (!name.ends_with(".rpak"))
 			name += ".rpak";
 
-		pakAsset->SetAssetName(name);
+		pakAsset->SetAssetName(name, true);
 	}
 
 	pakAsset->setExtraData(shaderAsset);
@@ -461,6 +464,9 @@ void PostLoadShaderAsset(CAssetContainer* const pak, CAsset* const asset)
 		Log("failed to create %s shader for asset %s (0x%08X)\n", GetShaderTypeName(shaderAsset->type), asset->name().c_str(), hr);
 	}
 #endif
+
+	if(!shaderAsset->name)
+		pakAsset->SetAssetNameFromCache();
 }
 
 void* PreviewShaderAsset(CAsset* const asset, const bool firstFrameForAsset)
@@ -536,11 +542,19 @@ static void ExportShaderMetaData(const ShaderAsset* const shaderAsset, std::file
 	// Copy shader features from the shader asset to the MSW instance
 	for (size_t i = 0, flagIdx = 0; i < shaderBufferCount; i++, flagIdx+=2)
 	{
+		const char* const commaChar = i != (shaderBufferCount - 1) ? "," : "";
+
+		// [rika]: no input flags, don't write them
+		if (!shaderAsset->inputFlags)
+		{
+			ofs << "\t\t\"0x0" << "\",\n";
+			ofs << "\t\t\"0x0" << "\"" << commaChar << "\n";
+
+			continue;
+		}
 
 		const uint64_t inputFlags1 = shaderAsset->inputFlags[flagIdx];
 		const uint64_t inputFlags2 = shaderAsset->inputFlags[flagIdx + 1];
-
-		const char* const commaChar = i != (shaderBufferCount - 1) ? "," : "";
 
 		ofs << "\t\t\"0x" << std::uppercase << std::hex << inputFlags1 << "\",\n";
 		ofs << "\t\t\"0x" << std::uppercase << std::hex << inputFlags2 << "\"" << commaChar << "\n";
@@ -590,6 +604,11 @@ bool ExportRawShaderAsset(const ShaderAsset* const shaderAsset, std::filesystem:
 
 void ConstructMSWShader(CMultiShaderWrapperIO::Shader_t& shader, const ShaderAsset* const shaderAsset)
 {
+	// [rika]: I'm not doing this but MSW needs to handle shaders without shader input flags
+	assertm(shaderAsset->inputFlags, "shader did not have valid input flags");
+	if (!shaderAsset->inputFlags)
+		return;
+
 	// Copy shader features from the shader asset to the MSW instance
 	size_t i = 0;
 	for (auto& buf : shaderAsset->shaderBuffers)

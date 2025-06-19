@@ -1,7 +1,5 @@
 #pragma once
 
-#include <pch.h>
-
 static constexpr size_t managedBufferSize = (1024 * 1024 * 16);
 
 // do it this way as allocating big memory blocks over and over is expensive
@@ -32,7 +30,14 @@ public:
 			openSlots.push(i);
 	};
 
-	~CBufferManager() { delete[] buffers; };
+	~CBufferManager()
+	{
+		// this definitely can happen if you send WM_QUIT while loading a pak
+		// if this happens after loading assets, then you leaked a buffer
+		assertm(!DidLeakBuffer(), "you leaked a buffer in runtime!");
+
+		delete[] buffers;
+	};
 
 	CManagedBuffer* ClaimBuffer()
 	{
@@ -62,6 +67,11 @@ public:
 
 		openSlots.push(index);
 		buffer->SetStatus(true);
+	}
+
+	bool DidLeakBuffer()
+	{
+		return (bufferCount != openSlots.size());
 	}
 
 	static inline const size_t MaxBufferSize() { return managedBufferSize; };

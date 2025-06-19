@@ -57,6 +57,23 @@ public:
 		return *this;
 	}
 
+	inline void move(CRamen& raman)
+	{
+		if (this != &raman)
+		{
+			clear();
+			shrink();
+
+			this->noodles = raman.noodles;
+			this->capacity = raman.capacity;
+			this->noodleSize = raman.noodleSize;
+
+			raman.noodles = nullptr;
+			raman.capacity = 0ull;
+			raman.noodleSize = 0ull;
+		}
+	}
+
 	inline const size_t addBack(char* const buf, const size_t bufSize)
 	{ 
 		return addIdx(noodleSize, buf, bufSize);

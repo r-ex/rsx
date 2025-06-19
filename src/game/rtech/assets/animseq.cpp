@@ -7,7 +7,9 @@
 #include <core/mdl/cast.h>
 #include <core/mdl/modeldata.h>
 
-extern CBufferManager* g_BufferManager;
+#include <thirdparty/imgui/misc/imgui_utility.h>
+
+extern CBufferManager g_BufferManager;
 extern ExportSettings_t g_ExportSettings;
 
 void LoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
@@ -49,7 +51,7 @@ void LoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 		return;
 	}
 
-	pakAsset->SetAssetName(seqAsset->name);
+	pakAsset->SetAssetName(seqAsset->name, true);
 	pakAsset->setExtraData(seqAsset);
 }
 
@@ -61,6 +63,8 @@ void PostLoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 
 	assertm(pakAsset->extraData(), "extra data should be valid");
 	AnimSeqAsset* const seqAsset = reinterpret_cast<AnimSeqAsset*>(pakAsset->extraData());
+	if (!seqAsset)
+		return;
 
 	// do not parse this animation if there is no skeleton, if we go to export a sequence from a model/rig that has not been parsed, we will have to parse on export.
 	// this also means this sequence will not export data when exported standalone
@@ -75,22 +79,15 @@ void PostLoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	}
 	else if (seqAsset->parentRig)
 	{
-		bones = &seqAsset->parentRig->bones;
+		bones = seqAsset->parentRig->GetRig();
 	}
 	assertm(!bones->empty(), "we should have bones at this point.");
 
 	// ramen here
 
-	const size_t boneCount = bones->size();
-
 	// [rika]: parse the animseq's raw data size in post load if we couldn't determine a bone count before.
 	if (seqAsset->dataSize == 0 && asset->GetAssetVersion().majorVer >= 12)
-		seqAsset->UpdateDataSizeNew(static_cast<int>(boneCount));
-
-	// check flags
-	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_POS) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_POS), "flag mismatch");
-	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_ROT) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_ROT), "flag mismatch");
-	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_SCL) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_SCALE), "flag mismatch");
+		seqAsset->UpdateDataSizeNew(static_cast<int>(bones->size()));
 
 	switch (seqAsset->version)
 	{
@@ -101,123 +98,7 @@ void PostLoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	case eSeqVersion::VERSION_11:
 	case eSeqVersion::VERSION_12:
 	{
-		char* (animdesc_t::*pAnimdata)(int* const) const = seqAsset->UseStall() ? &animdesc_t::pAnimdataStall : &animdesc_t::pAnimdataNoStall;
-
-		for (int i = 0; i < seqAsset->seqdesc.AnimCount(); i++)
-		{
-			animdesc_t* const animdesc = &seqAsset->seqdesc.anims.at(i);
-
-			if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID))
-			{
-				animdesc->parsedBufferIndex = invalidNoodleIdx;
-
-				continue;
-			}
-
-			// no point to allocate memory on empty animations!
-			CAnimData animData(boneCount, animdesc->numframes);
-			animData.ReserveVector();
-
-			for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
-			{				
-				const float cycle = animdesc->numframes > 1 ? static_cast<float>(frameIdx) / static_cast<float>(animdesc->numframes - 1) : 0.0f;
-				assertm(isfinite(cycle), "cycle was nan");
-
-				float fFrame = cycle * static_cast<float>(animdesc->numframes - 1);
-
-				const int iFrame = static_cast<int>(fFrame);
-				const float s = (fFrame - static_cast<float>(iFrame));
-
-				int iLocalFrame = iFrame;
-
-				const uint8_t* boneFlagArray = reinterpret_cast<uint8_t*>((animdesc->*pAnimdata)(&iLocalFrame));
-				const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount)]);
-
-				for (int boneIdx = 0; boneIdx < boneCount; boneIdx++)
-				{
-					const ModelBone_t* const bone = &bones->at(boneIdx);
-
-					Vector pos;
-					Quaternion q;
-					Vector scale;
-					RadianEuler baseRot;
-
-					if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA)
-					{
-						pos.Init(0.0f, 0.0f, 0.0f);
-						q.Init(0.0f, 0.0f, 0.0f, 1.0f);
-						scale.Init(1.0f, 1.0f, 1.0f);
-						baseRot.Init(0.0f, 0.0f, 0.0f);
-					}
-					else
-					{
-						pos = bone->pos;
-						q = bone->quat;
-						scale = bone->scale;
-						baseRot = bone->rot;
-					}
-
-					uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, boneIdx); // truncate byte offset then shift if needed
-
-					if (boneFlags & (r5::RleBoneFlags_t::STUDIO_ANIM_DATA)) // check if this bone has data
-					{
-						if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_POS)
-							CalcBonePosition(iLocalFrame, s, panim, pos);
-						if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_ROT)
-							CalcBoneQuaternion(iLocalFrame, s, panim, baseRot, q, boneFlags);
-						if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_SCALE)
-							CalcBoneScale(iLocalFrame, s, panim, scale, boneFlags);
-
-
-						panim = panim->pNext();
-					}
-
-					// adjust the origin bone
-					// do after we get anim data, so our rotation does not get overwritten
-					if (boneIdx == 0)
-					{
-						QAngle vecAngleBase(q);
-
-						if (nullptr != animdesc->movement && animdesc->flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
-						{
-							Vector vecPos;
-							QAngle vecAngle;
-
-							r5::Studio_AnimPosition(animdesc, cycle, vecPos, vecAngle);
-
-							pos += vecPos; // add our base movement position to our base position 
-							vecAngleBase.y += (vecAngle.y);
-						}
-						
-						vecAngleBase.y += -90; // rotate -90 degree on the yaw axis
-
-						// adjust position as we are rotating on the Z axis
-						const float x = pos.x;
-						const float y = pos.y;
-
-						pos.x = y;
-						pos.y = -x;
-
-						AngleQuaternion(vecAngleBase, q);
-
-						// has pos/rot data regardless since we just adjusted pos/rot
-						boneFlags |= (r5::RleBoneFlags_t::STUDIO_ANIM_POS | r5::RleBoneFlags_t::STUDIO_ANIM_ROT);
-					}
-
-					CAnimDataBone& animDataBone = animData.GetBone(boneIdx);
-					animDataBone.SetFlags(boneFlags);
-					animDataBone.SetFrame(frameIdx, pos, q, scale);
-				}
-			}
-
-			// parse into memory and compress
-			CManagedBuffer* buffer = g_BufferManager->ClaimBuffer();
-
-			const size_t sizeInMem = animData.ToMemory(buffer->Buffer());
-			animdesc->parsedBufferIndex = seqAsset->seqdesc.parsedData.addBack(buffer->Buffer(), sizeInMem);
-
-			g_BufferManager->RelieveBuffer(buffer);
-		}
+		ParseSeqDesc_R5_RLE(&seqAsset->seqdesc, bones, seqAsset->UseStall());
 
 		break;
 	}
@@ -237,6 +118,8 @@ void* PreviewAnimSeqAsset(CAsset* const asset, const bool firstFrameForAsset)
 
 	assertm(pakAsset->extraData(), "extra data should be valid");
 	const AnimSeqAsset* const animSeqAsset = reinterpret_cast<const AnimSeqAsset* const>(pakAsset->extraData());
+	if (!animSeqAsset)
+		return;
 
 	// [rika]: todo, preview settings and model lists? or is this covered in linked assets? unsure.
 
@@ -313,15 +196,14 @@ bool ExportAnimSeqAsset(CPakAsset* const asset, const int setting, const AnimSeq
 	// with this export setting and will cause issues!
 	switch (setting)
 	{
-
+	// exporting seqdesc
 	case eAnimSeqExportSetting::ANIMSEQ_CAST:
-	{
-		return ExportSeqDescCast(&animSeqAsset->seqdesc, exportPathCop, skelName, bones, asset->GetAssetGUID());
-	}
 	case eAnimSeqExportSetting::ANIMSEQ_RMAX:
+	case eAnimSeqExportSetting::ANIMSEQ_SMD:
 	{
-		return ExportSeqDescRMAX(&animSeqAsset->seqdesc, exportPathCop, skelName, bones);
+		return ExportSeqDesc(setting, &animSeqAsset->seqdesc, exportPathCop, skelName, bones, asset->guid());
 	}
+	//	exporting asset
 	case eAnimSeqExportSetting::ANIMSEQ_RSEQ:
 	{
 		return ExportRawAnimSeqAsset(asset, animSeqAsset, exportPathCop);
@@ -334,6 +216,56 @@ bool ExportAnimSeqAsset(CPakAsset* const asset, const int setting, const AnimSeq
 	}
 }
 
+bool ExportAnimSeqFromAsset(const std::filesystem::path& exportPath, const std::string& stem, const char* const name, const int numAnimSeqs, const AssetGuid_t* const animSeqs, const std::vector<ModelBone_t>* const bones)
+{
+	auto aseqAssetBinding = g_assetData.m_assetTypeBindings.find('qesa');
+
+	assertm(aseqAssetBinding != g_assetData.m_assetTypeBindings.end(), "Unable to find asset type binding for \"aseq\" assets");
+
+	if (aseqAssetBinding != g_assetData.m_assetTypeBindings.end())
+	{
+		std::filesystem::path outputPath(exportPath);
+		outputPath.append(std::format("anims_{}/temp", stem));
+
+		if (!CreateDirectories(outputPath.parent_path()))
+		{
+			assertm(false, "Failed to create directory.");
+			return false;
+		}
+
+		std::atomic<uint32_t> remainingSeqs = 0; // we don't actually need thread safe here
+		const ProgressBarEvent_t* const seqExportProgress = g_pImGuiHandler->AddProgressBarEvent("Exporting Sequences..", static_cast<uint32_t>(numAnimSeqs), &remainingSeqs, true);
+		for (int i = 0; i < numAnimSeqs; i++)
+		{
+			const uint64_t guid = animSeqs[i].guid;
+
+			CPakAsset* const animSeq = g_assetData.FindAssetByGUID<CPakAsset>(guid);
+
+			if (nullptr == animSeq)
+			{
+				Log("RMDL EXPORT: animseq asset 0x%llX was not loaded, skipping...\n", guid);
+
+				continue;
+			}
+
+			const AnimSeqAsset* const animSeqAsset = reinterpret_cast<AnimSeqAsset*>(animSeq->extraData());
+
+			// skip this animation if for some reason it has not been parsed. if a loaded mdl/animrig has sequence children, it should always be parsed. possibly move this to an assert.
+			if (!animSeqAsset->animationParsed)
+				continue;
+
+			outputPath.replace_filename(std::filesystem::path(animSeqAsset->name).filename());
+
+			ExportAnimSeqAsset(animSeq, aseqAssetBinding->second.e.exportSetting, animSeqAsset, outputPath, name, bones);
+
+			++remainingSeqs;
+		}
+		g_pImGuiHandler->FinishProgressBarEvent(seqExportProgress);
+	}
+
+	return true;
+}
+
 static const char* const s_PathPrefixASEQ = s_AssetTypePaths.find(AssetType_t::ASEQ)->second;
 bool ExportAnimSeqAsset(CAsset* const asset, const int setting)
 {
@@ -341,6 +273,9 @@ bool ExportAnimSeqAsset(CAsset* const asset, const int setting)
 
 	const AnimSeqAsset* const animSeqAsset = reinterpret_cast<AnimSeqAsset*>(pakAsset->extraData());
 	assertm(animSeqAsset, "Extra data should be valid at this point.");
+	if (!animSeqAsset)
+		return false;
+
 	assertm(animSeqAsset->name, "No name for anim rig.");
 
 	const bool exportAsRaw = setting == eAnimSeqExportSetting::ANIMSEQ_RSEQ;
@@ -385,7 +320,7 @@ bool ExportAnimSeqAsset(CAsset* const asset, const int setting)
 		}
 		else if (animSeqAsset->parentRig)
 		{
-			bones = &animSeqAsset->parentRig->bones;
+			bones = animSeqAsset->parentRig->GetRig();
 			skeletonName = animSeqAsset->parentRig->name;
 		}
 		assertm(bones && !bones->empty(), "we should have bones at this point.");

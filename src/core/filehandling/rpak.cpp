@@ -30,10 +30,23 @@ void HandlePakLoad(std::vector<std::string> filePaths)
 
             if (std::filesystem::exists(patchMasterPath))
             {
+                // [rika]: prevent double load on patch_master and catch if it fails to load
                 g_assetData.m_pakPatchMaster = new CPakFile();
-                static_cast<CPakFile*>(g_assetData.m_pakPatchMaster)->ParseFileBuffer(patchMasterPath.string());
+                if (static_cast<CPakFile*>(g_assetData.m_pakPatchMaster)->ParseFileBuffer(patchMasterPath.string()))
+                {
+                    const CPakFile* const pak = static_cast<CPakFile*>(g_assetData.m_pakPatchMaster);
 
-                //Log("[PTCH] Found %lld patch entries.\n", g_assetData.m_patchMasterEntries.size());
+                    if (pak->header()->crc != 0)
+                        g_assetData.m_pakLoadStatusMap.emplace(pak->header()->crc, true);
+                }
+                else
+                {
+                    assertm(false, "Parsing patch_master from file failed.");
+                    delete g_assetData.m_pakPatchMaster;
+                    g_assetData.m_pakPatchMaster = nullptr;
+                }
+
+                //Log("[PTCH] Found %lld patch entries.\n", g_assetData.m_patchMasterEntries.size());           
             }
         }
 

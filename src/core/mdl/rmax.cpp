@@ -72,6 +72,18 @@ namespace rmax
 
 	}
 
+    void RMAXExporter::ResetMeshData()
+    {
+        materials.clear();
+        collections.clear();
+        meshes.clear();
+        vertices.clear();
+        colors.clear();
+        texcoords.clear();
+        weights.clear();
+        indices.clear();
+    }
+
 	bool RMAXExporter::ToFile() const
 	{
         char* buffer = new char[maxFileSize];
@@ -252,13 +264,17 @@ namespace rmax
         curpos = stringtable.WriteStrings(curpos);
 
         // export
-        if (!CreateDirectories(path.parent_path()))
+        std::filesystem::path outPath(exportPath);
+        outPath.append(exportName);
+        outPath.replace_extension(".rmax");
+        
+        if (!CreateDirectories(exportPath))
         {
             assertm(false, "failed to create directory.");
             return false;
         }
 
-        StreamIO rmaxOut(path.string(), eStreamIOMode::Write);
+        StreamIO rmaxOut(outPath.string(), eStreamIOMode::Write);
         rmaxOut.write(buffer, IALIGN16(static_cast<int>(curpos - baseptr)));
 
         return true;

@@ -51,10 +51,8 @@ namespace r5
 		int sectionframes; // number of frames used in each fast lookup section, zero if not used
 		inline const mstudioanimsections_v12_1_t* pSection(int i) const { return reinterpret_cast<mstudioanimsections_v12_1_t*>((char*)this + sectionindex) + i; }
 
-		// both of these are used in pAnim
-		// todo: figure these out
-		int64_t unk1;
-		int64_t unk2; // gets converted to an offset on load?
+		int64_t unk1; // maybe some sort of thread/mutic for the external data? set on pak asset load from unk_10
+		char* sectionDataExternal; // set on pak asset load
 	};
 
 	#pragma pack(push, 1)
@@ -612,8 +610,8 @@ namespace r5
 		int checksum; // This has to be the same in the phy and vtx files to load!
 		int sznameindex; // This has been moved from studiohdr2 to the front of the main header.
 		char name[64]; // The internal name of the model, padding with null chars.
+		// Typically "my_model.mdl" will have an internal name of "my_model"
 		int length; // Data size of MDL file in chars.
-		inline const char* pszName() const { return ((char*)this + sznameindex); }
 
 		Vector eyeposition;	// ideal eye position
 
@@ -726,7 +724,7 @@ namespace r5
 		// sets of lods
 		int groupHeaderOffset;
 		int groupHeaderCount;
-		const studio_hw_groupdata_v12_1_t* const pLODGroup(int i) const { return reinterpret_cast<studio_hw_groupdata_v12_1_t*>((char*)this + offsetof(studiohdr_v12_3_t, groupHeaderOffset) + groupHeaderOffset) + i; }
+		const studio_hw_groupdata_v12_1_t* const pLODGroup(int i) const { return reinterpret_cast<studio_hw_groupdata_v12_1_t*>((char*)this + offsetof(studiohdr_v12_2_t, groupHeaderOffset) + groupHeaderOffset) + i; }
 
 		int lodOffset;
 		int lodCount;  // check this
@@ -751,10 +749,10 @@ namespace r5
 
 		int linearboneindex;
 
-		// unsure what this is for but it exists for jigglbones
+		// used for adjusting weights in sequences, quick lookup into bones that have procbones, unsure what else uses this.
 		int procBoneCount;
-		int procBoneOffset;
-		int linearProcBoneOffset;
+		int procBoneOffset; // in order array of procbones and their parent bone indice
+		int linearProcBoneOffset; // byte per bone with indices into each bones procbone, 0xff if no procbone is present
 
 		// always "" or "Titan"
 		int unkStringOffset;
@@ -789,7 +787,197 @@ namespace r5
 		int vvwOffset; // index will come last after other vertex files
 		int vvwSize;
 
-		int unk_v12_3[3]; // added in rmdl v12.3
+		/// might be related to those three at the end of v16 studiohdr, but I haven't seen them used in these versions
+		int unk_20C[2]; // added in rmdl v12.3
+	};
+
+	struct studiohdr_v12_4_t
+	{
+		int id; // Model format ID, such as "IDST" (0x49 0x44 0x53 0x54)
+		int version; // Format version number, such as 54 (0x36,0x00,0x00,0x00)
+		int checksum; // This has to be the same in the phy and vtx files to load!
+		int sznameindex; // This has been moved from studiohdr2 to the front of the main header.
+		char name[64]; // The internal name of the model, padding with null chars.
+		// Typically "my_model.mdl" will have an internal name of "my_model"
+		int length; // Data size of MDL file in chars.
+
+		Vector eyeposition;	// ideal eye position
+
+		Vector illumposition;	// illumination center
+
+		Vector hull_min;		// ideal movement hull size
+		Vector hull_max;
+
+		Vector view_bbmin;		// clipping bounding box
+		Vector view_bbmax;
+
+		int flags;
+
+		int numbones; // bones
+		int boneindex;
+
+		int numbonecontrollers; // bone controllers
+		int bonecontrollerindex;
+
+		int numhitboxsets;
+		int hitboxsetindex;
+
+		// seemingly unused now, as animations are per sequence
+		int numlocalanim; // animations/poses
+		int localanimindex; // animation descriptions
+
+		int numlocalseq; // sequences
+		int	localseqindex;
+
+		int activitylistversion; // initialization flag - have the sequences been indexed?
+
+		// mstudiotexture_t
+		// short rpak path
+		// raw textures
+		int materialtypesindex; // index into an array of char sized material type enums for each material used by the model
+		int numtextures; // the material limit exceeds 128, probably 256.
+		int textureindex;
+
+		// this should always only be one, unless using vmts.
+		// raw textures search paths
+		int numcdtextures;
+		int cdtextureindex;
+
+		// replaceable textures tables
+		int numskinref;
+		int numskinfamilies;
+		int skinindex;
+
+		int numbodyparts;
+		int bodypartindex;
+		inline const mstudiobodyparts_t* pBodypart(int i) const { return reinterpret_cast<const mstudiobodyparts_t*>(reinterpret_cast<const char*>(this) + bodypartindex) + i; }
+
+		int numlocalattachments;
+		int localattachmentindex;
+
+		int numlocalnodes;
+		int localnodeindex;
+		int localnodenameindex;
+		int localNodeUnk; // used sparsely in r2, unused in apex, removed in v16 rmdl
+		int localNodeDataOffset; // offset into an array of int sized offsets that read into the data for each nod
+
+		int numikchains;
+		int ikchainindex;
+
+		// mesh panels for using rui on models, primarily for weapons
+		int uiPanelCount;
+		int uiPanelOffset;
+
+		int numlocalposeparameters;
+		int localposeparamindex;
+
+		int surfacepropindex;
+
+		int keyvalueindex;
+		int keyvaluesize;
+
+		int numlocalikautoplaylocks;
+		int localikautoplaylockindex;
+
+		float mass;
+		int contents;
+
+		// unused for packed models
+		int numincludemodels;
+		int includemodelindex;
+
+		int /* mutable void* */ virtualModel;
+
+		int bonetablebynameindex;
+
+		// hw data lookup from rmdl
+		int meshCount; // number of meshes per lod
+		int meshOffset;
+
+		int boneStateOffset;
+		int boneStateCount;
+
+		int unk_v12_1; // related to vg likely
+
+		int hwDataSize;
+
+		// weird hw data stuff
+		// duplicates?
+		// NAMES NEEDED
+		short vgUnk; // same as padding in vg header
+		short vgLODCount; // same as lod count in vg header
+
+		int lodMap; // lods in this group, each bit is a lod
+
+		// sets of lods
+		int groupHeaderOffset;
+		int groupHeaderCount;
+		const studio_hw_groupdata_v12_1_t* const pLODGroup(int i) const { return reinterpret_cast<studio_hw_groupdata_v12_1_t*>((char*)this + offsetof(studiohdr_v12_2_t, groupHeaderOffset) + groupHeaderOffset) + i; }
+
+		int lodOffset;
+		int lodCount;  // check this
+
+		float fadeDistance;
+		float gatherSize; // what. from r5r struct
+
+		float flVertAnimFixedPointScale; // to be verified
+		int surfacepropLookup; // saved in the file
+
+		int unk_v12_2; // added in v12.2
+
+		// this is in most shipped models, probably part of their asset bakery.
+		// doesn't actually need to be written pretty sure, only four chars when not present.
+		// this is not completely true as some models simply have nothing, such as animation models.
+		int sourceFilenameOffset;
+
+		int numsrcbonetransform;
+		int srcbonetransformindex;
+
+		int	illumpositionattachmentindex;
+
+		int linearboneindex;
+
+		// used for adjusting weights in sequences, quick lookup into bones that have procbones, unsure what else uses this.
+		int procBoneCount;
+		int procBoneOffset; // in order array of procbones and their parent bone indice
+		int linearProcBoneOffset; // byte per bone with indices into each bones procbone, 0xff if no procbone is present
+
+		// always "" or "Titan"
+		int unkStringOffset;
+
+		// offsets into vertex buffer for component files, suzes are per file if course
+		// unused besides phy starting in rmdl v9
+		int vtxOffset; // VTX
+		int vvdOffset; // VVD / IDSV
+		int vvcOffset; // VVC / IDCV 
+		int phyOffset; // VPHY / IVPS
+
+		int vtxSize;
+		int vvdSize;
+		int vvcSize;
+		int phySize; // still used in models using vg
+
+		// mostly seen on '_animated' suffixed models
+		// manually declared bone followers are no longer stored in kvs under 'bone_followers', they are now stored in an array of ints with the bone index.
+		int boneFollowerCount;
+		int boneFollowerOffset;
+
+		// BVH4 size (?)
+		Vector bvhMin;
+		Vector bvhMax; // seem to be the same as hull size
+
+		int bvhOffset; // bvh4 tree
+
+		short bvhUnk[2]; // collision detail for bvh (?)
+
+		// new in apex vertex weight file for verts that have more than three weights
+		// vvw is a 'fake' extension name, we do not know the proper name.
+		int vvwOffset; // index will come last after other vertex files
+		int vvwSize;
+
+		/// might be related to those three at the end of v16 studiohdr, but I haven't seen them used in these versions
+		int unk_20C[2]; // added in rmdl v12.3
+		int unk_214;	// added in rmdl v12.4
 	};
 
 	struct studiohdr_v14_t

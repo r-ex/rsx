@@ -43,7 +43,7 @@ struct AnimSeqAssetHeader_v8_t
 	void* data;
 	char* name;
 
-	uint64_t unk_10;
+	void* unk_10; // gets set to an allocated struct for 16 bytes on asset load
 
 	uint16_t numModels;
 	uint16_t numSettings;
@@ -122,9 +122,10 @@ public:
 		}
 		case eSeqVersion::VERSION_11:
 		{
-			seqdesc = seqdesc_t(reinterpret_cast<r5::mstudioseqdesc_v16_t*>(data), dataExtraPerm);
+			r5::mstudioseqdesc_v16_t* const tmp = reinterpret_cast<r5::mstudioseqdesc_v16_t* const>(data);
 
-			const r5::mstudioseqdesc_v16_t* const tmp = reinterpret_cast<const r5::mstudioseqdesc_v16_t* const>(data);
+			seqdesc = seqdesc_t(tmp, dataExtraPerm);
+
 			const int boneCount = (tmp->activitymodifierindex - tmp->weightlistindex) / 4;
 
 			RawSizeV11(boneCount);
@@ -133,9 +134,9 @@ public:
 		}
 		case eSeqVersion::VERSION_12:
 		{
-			seqdesc = seqdesc_t(reinterpret_cast<r5::mstudioseqdesc_v16_t*>(data), dataExtraPerm);
+			r5::mstudioseqdesc_v18_t* const tmp = reinterpret_cast<r5::mstudioseqdesc_v18_t* const>(data);
 
-			const r5::mstudioseqdesc_v18_t* const tmp = reinterpret_cast<const r5::mstudioseqdesc_v18_t* const>(data);
+			seqdesc = seqdesc_t(tmp, dataExtraPerm);
 
 			if (tmp->weightlistindex == 1 || tmp->weightlistindex == 3)
 			{
@@ -339,3 +340,4 @@ private:
 };
 
 bool ExportAnimSeqAsset(CPakAsset* const asset, const int setting, const AnimSeqAsset* const animSeqAsset, const std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* bones);
+bool ExportAnimSeqFromAsset(const std::filesystem::path& exportPath, const std::string& stem, const char* const name, const int numAnimSeqs, const AssetGuid_t* const animSeqs, const std::vector<ModelBone_t>* const bones);

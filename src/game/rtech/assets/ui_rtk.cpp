@@ -15,6 +15,8 @@ void LoadRTKAsset(CAssetContainer* pak, CAsset* asset)
     RTKAsset* rtkAsset = nullptr;
 
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+    assertm(pakAsset->version() == 2, "invalid version");
+
     switch (pakAsset->data()->headerStructSize)
     {
     case 0x20:
@@ -43,6 +45,9 @@ void LoadRTKAsset(CAssetContainer* pak, CAsset* asset)
         break;
     }
     default:
+    {
+        assertm(false, "unaccounted asset version, will cause major issues!");
+
         static bool hasWarned = false;
 
         if (!hasWarned)
@@ -54,9 +59,10 @@ void LoadRTKAsset(CAssetContainer* pak, CAsset* asset)
         }
         return;
     }
+    }
 
     std::string assetName = "ui_rtk/" + rtkAsset->getName() + ".rpak";
-    pakAsset->SetAssetName(assetName);
+    pakAsset->SetAssetName(assetName, true);
     pakAsset->setExtraData(rtkAsset);
 }
 

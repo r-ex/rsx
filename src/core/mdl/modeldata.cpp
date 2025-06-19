@@ -3,12 +3,14 @@
 
 #include <core/mdl/rmax.h>
 #include <core/mdl/cast.h>
+#include <core/mdl/smd.h>
 
 //#include <core/render/dx.h>
 //#include <thirdparty/imgui/imgui.h>
 #include <thirdparty/imgui/misc/imgui_utility.h>
 
 extern CDXParentHandler* g_dxHandler;
+extern CBufferManager g_BufferManager;
 extern ExportSettings_t g_ExportSettings;
 
 //
@@ -19,7 +21,8 @@ void Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const wei
 {
 	int offset = 0;
 
-	if (mesh->rawVertexLayoutFlags & VERT_POSITION_UNPACKED)
+	// [rika]: older hwdata models used bit flags, but starting in season 11.1 (rmdl 13.1) it's treated more like an enum
+	/*if (mesh->rawVertexLayoutFlags & VERT_POSITION_UNPACKED)
 	{
 		vert->position = *VERT_DATA(Vector, rawVertexData, offset);
 		offset += sizeof(Vector);
@@ -29,6 +32,37 @@ void Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const wei
 	{
 		vert->position = VERT_DATA(Vector64, rawVertexData, offset)->Unpack();
 		offset += sizeof(Vector64);
+	}*/
+
+	const vg::eVertPositionType posType = static_cast<vg::eVertPositionType>(mesh->rawVertexLayoutFlags & 3);
+	switch (posType)
+	{
+	case vg::eVertPositionType::VG_POS_NONE:
+	{
+		break;
+	}
+	case vg::eVertPositionType::VG_POS_UNPACKED:
+	{
+		vert->position = *VERT_DATA(Vector, rawVertexData, offset);
+		offset += sizeof(Vector);
+
+		break;
+	}
+	case vg::eVertPositionType::VG_POS_PACKED64:
+	{
+		vert->position = VERT_DATA(Vector64, rawVertexData, offset)->Unpack();
+		offset += sizeof(Vector64);
+
+		break;
+	}
+	case vg::eVertPositionType::VG_POS_PACKED48:
+	{
+		// [rika]: not sure the format on this one, currently only used on switch and I can't be asked to find tools to decompile a shader at this time
+		vert->position = Vector(0.0f);
+		offset += 0x6;
+
+		break;
+	}
 	}
 
 	assertm(nullptr != weights, "weight pointer should be valid");
@@ -149,6 +183,8 @@ void Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const wei
 
 		countIdx++;
 	}
+
+	assertm(offset == mesh->vertCacheSize, "parsed data size differed from vertexCacheSize");
 }
 #undef VERT_DATA
 
@@ -295,6 +331,42 @@ void ModelMeshData_t::ParseMaterial(ModelParsedData_t* const parsed, const int m
 	materialAsset = parsed->materials.at(material).asset;
 }
 
+// bones
+void ParseModelBoneData_v8(ModelParsedData_t* const parsedData)
+{
+	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+
+	const r5::mstudiobone_v8_t* const bones = reinterpret_cast<const r5::mstudiobone_v8_t* const>(pStudioHdr->pBones());
+	parsedData->bones.resize(pStudioHdr->boneCount);
+
+	for (int i = 0; i < pStudioHdr->boneCount; i++)
+		parsedData->bones.at(i) = ModelBone_t(&bones[i]);
+}
+
+void ParseModelBoneData_v12_1(ModelParsedData_t* const parsedData)
+{
+	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+
+	const r5::mstudiobone_v12_1_t* const bones = reinterpret_cast<const r5::mstudiobone_v12_1_t* const>(pStudioHdr->pBones());
+	parsedData->bones.resize(pStudioHdr->boneCount);
+
+	for (int i = 0; i < pStudioHdr->boneCount; i++)
+		parsedData->bones.at(i) = ModelBone_t(&bones[i]);
+}
+
+void ParseModelBoneData_v16(ModelParsedData_t* const parsedData)
+{
+	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+
+	const r5::mstudiobonehdr_v16_t* const bonehdrs = reinterpret_cast<const r5::mstudiobonehdr_v16_t* const>(pStudioHdr->pBones());
+	const r5::mstudiobonedata_v16_t* const bonedata = reinterpret_cast<const r5::mstudiobonedata_v16_t* const>(pStudioHdr->pBoneData());
+
+	parsedData->bones.resize(pStudioHdr->boneCount);
+
+	for (int i = 0; i < pStudioHdr->boneCount; i++)
+		parsedData->bones.at(i) = ModelBone_t(&bonehdrs[i], &bonedata[i]);
+}
+
 void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const drawData, const uint64_t lod)
 {
 	// [rika]: eventually parse through models
@@ -366,6 +438,263 @@ void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const 
 	}
 
 	return;
+}
+
+void ParseModelSequenceData_NoStall(ModelParsedData_t* const parsedData, char* const baseptr)
+{
+	assertm(parsedData->bones.size() > 0, "should have bones");
+
+	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+
+	if (pStudioHdr->localSequenceCount == 0)
+		return;
+
+	parsedData->sequences = new seqdesc_t[pStudioHdr->localSequenceCount];
+
+	for (int i = 0; i < pStudioHdr->localSequenceCount; i++)
+	{
+		parsedData->sequences[i] = seqdesc_t(reinterpret_cast<r5::mstudioseqdesc_v8_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i);
+
+		ParseSeqDesc_R5_RLE(&parsedData->sequences[i], &parsedData->bones, false);
+	}
+}
+
+void ParseSeqDesc_R2_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr)
+{
+	const size_t boneCount = bones->size();
+
+	for (int i = 0; i < seqdesc->AnimCount(); i++)
+	{
+		animdesc_t* const animdesc = &seqdesc->anims.at(i);
+
+		// no point to allocate memory on empty animations!
+		CAnimData animData(boneCount, animdesc->numframes);
+		animData.ReserveVector();
+
+		for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
+		{
+			const float cycle = animdesc->GetCycle(frameIdx);
+
+			float fFrame = cycle * static_cast<float>(animdesc->numframes - 1);
+
+			const int iFrame = static_cast<int>(fFrame);
+			const float s = (fFrame - static_cast<float>(iFrame));
+
+			int iLocalFrame = iFrame;
+
+			const r2::mstudio_rle_anim_t* panim = reinterpret_cast<const r2::mstudio_rle_anim_t*>(animdesc->pAnimdataNoStall(&iLocalFrame));
+
+			for (int boneIdx = 0; boneIdx < boneCount; boneIdx++)
+			{
+				const ModelBone_t* const bone = &bones->at(boneIdx);
+
+				Vector pos;
+				Quaternion q;
+				Vector scale;
+
+				// r2 animations will always have position
+				uint8_t boneFlags = CAnimDataBone::ANIMDATA_POS
+					| (panim->flags & r2::RleFlags_t::STUDIO_ANIM_NOROT ? 0 : CAnimDataBone::ANIMDATA_ROT)
+					| (seqdesc->flags & 0x20000 ? CAnimDataBone::ANIMDATA_SCL : 0);
+
+				if (panim && panim->bone == boneIdx)
+				{
+					// need to add a bool here, we do not want the interpolated values (inbetween frames)
+					r2::CalcBonePosition(iLocalFrame, s, pStudioHdr->pBone(panim->bone), pStudioHdr->pLinearBones(), panim, pos);
+					r2::CalcBoneQuaternion(iLocalFrame, s, pStudioHdr->pBone(panim->bone), pStudioHdr->pLinearBones(), panim, q);
+					r2::CalcBoneScale(iLocalFrame, s, pStudioHdr->pBone(panim->bone)->scale, pStudioHdr->pBone(panim->bone)->scalescale, panim, scale);
+
+					panim = panim->pNext();
+				}
+				else
+				{
+					if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA)
+					{
+						pos.Init(0.0f, 0.0f, 0.0f);
+						q.Init(0.0f, 0.0f, 0.0f, 1.0f);
+						scale.Init(1.0f, 1.0f, 1.0f);
+					}
+					else
+					{
+						pos = bone->pos;
+						q = bone->quat;
+						scale = bone->scale;
+					}
+				}
+
+				// adjust the origin bone
+				// do after we get anim data, so our rotation does not get overwritten
+				if (boneIdx == 0)
+				{
+					QAngle vecAngleBase(q);
+
+					if (nullptr != animdesc->movement && animdesc->flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
+					{
+						Vector vecPos;
+						QAngle vecAngle;
+
+						r1::Studio_AnimPosition(animdesc, cycle, vecPos, vecAngle);
+
+						pos += vecPos; // add our base movement position to our base position 
+						vecAngleBase.y += (vecAngle.y);
+					}
+
+					vecAngleBase.y += -90; // rotate -90 degree on the yaw axis
+
+					// adjust position as we are rotating on the Z axis
+					const float x = pos.x;
+					const float y = pos.y;
+
+					pos.x = y;
+					pos.y = -x;
+
+					AngleQuaternion(vecAngleBase, q);
+
+					// has pos/rot data regardless since we just adjusted pos/rot
+					boneFlags |= (CAnimDataBone::ANIMDATA_POS | CAnimDataBone::ANIMDATA_ROT);
+				}
+
+				CAnimDataBone& animDataBone = animData.GetBone(boneIdx);
+				animDataBone.SetFlags(boneFlags);
+				animDataBone.SetFrame(frameIdx, pos, q, scale);
+			}
+		}
+
+		// parse into memory and compress
+		CManagedBuffer* buffer = g_BufferManager.ClaimBuffer();
+
+		const size_t sizeInMem = animData.ToMemory(buffer->Buffer());
+		animdesc->parsedBufferIndex = seqdesc->parsedData.addBack(buffer->Buffer(), sizeInMem);
+
+		g_BufferManager.RelieveBuffer(buffer);
+	}
+}
+
+void ParseSeqDesc_R5_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const bool useStall)
+{
+	// check flags
+	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_POS) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_POS), "flag mismatch");
+	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_ROT) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_ROT), "flag mismatch");
+	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_SCL) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_SCALE), "flag mismatch");
+
+	char* (animdesc_t::*pAnimdata)(int* const) const = useStall ? &animdesc_t::pAnimdataStall : &animdesc_t::pAnimdataNoStall;
+
+	const size_t boneCount = bones->size();
+
+	for (int i = 0; i < seqdesc->AnimCount(); i++)
+	{
+		animdesc_t* const animdesc = &seqdesc->anims.at(i);
+
+		if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID))
+		{
+			animdesc->parsedBufferIndex = invalidNoodleIdx;
+
+			continue;
+		}
+
+		// no point to allocate memory on empty animations!
+		CAnimData animData(boneCount, animdesc->numframes);
+		animData.ReserveVector();
+
+		for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
+		{
+			const float cycle = animdesc->GetCycle(frameIdx);
+
+			float fFrame = cycle * static_cast<float>(animdesc->numframes - 1);
+
+			const int iFrame = static_cast<int>(fFrame);
+			const float s = (fFrame - static_cast<float>(iFrame));
+
+			int iLocalFrame = iFrame;
+
+			const uint8_t* boneFlagArray = reinterpret_cast<uint8_t*>((animdesc->*pAnimdata)(&iLocalFrame));
+			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount)]);
+
+			for (int boneIdx = 0; boneIdx < boneCount; boneIdx++)
+			{
+				const ModelBone_t* const bone = &bones->at(boneIdx);
+
+				Vector pos;
+				Quaternion q;
+				Vector scale;
+				RadianEuler baseRot;
+
+				if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA)
+				{
+					pos.Init(0.0f, 0.0f, 0.0f);
+					q.Init(0.0f, 0.0f, 0.0f, 1.0f);
+					scale.Init(1.0f, 1.0f, 1.0f);
+					baseRot.Init(0.0f, 0.0f, 0.0f);
+				}
+				else
+				{
+					pos = bone->pos;
+					q = bone->quat;
+					scale = bone->scale;
+					baseRot = bone->rot;
+				}
+
+				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, boneIdx); // truncate byte offset then shift if needed
+
+				if (boneFlags & (r5::RleBoneFlags_t::STUDIO_ANIM_DATA)) // check if this bone has data
+				{
+					if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_POS)
+						CalcBonePosition(iLocalFrame, s, panim, pos);
+					if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_ROT)
+						CalcBoneQuaternion(iLocalFrame, s, panim, baseRot, q, boneFlags);
+					if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_SCALE)
+						CalcBoneScale(iLocalFrame, s, panim, scale, boneFlags);
+
+
+					panim = panim->pNext();
+				}
+
+				// adjust the origin bone
+				// do after we get anim data, so our rotation does not get overwritten
+				if (boneIdx == 0)
+				{
+					QAngle vecAngleBase(q);
+
+					if (nullptr != animdesc->movement && animdesc->flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
+					{
+						Vector vecPos;
+						QAngle vecAngle;
+
+						r5::Studio_AnimPosition(animdesc, cycle, vecPos, vecAngle);
+
+						pos += vecPos; // add our base movement position to our base position 
+						vecAngleBase.y += (vecAngle.y);
+					}
+
+					vecAngleBase.y += -90; // rotate -90 degree on the yaw axis
+
+					// adjust position as we are rotating on the Z axis
+					const float x = pos.x;
+					const float y = pos.y;
+
+					pos.x = y;
+					pos.y = -x;
+
+					AngleQuaternion(vecAngleBase, q);
+
+					// has pos/rot data regardless since we just adjusted pos/rot
+					boneFlags |= (CAnimDataBone::ANIMDATA_POS | CAnimDataBone::ANIMDATA_ROT);
+				}
+
+				CAnimDataBone& animDataBone = animData.GetBone(boneIdx);
+				animDataBone.SetFlags(boneFlags);
+				animDataBone.SetFrame(frameIdx, pos, q, scale);
+			}
+		}
+
+		// parse into memory and compress
+		CManagedBuffer* buffer = g_BufferManager.ClaimBuffer();
+
+		const size_t sizeInMem = animData.ToMemory(buffer->Buffer());
+		animdesc->parsedBufferIndex = seqdesc->parsedData.addBack(buffer->Buffer(), sizeInMem);
+
+		g_BufferManager.RelieveBuffer(buffer);
+	}
 }
 
 //
@@ -489,6 +818,7 @@ const size_t CAnimData::ToMemory(char* const buf)
 	return size;
 };
 
+
 //
 // EXPORT SETTINGS
 //
@@ -548,6 +878,10 @@ void HandleModelMaterials(const ModelParsedData_t* const parsedData, std::unorde
 		materials.emplace(baseId, material);
 	}
 
+	// [rika]: don't export material textures if it's not enabled
+	if (!g_ExportSettings.exportMaterialTextures)
+		return;
+
 	// [rika]: export material textures
 	std::atomic<uint32_t> remainingMaterials = 0; // we don't actually need thread safe here
 	const ProgressBarEvent_t* const materialExportProgress = g_pImGuiHandler->AddProgressBarEvent("Exporting Materials..", static_cast<uint32_t>(materials.size()), &remainingMaterials, true);
@@ -582,8 +916,27 @@ void HandleModelMaterials(const ModelParsedData_t* const parsedData, std::unorde
 bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath)
 {
 	std::string fileNameBase = exportPath.stem().string();
+	const std::filesystem::path filePath(exportPath.parent_path());
 
-	const std::filesystem::path texturePath(std::format("{}/{}", exportPath.parent_path().string(), fileNameBase)); // todo, remove duplicate code
+	rmax::RMAXExporter rmaxFile(filePath, fileNameBase.c_str(), fileNameBase.c_str());
+
+	// do bones
+	rmaxFile.ReserveBones(parsedData->bones.size());
+	for (auto& bone : parsedData->bones)
+		rmaxFile.AddBone(bone.name, bone.parentIndex, bone.pos, bone.quat, bone.scale);
+
+	// [rika]: model is skin and bones, no meat
+	if (parsedData->lods.size() == 0)
+	{
+		const std::string tmpName(std::format("{}.rmax", fileNameBase));
+		rmaxFile.SetName(tmpName);
+
+		rmaxFile.ToFile();
+
+		return true;
+	}
+
+	const std::filesystem::path texturePath(std::format("{}/{}", filePath.string(), fileNameBase)); // todo, remove duplicate code
 	std::unordered_map<int, ModelMaterialExport_t> materials;
 	HandleModelMaterials(parsedData, materials, texturePath);
 
@@ -593,14 +946,7 @@ bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem:
 		const ModelLODData_t& lodData = parsedData->lods.at(lodIdx);
 
 		const std::string tmpName = std::format("{}_LOD{}.rmax", fileNameBase, lodIdx);
-		exportPath.replace_filename(tmpName);
-
-		rmax::RMAXExporter rmaxFile(exportPath, fileNameBase.c_str(), fileNameBase.c_str());
-
-		// do bones
-		rmaxFile.ReserveBones(parsedData->bones.size());
-		for (auto& bone : parsedData->bones)
-			rmaxFile.AddBone(bone.name, bone.parentIndex, bone.pos, bone.quat, bone.scale);
+		rmaxFile.SetName(tmpName);		
 
 		// do materials
 		rmaxFile.ReserveMaterials(parsedData->materials.size());
@@ -704,6 +1050,7 @@ bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem:
 		}
 
 		rmaxFile.ToFile();
+		rmaxFile.ResetMeshData();
 	}
 
 	return true;
@@ -714,6 +1061,47 @@ bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem:
 bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const uint64_t guid)
 {
 	std::string fileNameBase = exportPath.stem().string();
+
+	// [rika]: build the skeleton once, and reuse it
+	cast::CastNode skelNode(cast::CastId::Skeleton, RTech::StringToGuid(fileNameBase.c_str()));
+	{
+		const size_t boneCount = parsedData->bones.size();
+		skelNode.ReserveChildren(boneCount);
+
+		// uses hashes for lookup, still gets bone parents by index :clown:
+		for (size_t i = 0; i < boneCount; i++)
+		{
+			const ModelBone_t& boneData = parsedData->bones.at(i);
+
+			cast::CastNodeBone boneNode(&skelNode);
+			boneNode.MakeBone(boneData.name, boneData.parentIndex, &boneData.pos, &boneData.quat, false);
+		}
+	}
+	const cast::CastNode& skelNodeConst = skelNode;
+
+	// [rika]: model is skin and bones, no meat
+	if (parsedData->lods.size() == 0)
+	{
+		const std::string tmpName(std::format("{}.cast", fileNameBase));
+		exportPath.replace_filename(tmpName);
+
+		cast::CastExporter cast(exportPath.string());
+
+		// cast
+		cast::CastNode* const rootNode = cast.GetChild(0); // we only have one root node, no hash
+		cast::CastNode* const modelNode = rootNode->AddChild(cast::CastId::Model, guid);
+
+		// [rika]: we can predict how big this vector needs to be, however resizing it will make adding new members a pain.
+		const size_t modelChildrenCount = 1; // skeleton (one)
+		modelNode->ReserveChildren(modelChildrenCount);
+
+		// do skeleton
+		modelNode->AddChild(skelNode); // one time use
+
+		cast.ToFile();
+
+		return true;
+	}
 
 	const std::filesystem::path texturePath(std::format("{}/{}", exportPath.parent_path().string(), fileNameBase)); // todo, remove duplicate code
 	std::unordered_map<int, ModelMaterialExport_t> materials;
@@ -737,21 +1125,7 @@ bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem:
 		modelNode->ReserveChildren(modelChildrenCount);
 
 		// do skeleton
-		{
-			const size_t boneCount = parsedData->bones.size();
-
-			cast::CastNode* skelNode = modelNode->AddChild(cast::CastId::Skeleton, RTech::StringToGuid(fileNameBase.c_str()));
-			skelNode->ReserveChildren(boneCount);
-
-			// uses hashes for lookup, still gets bone parents by index :clown:
-			for (size_t i = 0; i < boneCount; i++)
-			{
-				const ModelBone_t& boneData = parsedData->bones.at(i);
-
-				cast::CastNodeBone boneNode(skelNode);
-				boneNode.MakeBone(boneData.name, boneData.parentIndex, &boneData.pos, &boneData.quat, false);
-			}
-		}
+		modelNode->AddChild(skelNodeConst);
 
 		// do materials
 		for (const auto& it : materials)
@@ -950,6 +1324,113 @@ bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem:
 
 		delete[] vertexData.indices;
 	}
+
+	return true;
+}
+
+inline void ParseVertexIntoSMD(const Vertex_t* const srcVert, const VertexWeight_t* const srcWeights, smd::Vertex* const vert, const bool isStaticProp)
+{
+	vert->position = srcVert->position;
+	srcVert->normalPacked.UnpackNormal(vert->normal);
+
+	if (isStaticProp)
+	{
+		StaticPropFlipFlop(vert->position);
+		StaticPropFlipFlop(vert->normal);
+	}
+
+	vert->texcoords[0] = srcVert->texcoord;
+
+	vert->numBones = srcVert->weightCount > smd::maxBoneWeights ? smd::maxBoneWeights : srcVert->weightCount;
+
+	for (int weightIdx = 0; weightIdx < vert->numBones; weightIdx++)
+	{
+		const VertexWeight_t* const weight = &srcWeights[srcVert->weightIndex + weightIdx];
+
+		vert->bone[weightIdx] = weight->bone;
+		vert->weight[weightIdx] = weight->weight;
+	}
+}
+
+bool ExportModelSMD(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath)
+{
+	std::string fileNameBase = exportPath.stem().string();
+	const std::filesystem::path filePath(exportPath.parent_path());
+
+	smd::CSourceModelData* const smd = new smd::CSourceModelData(filePath, parsedData->bones.size(), 1ull);
+
+	// [rika]: initialize the nodes, and in this case the frames since we should only have one
+	for (size_t i = 0; i < parsedData->bones.size(); i++)
+	{
+		const ModelBone_t& bone = parsedData->bones.at(i);
+		const int ibone = static_cast<int>(i);
+
+		smd->InitNode(bone.name, ibone, bone.parentIndex);
+		smd->InitFrameBone(0, ibone, bone.pos, bone.rot);
+	}
+
+	// [rika]: model is skin and bones, no meat
+	if (parsedData->lods.size() == 0)
+	{
+		smd->SetName(fileNameBase);
+		smd->Write();
+
+		return true;
+	}
+
+	const std::filesystem::path texturePath(std::format("{}/{}", filePath.string(), fileNameBase)); // todo, remove duplicate code
+	std::unordered_map<int, ModelMaterialExport_t> materials;
+	HandleModelMaterials(parsedData, materials, texturePath);
+
+	const bool isStaticProp = parsedData->studiohdr.flags & STUDIOHDR_FLAGS_STATIC_PROP ? true : false;
+
+	for (size_t lodIdx = 0; lodIdx < parsedData->lods.size(); lodIdx++)
+	{
+		const ModelLODData_t& lod = parsedData->lods.at(lodIdx);
+
+		for (const ModelModelData_t& model : lod.models)
+		{
+			std::string name(model.name);
+			FixupExportLodNames(name, static_cast<int>(lodIdx));
+
+			smd->SetName(name);
+
+			for (uint32_t meshIdx = 0; meshIdx < model.meshCount; meshIdx++)
+			{
+				const ModelMeshData_t& meshData = lod.meshes.at(model.meshIndex + meshIdx);
+
+				assertm(meshData.meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
+
+				std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(meshData.meshVertexDataIndex);
+				const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
+
+				const uint16_t* const indices = parsedVertexData->GetIndices();
+				const Vertex_t* const vertices = parsedVertexData->GetVertices();
+				const VertexWeight_t* const weights = parsedVertexData->GetWeights();
+
+				// [rika]: add more triangles
+				smd->AddTriangles(static_cast<size_t>(meshData.indexCount / 3));
+
+				const char* materialName = materials.find(meshData.materialId)->second.asset->name;
+				materialName = g_ExportSettings.exportPathsFull ? materialName : keepAfterLastSlashOrBackslash(materialName);
+
+				for (uint32_t indiceIdx = 0; indiceIdx < meshData.indexCount; indiceIdx += 3)
+				{
+					smd->InitTriangle(materialName);
+					smd::Triangle* const tri = smd->TopTri();
+
+					ParseVertexIntoSMD(&vertices[indices[indiceIdx]], weights, &tri->vertices[0], isStaticProp);
+					ParseVertexIntoSMD(&vertices[indices[indiceIdx + 2]], weights, &tri->vertices[1], isStaticProp);
+					ParseVertexIntoSMD(&vertices[indices[indiceIdx + 1]], weights, &tri->vertices[2], isStaticProp);
+				}
+			}
+
+			smd->Write();
+			smd->ResetMeshData();
+		}
+	}
+
+	FreeAllocVar(smd);
 
 	return true;
 }
@@ -1175,6 +1656,123 @@ bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 	}
 
 	return true;
+}
+
+bool ExportSeqDescSMD(const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones)
+{
+	const std::string fileNameBase = exportPath.stem().string();
+	const std::string skelNameBase = std::filesystem::path(skelName).stem().string();
+
+	const size_t boneCount = bones->size();
+
+	smd::CSourceModelData* const smd = new smd::CSourceModelData(exportPath.parent_path(), bones->size(), 1ull);
+
+	// [rika]: initialize the nodes
+	for (size_t i = 0; i < boneCount; i++)
+	{
+		const ModelBone_t& bone = bones->at(i);
+
+		smd->InitNode(bone.name, static_cast<int>(i), bone.parentIndex);
+	}
+
+	Vector deltaPos(0.0f, 0.0f, 0.0f);
+	Quaternion deltaQuat(0.0f, 0.0f, 0.0f, 1.0f);
+
+	for (int animIdx = 0; animIdx < seqdesc->AnimCount(); animIdx++)
+	{
+		const animdesc_t* const animdesc = &seqdesc->anims.at(animIdx);
+		const std::string animname(std::format("{}_{}.smd", fileNameBase, std::to_string(animIdx)));
+
+		smd->ResetFrameData(static_cast<size_t>(animdesc->numframes));
+		smd->SetName(animname);
+
+		if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID) || animdesc->parsedBufferIndex == invalidNoodleIdx)
+		{
+			smd->Write();
+
+			continue;
+		}
+
+		const std::unique_ptr<char[]> noodle = seqdesc->parsedData.getIdx(animdesc->parsedBufferIndex);
+		CAnimData animData(noodle.get());
+
+		for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
+		{
+			for (size_t i = 0; i < boneCount; i++)
+			{
+				const ModelBone_t* const boneData = &bones->at(i);
+
+				// parsed data
+				const uint8_t flags = animData.GetFlag(i);
+				const char* dataPtr = animData.GetData(i);
+
+				const Vector* pos = nullptr;
+				const Quaternion* q = nullptr;
+
+				if (flags & CAnimDataBone::ANIMDATA_POS)
+				{
+					pos = reinterpret_cast<const Vector* const>(dataPtr) + frameIdx;
+
+					dataPtr += (sizeof(Vector) * animdesc->numframes);
+				}
+				else
+				{
+					pos = animdesc->flags & eStudioAnimFlags::ANIM_DELTA ? &deltaPos : &boneData->pos;
+				}
+
+				if (flags & CAnimDataBone::ANIMDATA_ROT)
+				{
+					q = reinterpret_cast<const Quaternion* const>(dataPtr) + frameIdx;
+				}
+				else
+				{
+					q = animdesc->flags & eStudioAnimFlags::ANIM_DELTA ? &deltaQuat : &boneData->quat;
+				}
+
+				assertm(pos, "should not be nullptr");
+				assertm(q, "should not be nullptr");
+
+				const RadianEuler rot(*q);
+
+				smd->InitFrameBone(frameIdx, static_cast<int>(i), *pos, rot);
+			}
+		}
+
+		smd->Write();
+	}
+
+	FreeAllocVar(smd);
+
+	return true;
+}
+
+bool ExportSeqDesc(const int setting, const seqdesc_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones, const uint64_t guid)
+{
+	switch (setting)
+	{
+
+	case eAnimSeqExportSetting::ANIMSEQ_CAST:
+	{
+		return ExportSeqDescCast(seqdesc, exportPath, skelName, bones, guid);
+	}
+	case eAnimSeqExportSetting::ANIMSEQ_RMAX:
+	{
+		return ExportSeqDescRMAX(seqdesc, exportPath, skelName, bones);
+	}
+	case eAnimSeqExportSetting::ANIMSEQ_SMD:
+	{
+		return ExportSeqDescSMD(seqdesc, exportPath, skelName, bones);
+	}
+	case eAnimSeqExportSetting::ANIMSEQ_RSEQ:
+	{
+		return false;
+	}
+	default:
+	{
+		assertm(false, "Export setting is not handled.");
+		return false;
+	}
+	}
 }
 
 //

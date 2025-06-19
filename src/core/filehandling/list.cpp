@@ -2,7 +2,7 @@
 #include <core/filehandling/export.h>
 #include <core/render/dx.h>
 
-extern CBufferManager* g_BufferManager;
+extern CBufferManager g_BufferManager;
 
 void HandleListExportPakAssets(const HWND handle, std::vector<CGlobalAssetData::AssetLookup_t>* assets)
 {
@@ -22,8 +22,7 @@ void HandleListExport(const HWND handle, std::vector<std::string> listElements)
     // We are in pak load now.
     //inJobAction = true;
 
-    g_BufferManager = new CBufferManager();
-    CManagedBuffer* fileNames = g_BufferManager->ClaimBuffer();
+    CManagedBuffer* fileNames = g_BufferManager.ClaimBuffer();
     memset(fileNames->Buffer(), 0, CBufferManager::MaxBufferSize());
 
     OPENFILENAMEA openFileName = {};
@@ -49,9 +48,7 @@ void HandleListExport(const HWND handle, std::vector<std::string> listElements)
         }
 
         ofs.close();
-
-        g_BufferManager->RelieveBuffer(fileNames);
-
-        delete g_BufferManager;
     }
+
+    g_BufferManager.RelieveBuffer(fileNames);
 }

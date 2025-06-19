@@ -10,77 +10,75 @@ extern CDXParentHandler* g_dxHandler;
 
 extern ExportSettings_t g_ExportSettings;
 
-#define FONT_TEXTURE_IDX_INVALID 0xffffffff
-constexpr int FONT_UTF16_QMARK = L'?';
-constexpr int FONT_UTF16_BOX = 0x25A1;
-
-// generic header when
-const uint32_t UIFont_GetTextureIndexFromUnicodeChar(const UIFontHeader_v6_t* const font, int charCode)
+// ui font header
+inline const uint32_t UIFontHeader::GetTextureIndexFromUnicodeMap(int unicode) const
 {
-    if (font->numUnicodeMaps == 0)
+    if (numUnicodeMaps == 0)
         return FONT_TEXTURE_IDX_INVALID;
+
+    assertm(unicodeMap, "unicode map should be valid if we're here");
 
     uint32_t mapIdx = 0;
 
-    for (mapIdx = 0; mapIdx < font->numUnicodeMaps; ++mapIdx)
+    for (mapIdx = 0; mapIdx < numUnicodeMaps; ++mapIdx)
     {
         // if this font charmap's last character is above the requested char code then the map contains
         // this character, so break early
-        if (font->unicodeMap[mapIdx].unicodeLast > charCode)
+        if (unicodeMap[mapIdx].unicodeLast > unicode)
             break;
     }
 
     // if the loop has been exited with a mapIdx value that is == to numUnicodeMaps
     // then the loop did not 
-    if (mapIdx >= font->numUnicodeMaps)
+    if (mapIdx >= numUnicodeMaps)
         return FONT_TEXTURE_IDX_INVALID;
 
     // if the found unicode map's first character is above the requested character, we do not have a valid charmap
-    if (font->unicodeMap[mapIdx].unicodeFirst > charCode)
+    if (unicodeMap[mapIdx].unicodeFirst > unicode)
         return FONT_TEXTURE_IDX_INVALID;
 
-    return font->unicodeMap[mapIdx].textureIndex + charCode - font->unicodeMap[mapIdx].unicodeFirst;
+    return unicodeMap[mapIdx].textureIndex + unicode - unicodeMap[mapIdx].unicodeFirst;
 }
 
-const uint32_t UIFontTextureFromUnicode(const UIFontHeader_v6_t* const font, int unicode)
+const uint32_t UIFontHeader::TextureFromUnicodeMap(int unicode) const
 {
-    const uint32_t foundTextureIndex = UIFont_GetTextureIndexFromUnicodeChar(font, unicode);
+    const uint32_t foundTextureIndex = GetTextureIndexFromUnicodeMap(unicode);
 
     if (foundTextureIndex != FONT_TEXTURE_IDX_INVALID)
         return foundTextureIndex;
 
     // if we failed to find the requested character in the font's charmaps, look for the texture index
     // of a question mark to replace it as a placeholder 
-    const uint32_t fallbackTextureIndex = UIFont_GetTextureIndexFromUnicodeChar(font, FONT_UTF16_QMARK);
+    const uint32_t fallbackTextureIndex = GetTextureIndexFromUnicodeMap(FONT_UTF16_QMARK);
 
     if (fallbackTextureIndex != FONT_TEXTURE_IDX_INVALID)
         return fallbackTextureIndex;
 
     // if the fallback also fails, print an error message and return an invalid texture index
-    Log("Font %s doesn't even have question mark \"?\"\n", font->name);
+    Log("Font %s doesn't even have question mark \"?\"\n", name);
 
     return FONT_TEXTURE_IDX_INVALID;
 }
 
-const uint32_t UIFontTextureFromUnicode(const UIFontHeader_v7_t* const font, int unicode)
+const uint32_t UIFontHeader::TextureFromUnicode(int unicode) const
 {
     while (true)
     {
-        const int fixedUnicode = (unicode - font->unicodeIndex);
+        const int fixedUnicode = (unicode - unicodeIndex);
         const uint32_t chunkIndex = static_cast<uint32_t>(fixedUnicode) >> 6; // discard the lower bits for our chunk index, this preserves size
 
-        if (chunkIndex < font->numUnicodeChunks)
+        if (chunkIndex < numUnicodeChunks)
         {
             const uint8_t bitIndex = fixedUnicode & 0x3F; // get our discarded bits back as an index, use this to get certain bits
 
-            const int64_t tableIndex = font->unicodeChunks[chunkIndex]; // index into the other tables
-            const int64_t unicodeMask = font->unicodeChunksMask[tableIndex]; // number of bits (unicodes/textures in this chunk). we get popcount to get the index for this texture, which doesn't count unused unicodes
+            const int64_t tableIndex = unicodeChunks[chunkIndex]; // index into the other tables
+            const int64_t unicodeMask = unicodeChunksMask[tableIndex]; // number of bits (unicodes/textures in this chunk). we get popcount to get the index for this texture, which doesn't count unused unicodes
 
             const int64_t bit = 1ll << bitIndex;
 
             // check that bitIndex has this bit set, if not, we don't have a texture for this unicode
             if (bit & unicodeMask)
-                return font->unicodeChunksIndex[tableIndex] + static_cast<uint32_t>(__popcnt64((bit - 1) & unicodeMask));
+                return unicodeChunksIndex[tableIndex] + static_cast<uint32_t>(__popcnt64((bit - 1) & unicodeMask));
         }
 
         if (unicode == FONT_UTF16_BOX)
@@ -89,97 +87,132 @@ const uint32_t UIFontTextureFromUnicode(const UIFontHeader_v7_t* const font, int
         unicode = FONT_UTF16_BOX;
     }
 
-    Log("Font %s doesn't have the code point U+%04X which is required to display a missing glyph.\n", font->name, FONT_UTF16_BOX);
+    Log("Font %s doesn't have the code point U+%04X which is required to display a missing glyph.\n", name, FONT_UTF16_BOX);
 
     return FONT_TEXTURE_IDX_INVALID;
 }
 
-const uint32_t UIFontTextureFromGlyph(UIFontHeader_v12_t* font, int glyph)
+const uint32_t UIFontHeader::TextureFromGlyph(int glyph) const
 {
     while (true)
     {
-        const int fixedGlyph = (glyph - font->glyphIndex);
+        const int fixedGlyph = (glyph - glyphIndex);
         const uint32_t chunkIndex = static_cast<uint32_t>(fixedGlyph) >> 6;
 
-        if (chunkIndex < font->numGlyphChunks)
+        if (chunkIndex < numGlyphChunks)
         {
             const uint8_t bitIndex = fixedGlyph & 0x3F;
 
-            const int64_t tableIndex = font->glyphChunks[chunkIndex];
-            const int64_t glyphMask = font->glyphChunksMask[tableIndex];
+            const int64_t tableIndex = glyphChunks[chunkIndex];
+            const int64_t glyphMask = glyphChunksMask[tableIndex];
 
             const int64_t bit = 1ll << bitIndex;
 
             if (bit & glyphMask)
-                return font->glyphChunksIndex[tableIndex] + static_cast<uint32_t>(__popcnt64((bit - 1) & glyphMask));
+                return glyphChunksIndex[tableIndex] + static_cast<uint32_t>(__popcnt64((bit - 1) & glyphMask));
         }
 
         if (!glyph)
             break;
 
-        glyph = LOBYTE(font->errorGlyph) << 16;
+        glyph = LOBYTE(errorGlyph) << 16; // 
     }
 
-    Log("Font %s doesn't have the glyph index %u which is required to display a missing glyph.\n", font->name, 0u);
+    Log("Font %s doesn't have the glyph index %u which is required to display a missing glyph.\n", name, 0u);
 
     return FONT_TEXTURE_IDX_INVALID;
 }
 
-void UIFontParseProportions(const UIFontHeader* const font, const UIFontProportion& proportions, Vector2D* const imageBoundsScale, Vector2D* const imageSizeBase, const uint16_t propIdx)
+void UIFontHeader::ParseProportions(Vector2D* const imageBoundsScale, Vector2D* const imageSizeBase) const
 {
     // this is how R2TT does it exactly, I do not want to lose this.
     /*
-    imageBoundsScale[0].x = font->proportionScaleX;
-    imageBoundsScale[0].y = font->proportionScaleY;
+    imageBoundsScale[0].x = proportionScaleX;
+    imageBoundsScale[0].y = proportionScaleY;
 
-    imageSizeBase[0].x = font->proportionSizeScale * imageBoundsScale[0].x;
-    imageSizeBase[0].y = font->proportionSizeScale * imageBoundsScale[0].y;
+    imageSizeBase[0].x = proportionSizeScale * imageBoundsScale[0].x;
+    imageSizeBase[0].y = proportionSizeScale * imageBoundsScale[0].y;
     */
 
-    assertm(propIdx < 8, "this would cause issues");
+    assertm(numProportions <= FONT_MAX_PROPORTIONS, "this would cause issues");
 
-    imageBoundsScale[propIdx].x = proportions.scaleBounds * font->proportionScaleX;
-    imageBoundsScale[propIdx].y = proportions.scaleBounds * font->proportionScaleY;
+    for (uint16_t i = 0; i < numProportions; i++)
+    {
+        imageBoundsScale[i].x = proportions[i].scaleBounds * proportionScaleX;
+        imageBoundsScale[i].y = proportions[i].scaleBounds * proportionScaleY;
 
-    // used to get a minimum character size (I think)
-    imageSizeBase[propIdx].x = proportions.scaleSize * imageBoundsScale[propIdx].x;
-    imageSizeBase[propIdx].y = proportions.scaleSize * imageBoundsScale[propIdx].y;
+        // used to get a minimum character size (I think)
+        imageSizeBase[i].x = proportions[i].scaleSize * imageBoundsScale[i].x;
+        imageSizeBase[i].y = proportions[i].scaleSize * imageBoundsScale[i].y;
+    }
 }
 
-void UIFontSetupImageBounds(const UIFontAtlasAsset* const fontAsset, UIFontCharacter_t* image, const UIFontTexture* const texture, const Vector2D* const imageBoundsScale, const Vector2D* const imageSizeBase)
+void UIFontCharacter_t::SetBounds(const UIFontAtlasAsset* const fontAsset, const UIFontTexture* const texture, const Vector2D* const imageBoundsScale, const Vector2D* const imageSizeBase)
 {
     if (texture->posMinX == texture->posMaxX) UNLIKELY
     {
-        image->mins.x = 1.0f;
-        image->mins.y = 1.0f;
+        mins.x = 1.0f;
+        mins.y = 1.0f;
 
-        image->maxs.x = 0.0f;
-        image->maxs.y = 0.0f;
+        maxs.x = 0.0f;
+        maxs.y = 0.0f;
 
         // not handled in the native function, handled in the shader! (probably)
         // hard set these to avoid unneeded math and checks.
-        image->posX = fontAsset->width;
-        image->posY = fontAsset->height;
+        posX = fontAsset->width;
+        posY = fontAsset->height;
 
-        image->width = 0;
-        image->height = 0;
+        width = 0;
+        height = 0;
 
         return;
     }
 
-    image->mins.x = ((imageBoundsScale[texture->proportionIndex].x * texture->posMinX) + texture->posBaseX) - imageSizeBase[texture->proportionIndex].x;
-    image->mins.y = ((imageBoundsScale[texture->proportionIndex].y * texture->posMinY) + texture->posBaseY) - imageSizeBase[texture->proportionIndex].y;
+    mins.x = ((imageBoundsScale[texture->proportionIndex].x * texture->posMinX) + texture->posBaseX) - imageSizeBase[texture->proportionIndex].x;
+    mins.y = ((imageBoundsScale[texture->proportionIndex].y * texture->posMinY) + texture->posBaseY) - imageSizeBase[texture->proportionIndex].y;
 
-    image->maxs.x = ((imageBoundsScale[texture->proportionIndex].x * texture->posMaxX) + texture->posBaseX) + imageSizeBase[texture->proportionIndex].x;
-    image->maxs.y = ((imageBoundsScale[texture->proportionIndex].y * texture->posMaxY) + texture->posBaseY) + imageSizeBase[texture->proportionIndex].y;
+    maxs.x = ((imageBoundsScale[texture->proportionIndex].x * texture->posMaxX) + texture->posBaseX) + imageSizeBase[texture->proportionIndex].x;
+    maxs.y = ((imageBoundsScale[texture->proportionIndex].y * texture->posMaxY) + texture->posBaseY) + imageSizeBase[texture->proportionIndex].y;
 
-    // not handled in the native function, handled in the shader! (probably)
-    // missing stuff for calculations, as these are not quite correct, but pretty close
-    image->posX = static_cast<uint16_t>(image->mins.x * fontAsset->width);
-    image->posY = static_cast<uint16_t>(image->mins.y * fontAsset->height);
+    // [rika]: same deal in this case with shadering rounding, hence the '+ 0.5f', but in this case it yielded noticeably better results after the change
+    // [rika]: output is now improved, closer but maybe still a bit off, definitely handled within shader.
+    posX = static_cast<uint16_t>(mins.x * static_cast<float>(fontAsset->width) + 0.5f);
+    posY = static_cast<uint16_t>(mins.y * static_cast<float>(fontAsset->height) + 0.5f);
 
-    image->width = static_cast<uint16_t>((image->maxs.x - image->mins.x) * fontAsset->width);
-    image->height = static_cast<uint16_t>((image->maxs.y - image->mins.y) * fontAsset->height);
+    width = static_cast<uint16_t>((maxs.x - mins.x) * static_cast<float>(fontAsset->width) + 0.5f);
+    height = static_cast<uint16_t>((maxs.y - mins.y) * static_cast<float>(fontAsset->height) + 0.5f);
+}
+
+void UIFontHeader::SetCharacterForImages(const UIFontAtlasAsset* const fontAsset, const int maxCodepoint, const uint32_t numTextures, const uint32_t(UIFontHeader::* TextureFromCharacter)(int) const) const
+{
+    uint32_t remainingTextures = numTextures;
+    for (int j = 0; j < maxCodepoint; j++)
+    {
+        if (remainingTextures == 0)
+            break;
+
+        const uint32_t idx = (this->*TextureFromCharacter)(j);
+
+        if (idx >= numTextures)
+            continue;
+
+        UIFontCharacter_t* image = &fontAsset->images[textureIndex + idx];
+
+        // has this image already been assigned a unicode character?
+        // note: unsupported unicode characters often map to one image
+        // note: on v6 everything gets bound to the '?' glyph, causing it to display the incorrect code.
+        if (image->utf16 != -1)
+        {
+            //Log("image %u had existing character binding, current: %x new: %x\n", idx, image->utf16, j);
+            continue;
+        }
+
+        image->utf16 = j;
+
+        remainingTextures--;
+    }
+
+    //assertm(remainingTextures == 0, "not every image was assigned a unicode character.");
 }
 
 void LoadUIFontAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
@@ -196,7 +229,7 @@ void LoadUIFontAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
 	case 10:
 	{
 		const UIFontAtlasAssetHeader_v6_t* const hdr = reinterpret_cast<const UIFontAtlasAssetHeader_v6_t* const>(pakAsset->header());
-		fontAsset = new UIFontAtlasAsset(hdr);
+		fontAsset = new UIFontAtlasAsset(hdr, pakAsset->version());
 
 		break;
 	}
@@ -208,157 +241,88 @@ void LoadUIFontAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
         break;
     }
 	default:
-		return;
+    {
+        assertm(false, "unaccounted asset version, will cause major issues!");
+        return;
+    }
 	}
 
-	pakAsset->setExtraData(fontAsset);
+    const bool useGlyphLookup = pakAsset->version() >= 12 ? true : false;
 
-    fontAsset->fontData.reserve(fontAsset->fontCount);
+    // [rika]: setup images
+    {
+        const UIFontHeader* const lastFont = &fontAsset->fontData.at(fontAsset->fontCount - 1);
+
+        fontAsset->imageCount = lastFont->textureIndex + (useGlyphLookup ? lastFont->numGlyphTextures : lastFont->numUnicodeTextures);
+        fontAsset->images = new UIFontCharacter_t[fontAsset->imageCount];
+    }
+
+    assertm(fontAsset->images, "invalid image pointer?");
 
     // handled as one buffer with an index in source
     // different proportions of characters
-	Vector2D imageBoundsScale[8];
-	Vector2D imageSizeBase[8];
+    Vector2D imageBoundsScale[8];
+    Vector2D imageSizeBase[8];
 
-    UIFontCharacter_t* images = nullptr;
-
-    switch (pakAsset->version())
+    for (uint16_t i = 0; i < fontAsset->fontCount; i++)
     {
-    case 6:
-    {
-        const UIFontHeader_v6_t* const fonts = reinterpret_cast<const UIFontHeader_v6_t* const>(fontAsset->fonts);
+        const UIFontHeader* const font = &fontAsset->fontData.at(i);
 
-        fontAsset->imageCount = fonts[fontAsset->fontCount - 1].textureIndex + fonts[fontAsset->fontCount - 1].numTextures;
-        images = new UIFontCharacter_t[fontAsset->imageCount];
+        font->ParseProportions(imageBoundsScale, imageSizeBase);
 
-        for (uint16_t i = 0; i < fontAsset->fontCount; i++)
+        // [rika]: code checks for font 10 when deciding about glyphs for whatever reason...
+        // [rika]: this is not quite right, also font 10 has no error codepoint
+        // [rika]: switch doesn't use glyphs! could be useful for figuring out how glyphs work
+        if (useGlyphLookup && font->fontIndex != 10 && font->glyphTextures) LIKELY
         {
-            const UIFontHeader_v6_t* const font = &fonts[i];
-
-            fontAsset->fontData.emplace_back(font);
-
-            const UIFontHeader* const fontData = &fontAsset->fontData.at(i);
-
-            // r2tt only has one proportion (very small font, basically hardcoded)
-            UIFontParseProportions(fontData, UIFontProportion(1.0f, font->proportionSizeScale), imageBoundsScale, imageSizeBase, 0);
-
-            for (uint32_t j = 0; j < font->numTextures; j++)
+            for (uint32_t j = 0; j < font->numGlyphTextures; j++)
             {
-                const UIFontTexture texture(&font->textures[j]);
-                UIFontCharacter_t* image = &images[font->textureIndex + j];
+                UIFontCharacter_t* image = &fontAsset->images[font->textureIndex + j];
 
                 image->utf16 = -1;
-                image->font = i;
+                image->glyph = -1;
 
-                UIFontSetupImageBounds(fontAsset, image, &texture, imageBoundsScale, imageSizeBase);
+                image->font = i;
+                image->SetBounds(fontAsset, &font->glyphTextures[j], imageBoundsScale, imageSizeBase);
             }
 
+            const int maxGlyph = (font->numGlyphChunks + 1) << 6;
+
+            font->SetCharacterForImages(fontAsset, maxGlyph, font->numGlyphTextures, &UIFontHeader::TextureFromGlyph);
+
+            continue;
+        }
+
+        for (uint32_t j = 0; j < font->numUnicodeTextures; j++)
+        {
+            UIFontCharacter_t* image = &fontAsset->images[font->textureIndex + j];
+
+            image->utf16 = -1;
+            image->glyph = -1;
+
+            image->font = i;
+            image->SetBounds(fontAsset, &font->unicodeTextures[j], imageBoundsScale, imageSizeBase);
+        }
+
+        // [rika]: r2tt handling
+        if (font->numUnicodeMaps > 0) UNLIKELY
+        {
             // get the max number of unicodes in here!
-            const int fakeChunkCount = (font->unicodeMap[font->numUnicodeMaps - 1].unicodeLast >> 6);
+            const int fakeChunkCount = (font->unicodeMap[font->numUnicodeMaps - 1].unicodeLast >> 6); // fake it til we make it, get the last possible chunk if this wasn't a legacy map!
             const int maxUnicode = (fakeChunkCount + 1) << 6;
 
-            uint32_t remainingTextures = font->numTextures;
-            for (int j = 0; j < maxUnicode; j++)
-            {
-                if (remainingTextures == 0)
-                    break;
+            font->SetCharacterForImages(fontAsset, maxUnicode, font->numUnicodeTextures, &UIFontHeader::TextureFromUnicodeMap);
 
-                const uint32_t idx = UIFontTextureFromUnicode(font, j);
-
-                if (idx >= font->numTextures)
-                    continue;
-
-                UIFontCharacter_t* image = &images[font->textureIndex + idx];
-
-                // has this image already been assigned a unicode character?
-                // note: unsupported unicode characters often map to one image
-                // note: on v6 everything gets bound to the '?' glyph, causing it to display the incorrect code.
-                if (image->utf16 != -1)
-                {
-                    //Log("image %u had existing character binding, current: %x new: %x\n", idx, image->utf16, j);
-                    continue;
-                }
-
-                image->utf16 = j;
-
-                remainingTextures--;
-            }
-
-            assertm(remainingTextures == 0, "not every image was assigned a unicode character.");
+            continue;
         }
 
-        break;
-    }
-    case 7:
-    case 10:
-    {
-        const UIFontHeader_v7_t* const fonts = reinterpret_cast<const UIFontHeader_v7_t* const>(fontAsset->fonts);
+        // [rika]: versions 7 & 10
+        const int maxUnicode = (font->numUnicodeChunks + 1) << 6;
 
-        fontAsset->imageCount = fonts[fontAsset->fontCount - 1].textureIndex + fonts[fontAsset->fontCount - 1].numTextures;
-        images = new UIFontCharacter_t[fontAsset->imageCount];
-
-        for (uint16_t i = 0; i < fontAsset->fontCount; i++)
-        {
-            const UIFontHeader_v7_t* const font = &fonts[i];
-
-            fontAsset->fontData.emplace_back(font);
-
-            const UIFontHeader* const fontData = &fontAsset->fontData.at(i);
-
-            // do our proportions
-            for (uint16_t j = 0; j < font->numProportions; j++)
-                UIFontParseProportions(fontData, UIFontProportion(&font->proportions[j]), imageBoundsScale, imageSizeBase, j); // bad! do not cast!
-
-            for (uint32_t j = 0; j < font->numTextures; j++)
-            {
-                const UIFontTexture texture(&font->textures[j]);
-                UIFontCharacter_t* image = &images[font->textureIndex + j];
-
-                image->utf16 = -1;
-                image->font = i;
-
-                UIFontSetupImageBounds(fontAsset, image, &texture, imageBoundsScale, imageSizeBase);
-            }
-
-            // get the max number of unicodes in here!
-            const int maxUnicode = (font->numUnicodeChunks + 1) << 6;
-
-            uint32_t remainingTextures = font->numTextures;
-            for (int j = 0; j < maxUnicode; j++)
-            {
-                if (remainingTextures == 0)
-                    break;
-
-                const uint32_t idx = UIFontTextureFromUnicode(font, j);
-
-                if (idx >= font->numTextures)
-                    continue;
-
-                UIFontCharacter_t* image = &images[font->textureIndex + idx];
-
-                // has this image already been assigned a unicode character?
-                // note: unsupported unicode characters often map to one image
-                if (image->utf16 != -1)
-                {
-                    //Log("image %lld had existing character binding, current: %x new: %x\n", idx, image->utf16, j);
-                    continue;
-                }
-
-                image->utf16 = j;
-
-                remainingTextures--;
-            }
-
-            assertm(remainingTextures == 0, "not every image was assigned a unicode character.");
-        }
-
-        break;
-    }
-    default:
-        break;
+        font->SetCharacterForImages(fontAsset, maxUnicode, font->numUnicodeTextures, &UIFontHeader::TextureFromUnicode);
     }
 
-	fontAsset->images = images;
+    pakAsset->setExtraData(fontAsset);
 }
 
 extern CDXParentHandler* g_dxHandler;
@@ -367,6 +331,9 @@ void PostLoadUIFontAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
 	UNUSED(pak);
 
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    if (!pakAsset->extraData())
+        return;
 
 	// Setup main texture.
 	UIFontAtlasAsset* const fontAsset = reinterpret_cast<UIFontAtlasAsset*>(pakAsset->extraData());
@@ -384,13 +351,23 @@ void PostLoadUIFontAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
 
 		assertm(pakAsset->data()->guid == RTech::StringToGuid(atlasName.c_str()), "hashed name for atlas did not match existing guid\n");
 
-		pakAsset->SetAssetName(atlasName);
+		pakAsset->SetAssetName(atlasName, true);
 	}
+    else
+    {
+        pakAsset->SetAssetNameFromCache();
+    }
 
 	assertm(txtrAsset->mipArray.size() >= 1, "Mip array should at least contain idx 0.");
 	TextureMip_t* const highestMip = &txtrAsset->mipArray[0];
 
     fontAsset->txtrFormat = s_PakToDxgiFormat[txtrAsset->imgFormat];
+
+    if (fontAsset->txtrFormat == DXGI_FORMAT::DXGI_FORMAT_UNKNOWN)
+    {
+        assertm(false, "unknown format");
+        return;
+    }
 
     std::unique_ptr<char[]> txtrData = GetTextureDataForMip(textureAsset, highestMip, fontAsset->txtrFormat); // parse texture through this mip function instead of copying, that way if swizzling is present it gets fixed.
 
@@ -474,7 +451,7 @@ void* PreviewUIFontAtlasAsset(CAsset* const asset, const bool firstFrameForAsset
 
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
 
-    if (pakAsset->version() > 10)
+    if (!pakAsset->extraData())
     {
         ImGui::Text("This asset version is not currently supported for preview.");
         return nullptr;
@@ -512,10 +489,14 @@ void* PreviewUIFontAtlasAsset(CAsset* const asset, const bool firstFrameForAsset
     static int lastSelectedUIFont = 0;
     static std::vector<UIFontPreviewData_t> previewUIFonts;
 
+    // TODO: ui_font_atlas and ui_image_atlas share this lambda, should we try to make it a function?
     auto CreateTextureForImage = [](UIFontAtlasAsset* const fontAsset, const UIFontCharacter_t* const fontCharacter) -> std::shared_ptr<CTexture>
     {
         assertm(fontAsset->txtrRaw, "Atlas texture wasn't created yet.");
         assertm(fontAsset->txtrConverted, "Converted atlas texture wasn't created yet.");
+
+        if (!fontAsset->txtrRaw || !fontAsset->txtrConverted)
+            return nullptr;
 
         // This will be the main texture.
         if (fontCharacter->width == fontAsset->width && fontCharacter->height == fontCharacter->height)
@@ -543,7 +524,7 @@ void* PreviewUIFontAtlasAsset(CAsset* const asset, const bool firstFrameForAsset
         {
             const UIFontHeader* const font = &fontAsset->fontData.at(i);
 
-            const std::string name = !font->name ? std::format("unnamed_{}", i) : font->name;
+            const std::string name = !font->name ? std::format("font_{}", font->fontIndex) : font->name;
             previewUIFonts.emplace_back(name, static_cast<int>(i));
         }
 
@@ -558,6 +539,12 @@ void* PreviewUIFontAtlasAsset(CAsset* const asset, const bool firstFrameForAsset
         {
             UICharacterPreviewData_t& previewData = previewTextures.at(i);
             const UIFontCharacter_t& image = fontAsset->images[i];
+
+            // [rika]: texture did not get initalized, likely from using unicode instead of glyphs
+            if (image.font >= fontAsset->fontCount)
+            {
+                continue;
+            }
 
             previewData.index = static_cast<int>(i);
             previewData.localIndex = static_cast<int>(i) - fontAsset->fontData.at(image.font).textureIndex;
@@ -625,14 +612,14 @@ void* PreviewUIFontAtlasAsset(CAsset* const asset, const bool firstFrameForAsset
 
         if (sortSpecs && (firstFrameForAsset || sortSpecs->SpecsDirty) && previewTextures.size() > 1)
         {
-            std::sort(previewTextures.begin() + selectedFont->textureIndex, previewTextures.begin() + (selectedFont->textureIndex + selectedFont->numTextures), UICharCompare_t(sortSpecs));
+            std::sort(previewTextures.begin() + selectedFont->textureIndex, previewTextures.begin() + (selectedFont->textureIndex + selectedFont->numUnicodeTextures), UICharCompare_t(sortSpecs));
             sortSpecs->SpecsDirty = false;
         }
 
         ImGui::TableHeadersRow();
         
         ImGuiListClipper clipper;
-        clipper.Begin(selectedFont->numTextures);
+        clipper.Begin(selectedFont->numUnicodeTextures);
         while (clipper.Step())
         {
             for (int rowNum = clipper.DisplayStart; rowNum < clipper.DisplayEnd; rowNum++)
@@ -775,7 +762,7 @@ static const char* const s_PathPrefixFONT = s_AssetTypePaths.find(AssetType_t::F
 bool ExportUIFontAtlasAsset(CAsset* const asset, const int setting)
 {
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
-    if (pakAsset->version() > 10)
+    if (!pakAsset->extraData())
         return false;
 
     UIFontAtlasAsset* const uiAsset = reinterpret_cast<UIFontAtlasAsset*>(pakAsset->extraData());
@@ -854,7 +841,7 @@ bool ExportUIFontAtlasAsset(CAsset* const asset, const int setting)
 
             fontPath.append("generic");
 
-            for (uint32_t texIdx = 0; texIdx < font->numTextures; texIdx++)
+            for (uint32_t texIdx = 0; texIdx < font->numUnicodeTextures; texIdx++)
             {
                 const UIFontCharacter_t* const character = &uiAsset->images[font->textureIndex + texIdx];
 
@@ -896,7 +883,7 @@ bool ExportUIFontAtlasAsset(CAsset* const asset, const int setting)
 
             fontPath.append("generic");
 
-            for (uint32_t texIdx = 0; texIdx < font->numTextures; texIdx++)
+            for (uint32_t texIdx = 0; texIdx < font->numUnicodeTextures; texIdx++)
             {
                 const UIFontCharacter_t* const character = &uiAsset->images[font->textureIndex + texIdx];
 

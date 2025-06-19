@@ -1,9 +1,6 @@
 #pragma once
 #include <game/rtech/cpakfile.h>
 
-// mdl.cpp
-void HandleModelLoad(std::vector<std::string> filePaths);
-
 // rpak.cpp
 FORCEINLINE void HandleExportBindingForAsset(CAsset* const asset, const bool exportDependencies);
 void HandlePakAssetExportList(std::deque<CAsset*> selectedAssets, const bool exportDependencies);

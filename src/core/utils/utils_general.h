@@ -1,7 +1,6 @@
 #pragma once
 
 // misc for pch so rtech utils (teheheh) doesn't have to be included in 9000 files
-
 #define IALIGN(a, b) (((a)+((b)-1)) & ~((b)-1))
 
 #define IALIGN2(a)   IALIGN(a,2)
@@ -18,6 +17,9 @@
 // one liners to make it Look Fancy
 #define FreeAllocArray(var) if (nullptr != var) { delete[] var; }
 #define FreeAllocVar(var) if (nullptr != var) { delete var; }
+
+#define SWAP32(n) (((uint32_t)n & 0xff) << 24 | ((uint32_t)n & 0xff00) << 8 | ((uint32_t)n & 0xff0000) >> 8 | ((uint32_t)n >> 24))
+#define ISWAP32(n) n = SWAP32(n)
 
 inline const char* keepAfterLastSlashOrBackslash(const char* src)
 {
@@ -60,3 +62,5 @@ struct Color4
 
 	float r, g, b, a;
 };
+
+void WaitForDebugger();

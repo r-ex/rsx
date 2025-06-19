@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -11,8 +11,10 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="core\cache\cachedb.h" />
     <ClInclude Include="core\crashhandler.h" />
     <ClInclude Include="core\mdl\modeldata.h" />
+    <ClInclude Include="core\mdl\smd.h" />
     <ClInclude Include="core\render\dx.h" />
     <ClInclude Include="core\render\dxscene.h" />
     <ClInclude Include="core\render\dxshader.h" />
@@ -47,6 +49,7 @@
     <ClInclude Include="game\asset.h" />
     <ClInclude Include="game\audio\miles.h" />
     <ClInclude Include="game\audio\wavefile.h" />
+    <ClInclude Include="game\bluepoint\bp_pakfile.h" />
     <ClInclude Include="game\model\sourcemodel.h" />
     <ClInclude Include="game\rtech\assets\animrig.h" />
     <ClInclude Include="game\rtech\assets\animseq.h" />
@@ -59,6 +62,7 @@
     <ClInclude Include="game\rtech\assets\material.h" />
     <ClInclude Include="game\rtech\assets\material_snapshot.h" />
     <ClInclude Include="game\rtech\assets\model.h" />
+    <ClInclude Include="game\rtech\assets\particle_script.h" />
     <ClInclude Include="game\rtech\assets\patch_master.h" />
     <ClInclude Include="game\rtech\assets\rson.h" />
     <ClInclude Include="game\rtech\assets\settings.h" />
@@ -105,10 +109,13 @@
     <ClInclude Include="thirdparty\imgui\misc\imgui_utility.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="core\cache\cachedb.cpp" />
     <ClCompile Include="core\crashhandler.cpp" />
+    <ClCompile Include="core\filehandling\bpk.cpp" />
     <ClCompile Include="core\filehandling\list.cpp" />
     <ClCompile Include="core\filehandling\mbnk.cpp" />
     <ClCompile Include="core\mdl\modeldata.cpp" />
+    <ClCompile Include="core\mdl\smd.cpp" />
     <ClCompile Include="core\render\dx.cpp" />
     <ClCompile Include="core\render\dxscene.cpp" />
     <ClCompile Include="core\render\dxshader.cpp" />
@@ -136,6 +143,7 @@
     <ClCompile Include="game\audio\miles.cpp" />
     <ClCompile Include="game\audio\miles_bcf.cpp" />
     <ClCompile Include="game\audio\miles_rada.cpp" />
+    <ClCompile Include="game\bluepoint\bp_pakfile.cpp" />
     <ClCompile Include="game\model\sourcemodel.cpp" />
     <ClCompile Include="game\rtech\assets\animrig.cpp" />
     <ClCompile Include="game\rtech\assets\animseq.cpp" />
@@ -148,6 +156,7 @@
     <ClCompile Include="game\rtech\assets\material.cpp" />
     <ClCompile Include="game\rtech\assets\material_snapshot.cpp" />
     <ClCompile Include="game\rtech\assets\model.cpp" />
+    <ClCompile Include="game\rtech\assets\particle_script.cpp" />
     <ClCompile Include="game\rtech\assets\patch_master.cpp" />
     <ClCompile Include="game\rtech\assets\rson.cpp" />
     <ClCompile Include="game\rtech\assets\settings.cpp" />

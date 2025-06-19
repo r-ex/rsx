@@ -67,9 +67,16 @@ enum class AssetType_t
 	ODLC = MAKEFOURCC('o', 'd', 'l', 'c'),
 	ODLP = MAKEFOURCC('o', 'd', 'l', 'p'),
 
+	// unknown
+	REFM = MAKEFOURCC('r', 'e', 'f', 'm'), // 'refm' "refmap/grx/grx_refs.rpak"
+	HCXT = MAKEFOURCC('h', 'c', 'x', 't'), // 'hcxt' ?
+
 	// audio
 	ASRC = MAKEFOURCC('a', 's', 'r', 'c'), // source
 	AEVT = MAKEFOURCC('a', 'e', 'v', 't'), // event
+
+	// bluepoint pak
+	BPWF = MAKEFOURCC('b', 'p', 'w', 'f'),
 };
 
 static std::map<AssetType_t, Color4> s_AssetTypeColours =
@@ -141,6 +148,9 @@ static std::map<AssetType_t, Color4> s_AssetTypeColours =
 	// audio
 	{ AssetType_t::ASRC, Color4(91,  52, 252) },
 	{ AssetType_t::AEVT, Color4(91,  52, 252) },
+
+	// bluepoint
+	// bpwf
 };
 
 static const std::map<AssetType_t, const char*> s_AssetTypePaths =
@@ -167,7 +177,7 @@ static const std::map<AssetType_t, const char*> s_AssetTypePaths =
 
 	// particle (texture)
 	{ AssetType_t::EFCT, "effect" },
-	// rpsk
+	{ AssetType_t::RPSK, "particle_script" },
 
 	// dx/shader
 	{ AssetType_t::SHDS, "shaderset" },
@@ -175,8 +185,8 @@ static const std::map<AssetType_t, const char*> s_AssetTypePaths =
 
 	// ui
 	{ AssetType_t::RTK,  "ui_rtk" },
-	// hsys
-	// rlcd
+	{ AssetType_t::HSYS, "highlight_system" },
+	{ AssetType_t::RLCD, "lcd_screen_effect" },
 	{ AssetType_t::UI,   "ui" },
 
 	// pak
@@ -201,9 +211,9 @@ static const std::map<AssetType_t, const char*> s_AssetTypePaths =
 	{ AssetType_t::LLYR, "llayer" },
 
 	// odl
-	// odla "odl asset"
-	// odlc "odl ctx"
-	// odlp "odl pak"
+	{ AssetType_t::ODLA, "odl_asset" },
+	{ AssetType_t::ODLC, "odl_ctx" },
+	{ AssetType_t::ODLP, "odl_pak" },
 };
 
 struct AssetVersion_t
@@ -232,6 +242,7 @@ public:
 		PAK,
 		MDL,
 		AUDIO,
+		BP_PAK,
 
 
 		_COUNT
@@ -264,10 +275,21 @@ public:
 
 	// setters
 
-	void SetAssetName(const std::string& name)
+	void SetAssetName(const std::string& name, bool addToCache=false)
 	{
-		m_assetName = std::filesystem::path(name).make_preferred().string();;
+		m_assetName = std::filesystem::path(name).make_preferred().string();
+
+		if (addToCache)
+			g_cacheDBManager.Add(name);
 	};
+
+	void SetAssetNameFromCache()
+	{
+		CCacheEntry entry;
+
+		if (g_cacheDBManager.LookupGuid(GetAssetGUID(), &entry))
+			m_assetName = std::filesystem::path(entry.origString).make_preferred().string();
+	}
 
 	void SetAssetVersion(const AssetVersion_t& version)
 	{

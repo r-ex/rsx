@@ -18,11 +18,14 @@ void LoadWrapAsset(CAssetContainer* const pak, CAsset* const asset)
         break;
     }
     default:
+    {
+        assertm(false, "unaccounted asset version, will cause major issues!");
         return;
+    }
     }
 
     const std::string name = std::string(wrapAsset->path + wrapAsset->skipFirstFolderPos);
-    pakAsset->SetAssetName(name);
+    pakAsset->SetAssetName(name, true);
     pakAsset->setExtraData(wrapAsset);
 }
 

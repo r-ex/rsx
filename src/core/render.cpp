@@ -21,8 +21,6 @@
 extern CDXParentHandler* g_dxHandler;
 extern std::atomic<uint32_t> maxConcurrentThreads;
 
-CBufferManager* g_BufferManager;
-
 ExportSettings_t g_ExportSettings{ .previewedSkinIndex = 0, .exportNormalRecalcSetting = eNormalExportRecalc::NML_RECALC_NONE, .exportTextureNameSetting = eTextureExportName::TXTR_NAME_TEXT,
     .exportPathsFull = false, .exportAssetDeps = false, .exportRigSequences = true, .exportModelSkin = false, .exportMaterialTextures = true, .exportPhysicsContentsFilter = static_cast<uint32_t>(TRACE_MASK_ALL) };
 PreviewSettings_t g_PreviewSettings { .previewCullDistance = PREVIEW_CULL_DEFAULT, .previewMovementSpeed = PREVIEW_SPEED_DEFAULT };
@@ -89,6 +87,7 @@ void ColouredTextForAssetType(const CAsset* const asset)
     case CAsset::ContainerType::PAK:
     case CAsset::ContainerType::AUDIO:
     case CAsset::ContainerType::MDL:
+    case CAsset::ContainerType::BP_PAK:
     {
         const AssetType_t assetType = static_cast<AssetType_t>(asset->GetAssetType());
         if (s_AssetTypeColours.contains(assetType))

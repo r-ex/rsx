@@ -355,3 +355,4 @@ MigrationBackup/
 **/exported_files/*
 radaudio_decoder_win64.lib
 imgui.ini
+rsx_cache_db.bin

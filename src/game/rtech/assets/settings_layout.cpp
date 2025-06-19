@@ -130,7 +130,7 @@ void LoadSettingsLayoutAsset(CAssetContainer* pak, CAsset* asset)
 	
 	SettingsLayoutAsset* settingsLayoutAsset = new SettingsLayoutAsset(hdr);
 
-	pakAsset->SetAssetName(settingsLayoutAsset->name);
+	pakAsset->SetAssetName(settingsLayoutAsset->name, true);
 	pakAsset->setExtraData(settingsLayoutAsset);
 }
 

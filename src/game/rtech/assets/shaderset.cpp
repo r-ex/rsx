@@ -36,16 +36,16 @@ void LoadShaderSetAsset(CAssetContainer* const pak, CAsset* const asset)
 	}
 	case 13:
 	{
-		if (pakAsset->data()->headerStructSize != sizeof(ShaderSetAssetHeader_v13_t))
+		if (pakAsset->data()->headerStructSize == sizeof(ShaderSetAssetHeader_v12_t))
 		{
 			pakAsset->SetAssetVersion({ 13, 1 }); // [rika]: set minor version
-
-			assertm(pakAsset->data()->headerStructSize == sizeof(ShaderSetAssetHeader_v12_t), "incorrect header");
 
 			ShaderSetAssetHeader_v12_t* hdr = reinterpret_cast<ShaderSetAssetHeader_v12_t*>(pakAsset->header());
 			shdsAsset = new ShaderSetAsset(hdr);
 			break;
 		}
+
+		assertm(pakAsset->data()->headerStructSize == sizeof(ShaderSetAssetHeader_v13_t), "incorrect header");
 
 		ShaderSetAssetHeader_v13_t* hdr = reinterpret_cast<ShaderSetAssetHeader_v13_t*>(pakAsset->header());
 		shdsAsset = new ShaderSetAsset(hdr);
@@ -67,7 +67,7 @@ void LoadShaderSetAsset(CAssetContainer* const pak, CAsset* const asset)
 		if (!name.ends_with(".rpak"))
 			name += ".rpak";
 
-		pakAsset->SetAssetName(name);
+		pakAsset->SetAssetName(name, true);
 	}
 
 	pakAsset->setExtraData(shdsAsset);
@@ -95,6 +95,9 @@ void PostLoadShaderSetAsset(CAssetContainer* const pak, CAsset* const asset)
 
 	shdsAsset->vertexShaderAsset = g_assetData.FindAssetByGUID<CPakAsset>(shdsAsset->vertexShader);
 	shdsAsset->pixelShaderAsset = g_assetData.FindAssetByGUID<CPakAsset>(shdsAsset->pixelShader);
+
+	if(!shdsAsset->name)
+		pakAsset->SetAssetNameFromCache();
 
 	//if (shdsAsset->vertexShader && !shdsAsset->vertexShaderAsset)
 	//	Log("Shaderset has vertex shader but it is not loaded.\n");

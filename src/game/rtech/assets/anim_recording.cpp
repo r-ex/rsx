@@ -5,6 +5,16 @@
 #include <game/rtech/utils/utils.h>
 #include <thirdparty/imgui/imgui.h>
 
+void PostLoadAnimRecordingAsset(CAssetContainer* const container, CAsset* const asset)
+{
+    UNUSED(container);
+
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    // [rika]: has no name var
+    pakAsset->SetAssetNameFromCache();
+}
+
 extern ExportSettings_t g_ExportSettings;
 static const char* const s_PathPrefixANIR = s_AssetTypePaths.find(AssetType_t::ANIR)->second;
 
@@ -144,7 +154,7 @@ void InitAnimRecordingAssetType()
         .type = 'rina',
         .headerAlignment = 8,
         .loadFunc = nullptr,
-        .postLoadFunc = nullptr,
+        .postLoadFunc = PostLoadAnimRecordingAsset,
         .previewFunc = nullptr,
         .e = { ExportAnimRecordingAsset, 0, nullptr, 0ull },
     };

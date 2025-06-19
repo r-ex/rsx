@@ -33,7 +33,7 @@ static void TextureList_LoadAsset(CAssetContainer* pak, CAsset* asset)
 	const uint64_t guidFromString = RTech::StringToGuid(s_TextureListCamoSkinsPath);
 
 	if (guidFromString == asset->GetAssetGUID())
-		pakAsset->SetAssetName(s_TextureListCamoSkinsPath);
+		pakAsset->SetAssetName(s_TextureListCamoSkinsPath, true);
 
 	pakAsset->setExtraData(textureListAsset);
 }
@@ -48,27 +48,40 @@ static void TextureList_PostLoadAsset(CAssetContainer* pak, CAsset* asset)
 	assertm(pakAsset->extraData(), "extra data should be valid");
 	TextureListAsset* const textureListAsset = reinterpret_cast<TextureListAsset* const>(pakAsset->extraData());
 
-	assertm(textureListAsset->textureGuids, "texture list had invalid guids?");
 	assertm(textureListAsset->textureNames, "texture list had invalid names?");
 
 	// [rika]: use the stored texture names to set asset names
 	for (uint64_t i = 0; i < textureListAsset->numTextures; i++)
 	{
-		const uint64_t guid = textureListAsset->textureGuids[i];
+		std::string fullTexName;
+
+		uint64_t guid;
 		const char* const name = textureListAsset->textureNames[i];
+
+		// [amos]: will be null on server paks, because storing guids in an rpak asset
+		// will automatically declare it as a dependency. server rpak's don't store
+		// textures so that will cause problems. the server also exclusively uses the
+		// `textureNames` array, the `textureGuids` array is only used on the client.
+		// 
+		// server camo skin list = 14D4EE8A8 (r5r) (type = TextureListHeader_v1_s)
+		// client camo skin list = 14D40B2C0 (r5r) (type = TextureListHeader_v1_s)
+		if (textureListAsset->textureGuids)
+			guid = textureListAsset->textureGuids[i];
+		else
+		{
+			fullTexName = FormatTextureAssetName(name);
+			guid = RTech::StringToGuid(fullTexName.c_str());
+		}
 
 		// [rika]: probably should check if texture asset has a name, but it won't ever get overwritten with an incorrect name
 		CPakAsset* const textureAsset = g_assetData.FindAssetByGUID<CPakAsset>(guid);
 		if (!textureAsset)
 			continue;
 
-		std::string newName = FormatTextureAssetName(name);
-		const uint64_t newGuid = RTech::StringToGuid(newName.c_str());
+		if (fullTexName.empty())
+			fullTexName = FormatTextureAssetName(name);
 
-		if (guid != newGuid)
-			continue;
-
-		textureAsset->SetAssetName(newName);
+		textureAsset->SetAssetName(fullTexName, true);
 	}
 }
 

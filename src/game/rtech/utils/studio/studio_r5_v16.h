@@ -96,9 +96,8 @@ namespace r5
 		uint16_t ikruleindex; // non-zero when IK data is stored in the mdl
 		inline const mstudioikrule_v16_t* const pIKRule(const int i) const { return reinterpret_cast<mstudioikrule_v16_t*>((char*)this + FIX_OFFSET(ikruleindex)) + i; };
 
-		// todo: figure these out
-		int64_t unk2;
-		uint16_t unk1;
+		char* sectionDataExternal; // set on pak asset load
+		uint16_t unk1; // maybe some sort of thread/mutic for the external data? set on pak asset load from unk_10
 
 		uint16_t sectionindex;
 		uint16_t sectionstallframes; // number of stall frames inside the animation, the reset excluding the final frame are stored externally. when external data is not loaded(?)/found(?) it falls back on the last frame of this as a stall

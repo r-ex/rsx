@@ -188,7 +188,17 @@ namespace cast
 
 		// copy constructors
 		CastNode(CastNode& node) : nodeId(node.nodeId), str(std::move(node.str)), hash(node.hash), children(std::move(node.children)), properties(std::move(node.properties)) {};
-		CastNode(const CastNode& node) : nodeId(node.nodeId), str(node.str), hash(node.hash), children(node.children), properties(node.properties) {};
+		CastNode(const CastNode& node) : nodeId(node.nodeId), str(node.str), hash(node.hash)
+		{
+			children.reserve(node.children.size());
+			properties.reserve(node.properties.size());
+
+			for (const CastNode& child : node.children)
+				children.emplace_back(child);
+
+			for (const CastProperty& property : node.properties)
+				properties.emplace_back(property);
+		};
 		
 		// init with properties
 		CastNode(const CastId idIn, const int propertyCount) : nodeId(idIn), hash(0ull) { properties.resize(propertyCount); };
@@ -208,6 +218,7 @@ namespace cast
 		CastNode* AddChild(const CastId idIn, const uint64_t hashIn);
 		CastNode* AddChild(const CastId idIn, const uint64_t hashIn, const size_t childCount);
 		CastNode* AddChild(CastNode& node); // move the provided node
+		CastNode* AddChild(const CastNode& node); // copy the provided node
 
 		void SetChild(const uint64_t hashIn, CastNode& node);
 		void SetChild(const int idx, CastNode& node);

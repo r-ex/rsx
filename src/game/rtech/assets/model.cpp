@@ -19,7 +19,7 @@
 #include <immintrin.h>
 
 extern CDXParentHandler* g_dxHandler;
-extern CBufferManager* g_BufferManager;
+extern CBufferManager g_BufferManager;
 extern ExportSettings_t g_ExportSettings;
 
 static void ParseModelVertexData_v8(CPakAsset* const asset, ModelAsset* const modelAsset)
@@ -64,7 +64,7 @@ static void ParseModelVertexData_v8(CPakAsset* const asset, ModelAsset* const mo
     constexpr size_t maxVertexBufferSize = maxVertexDataSize * s_MaxStudioVerts;
 
     // needed due to how vtx is parsed!
-    CManagedBuffer* const   parseBuf = g_BufferManager->ClaimBuffer();
+    CManagedBuffer* const   parseBuf = g_BufferManager.ClaimBuffer();
 
     Vertex_t* const         parseVertices   = reinterpret_cast<Vertex_t*>       (parseBuf->Buffer() + maxVertexBufferSize);
     Vector2D* const         parseTexcoords  = reinterpret_cast<Vector2D*>       (&parseVertices[s_MaxStudioVerts]);
@@ -120,7 +120,7 @@ static void ParseModelVertexData_v8(CPakAsset* const asset, ModelAsset* const mo
                         pVVC->PerLODVertexBuffer(lodIdx, pVVD->numFixups, pVVD->GetFixupData(0), colors, uv2s, baseVertexOffset, baseVertexOffset + studioVertCount);
 
                     // reserve a buffer
-                    CManagedBuffer* const buffer = g_BufferManager->ClaimBuffer();
+                    CManagedBuffer* const buffer = g_BufferManager.ClaimBuffer();
 
                     CMeshData* meshVertexData = reinterpret_cast<CMeshData*>(buffer->Buffer());
                     meshVertexData->InitWriter();
@@ -196,7 +196,7 @@ static void ParseModelVertexData_v8(CPakAsset* const asset, ModelAsset* const mo
                     parsedData->meshVertexData.addBack(reinterpret_cast<char*>(meshVertexData), meshVertexData->GetSize());
 
                     // relieve buffer
-                    g_BufferManager->RelieveBuffer(buffer);
+                    g_BufferManager.RelieveBuffer(buffer);
                 }
 
                 lodData.models.push_back(modelData);
@@ -216,7 +216,7 @@ static void ParseModelVertexData_v8(CPakAsset* const asset, ModelAsset* const mo
         }
     }
 
-    g_BufferManager->RelieveBuffer(parseBuf);
+    g_BufferManager.RelieveBuffer(parseBuf);
 }
 
 const uint8_t s_VertexDataBaseBoneMap[8] = { 0, 1, 2, 3, 4, 5, 6, 7 };
@@ -302,7 +302,7 @@ static void ParseModelVertexData_v9(CPakAsset* const asset, ModelAsset* const mo
                         continue;
 
                     // reserve a buffer
-                    CManagedBuffer* const buffer = g_BufferManager->ClaimBuffer();
+                    CManagedBuffer* const buffer = g_BufferManager.ClaimBuffer();
 
                     CMeshData* meshVertexData = reinterpret_cast<CMeshData*>(buffer->Buffer());
                     meshVertexData->InitWriter();
@@ -366,7 +366,7 @@ static void ParseModelVertexData_v9(CPakAsset* const asset, ModelAsset* const mo
                     parsedData->meshVertexData.addBack(reinterpret_cast<char*>(meshVertexData), meshVertexData->GetSize());
 
                     // relieve buffer
-                    g_BufferManager->RelieveBuffer(buffer);
+                    g_BufferManager.RelieveBuffer(buffer);
                 }
 
                 lodData.models.push_back(modelData);
@@ -459,7 +459,7 @@ static void ParseModelVertexData_v12_1(CPakAsset* const asset, ModelAsset* const
                             continue;
 
                         // reserve a buffer
-                        CManagedBuffer* const buffer = g_BufferManager->ClaimBuffer();
+                        CManagedBuffer* const buffer = g_BufferManager.ClaimBuffer();
 
                         CMeshData* meshVertexData = reinterpret_cast<CMeshData*>(buffer->Buffer());
                         meshVertexData->InitWriter();
@@ -523,7 +523,7 @@ static void ParseModelVertexData_v12_1(CPakAsset* const asset, ModelAsset* const
                         parsedData->meshVertexData.addBack(reinterpret_cast<char*>(meshVertexData), meshVertexData->GetSize());
 
                         // relieve buffer
-                        g_BufferManager->RelieveBuffer(buffer);
+                        g_BufferManager.RelieveBuffer(buffer);
                     }
 
                     lodData.models.push_back(modelData);
@@ -621,7 +621,7 @@ static void ParseModelVertexData_v14(CPakAsset* const asset, ModelAsset* const m
                             continue;
 
                         // reserve a buffer
-                        CManagedBuffer* const buffer = g_BufferManager->ClaimBuffer();
+                        CManagedBuffer* const buffer = g_BufferManager.ClaimBuffer();
 
                         CMeshData* meshVertexData = reinterpret_cast<CMeshData*>(buffer->Buffer());
                         meshVertexData->InitWriter();
@@ -685,7 +685,7 @@ static void ParseModelVertexData_v14(CPakAsset* const asset, ModelAsset* const m
                         parsedData->meshVertexData.addBack(reinterpret_cast<char*>(meshVertexData), meshVertexData->GetSize());
 
                         // relieve buffer
-                        g_BufferManager->RelieveBuffer(buffer);
+                        g_BufferManager.RelieveBuffer(buffer);
                     }
 
                     lodData.models.push_back(modelData);
@@ -810,7 +810,7 @@ static void ParseModelVertexData_v16(CPakAsset* const asset, ModelAsset* const m
                             continue;
 
                         // reserve a buffer
-                        CManagedBuffer* const buffer = g_BufferManager->ClaimBuffer();
+                        CManagedBuffer* const buffer = g_BufferManager.ClaimBuffer();
 
                         CMeshData* meshVertexData = reinterpret_cast<CMeshData*>(buffer->Buffer());
                         meshVertexData->InitWriter();
@@ -874,7 +874,7 @@ static void ParseModelVertexData_v16(CPakAsset* const asset, ModelAsset* const m
                         parsedData->meshVertexData.addBack(reinterpret_cast<char*>(meshVertexData), meshVertexData->GetSize());
 
                         // relieve buffer
-                        g_BufferManager->RelieveBuffer(buffer);
+                        g_BufferManager.RelieveBuffer(buffer);
                     }
 
                     lodData.models.push_back(modelData);
@@ -942,41 +942,6 @@ static void ParseModelTextureData_v16(ModelParsedData_t* const parsedData)
         parsedData->skins.emplace_back(pStudioHdr->pSkinName_V16(i), pStudioHdr->pSkinFamily(i));
 }
 
-static void ParseModelBoneData_v8(ModelParsedData_t* const parsedData)
-{
-    const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-    const r5::mstudiobone_v8_t* const bones = reinterpret_cast<const r5::mstudiobone_v8_t* const>(pStudioHdr->pBones());
-    parsedData->bones.resize(pStudioHdr->boneCount);
-
-    for (int i = 0; i < pStudioHdr->boneCount; i++)
-        parsedData->bones.at(i) = ModelBone_t(&bones[i]);
-}
-
-static void ParseModelBoneData_v12_1(ModelParsedData_t* const parsedData)
-{
-    const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-    const r5::mstudiobone_v12_1_t* const bones = reinterpret_cast<const r5::mstudiobone_v12_1_t* const>(pStudioHdr->pBones());
-    parsedData->bones.resize(pStudioHdr->boneCount);
-
-    for (int i = 0; i < pStudioHdr->boneCount; i++)
-        parsedData->bones.at(i) = ModelBone_t(&bones[i]);
-}
-
-static void ParseModelBoneData_v16(ModelParsedData_t* const parsedData)
-{
-    const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-    const r5::mstudiobonehdr_v16_t* const bonehdrs = reinterpret_cast<const r5::mstudiobonehdr_v16_t* const>(pStudioHdr->pBones());
-    const r5::mstudiobonedata_v16_t* const bonedata = reinterpret_cast<const r5::mstudiobonedata_v16_t* const>(pStudioHdr->pBoneData());
-
-    parsedData->bones.resize(pStudioHdr->boneCount);
-
-    for (int i = 0; i < pStudioHdr->boneCount; i++)
-        parsedData->bones.at(i) = ModelBone_t(&bonehdrs[i], &bonedata[i]);
-}
-
 void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
 {
     UNUSED(pak);
@@ -997,6 +962,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         ParseModelBoneData_v8(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v8(pakAsset, mdlAsset);
+        ParseModelSequenceData_NoStall(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
         break;
     }
     case eMDLVersion::VERSION_9:
@@ -1010,11 +976,13 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         ParseModelBoneData_v8(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v9(pakAsset, mdlAsset);
+        ParseModelSequenceData_NoStall(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
         break;
     }
     case eMDLVersion::VERSION_12_1: // has to have its own vertex func
     case eMDLVersion::VERSION_12_2:
     case eMDLVersion::VERSION_12_3:
+    case eMDLVersion::VERSION_12_4:
     {
         ModelAssetHeader_v12_1_t* hdr = reinterpret_cast<ModelAssetHeader_v12_1_t*>(pakAsset->header());
         mdlAsset = new ModelAsset(hdr, streamEntry, ver);
@@ -1022,6 +990,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         ParseModelBoneData_v12_1(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v12_1(pakAsset, mdlAsset);
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v8_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
         break;
     }
     case eMDLVersion::VERSION_13:
@@ -1033,6 +1002,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         ParseModelBoneData_v12_1(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v12_1(pakAsset, mdlAsset);
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v8_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
         break;
     }
     case eMDLVersion::VERSION_14:
@@ -1045,10 +1015,22 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         ParseModelBoneData_v12_1(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v14(pakAsset, mdlAsset);
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v8_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
         break;
     }
     case eMDLVersion::VERSION_16:
     case eMDLVersion::VERSION_17:
+    {
+        ModelAssetHeader_v16_t* hdr = reinterpret_cast<ModelAssetHeader_v16_t*>(pakAsset->header());
+        ModelAssetCPU_v16_t* cpu = reinterpret_cast<ModelAssetCPU_v16_t*>(pakAsset->cpu());
+        mdlAsset = new ModelAsset(hdr, cpu, streamEntry, ver);
+
+        ParseModelBoneData_v16(mdlAsset->GetParsedData());
+        ParseModelTextureData_v16(mdlAsset->GetParsedData());
+        ParseModelVertexData_v16(pakAsset, mdlAsset);
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v16_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
+        break;
+    }
     case eMDLVersion::VERSION_18:
     {
         ModelAssetHeader_v16_t* hdr = reinterpret_cast<ModelAssetHeader_v16_t*>(pakAsset->header());
@@ -1058,6 +1040,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         ParseModelBoneData_v16(mdlAsset->GetParsedData());
         ParseModelTextureData_v16(mdlAsset->GetParsedData());
         ParseModelVertexData_v16(pakAsset, mdlAsset);
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v18_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
         break;
     }
     default:
@@ -1085,6 +1068,11 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         asset->SetAssetVersion({ 12, 3 });
         break;
     }
+    case eMDLVersion::VERSION_12_4:
+    {
+        asset->SetAssetVersion({ 12, 4 });
+        break;
+    }
     case eMDLVersion::VERSION_13_1:
     {
         asset->SetAssetVersion({ 13, 1 });
@@ -1102,7 +1090,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
     }
 
     assertm(mdlAsset->name, "Model had no name.");
-    pakAsset->SetAssetName(mdlAsset->name);
+    pakAsset->SetAssetName(mdlAsset->name, true);
     pakAsset->setExtraData(mdlAsset);
 }
 
@@ -1113,6 +1101,8 @@ void PostLoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
     CPakAsset* const pakAsset = static_cast<CPakAsset*>(asset);
 
     ModelAsset* const mdlAsset = reinterpret_cast<ModelAsset*>(pakAsset->extraData());
+    if (!mdlAsset)
+        return;
 
     // parse sequences for children
     const uint64_t* guids = reinterpret_cast<const uint64_t*>(mdlAsset->animSeqs);
@@ -1224,6 +1214,7 @@ static bool ExportRawModelAsset(const ModelAsset* const modelAsset, std::filesys
     case eMDLVersion::VERSION_12_1:
     case eMDLVersion::VERSION_12_2:
     case eMDLVersion::VERSION_12_3:
+    case eMDLVersion::VERSION_12_4:
     case eMDLVersion::VERSION_13:
     case eMDLVersion::VERSION_13_1:
     case eMDLVersion::VERSION_14:
@@ -1424,6 +1415,8 @@ bool ExportModelAsset(CAsset* const asset, const int setting)
 
     const ModelAsset* const modelAsset = reinterpret_cast<ModelAsset*>(pakAsset->extraData());
     assertm(modelAsset, "Extra data should be valid at this point.");
+    if (!modelAsset)
+        return false;
 
     std::unique_ptr<char[]> streamedData = pakAsset->getStarPakData(modelAsset->vertDataStreamed.offset, modelAsset->vertDataStreamed.size, false);
 
@@ -1446,61 +1439,40 @@ bool ExportModelAsset(CAsset* const asset, const int setting)
         return false;
     }
 
-    // [rika]: needs setting to toggle this
+    const ModelParsedData_t* const parsedData = &modelAsset->parsedData;
+
     if (g_ExportSettings.exportRigSequences && modelAsset->numAnimSeqs > 0)
     {
-        auto aseqAssetBinding = g_assetData.m_assetTypeBindings.find('qesa');
+        if (!ExportAnimSeqFromAsset(exportPath, modelStem, modelAsset->name, modelAsset->numAnimSeqs, modelAsset->animSeqs, modelAsset->GetRig()))
+            return false;
+    }
 
+    if (g_ExportSettings.exportRigSequences && parsedData->NumLocalSeq() > 0)
+    {
+        std::filesystem::path outputPath(exportPath);
+        outputPath.append(std::format("anims_{}/temp", modelStem));
+
+        if (!CreateDirectories(outputPath.parent_path()))
+        {
+            assertm(false, "Failed to create directory.");
+            return false;
+        }
+
+        auto aseqAssetBinding = g_assetData.m_assetTypeBindings.find('qesa');
         assertm(aseqAssetBinding != g_assetData.m_assetTypeBindings.end(), "Unable to find asset type binding for \"aseq\" assets");
 
-        if (aseqAssetBinding != g_assetData.m_assetTypeBindings.end())
+        for (int i = 0; i < parsedData->NumLocalSeq(); i++)
         {
-            std::filesystem::path outputPath(exportPath);
-            outputPath.append(std::format("anims_{}/temp", modelStem));
+            const seqdesc_t* const seqdesc = parsedData->LocalSeq(i);
 
-            if (!CreateDirectories(outputPath.parent_path()))
-            {
-                assertm(false, "Failed to create directory.");
-                return false;
-            }
+            outputPath.replace_filename(seqdesc->szlabel);
 
-            // [rika]: get the skeleton once
-            const std::vector<ModelBone_t>* const bones = modelAsset->GetRig();
-
-            std::atomic<uint32_t> remainingSeqs = 0; // we don't actually need thread safe here
-            const ProgressBarEvent_t* const seqExportProgress = g_pImGuiHandler->AddProgressBarEvent("Exporting Sequences..", static_cast<uint32_t>(modelAsset->numAnimSeqs), &remainingSeqs, true);
-            for (int i = 0; i < modelAsset->numAnimSeqs; i++)
-            {
-                const uint64_t guid = modelAsset->animSeqs[i].guid;
-
-                CPakAsset* const animSeq = g_assetData.FindAssetByGUID<CPakAsset>(guid);
-
-                if (nullptr == animSeq)
-                {
-                    Log("RMDL EXPORT: animseq asset 0x%llX was not loaded, skipping...\n", guid);
-
-                    continue;
-                }
-
-                const AnimSeqAsset* const animSeqAsset = reinterpret_cast<AnimSeqAsset*>(animSeq->extraData());
-
-                // skip this animation if for some reason it has not been parsed. if a loaded mdl/animrig has sequence children, it should always be parsed. possibly move this to an assert.
-                if (!animSeqAsset->animationParsed)
-                    continue;
-
-                outputPath.replace_filename(std::filesystem::path(animSeqAsset->name).filename());
-
-                ExportAnimSeqAsset(animSeq, aseqAssetBinding->second.e.exportSetting, animSeqAsset, outputPath, modelAsset->name, bones);
-
-                ++remainingSeqs;
-            }
-            g_pImGuiHandler->FinishProgressBarEvent(seqExportProgress);
+            ExportSeqDesc(aseqAssetBinding->second.e.exportSetting, seqdesc, outputPath, modelAsset->name, modelAsset->GetRig(), RTech::StringToGuid(seqdesc->szlabel));
         }
     }
 
     exportPath.append(std::format("{}.rmdl", modelStem));
 
-    const ModelParsedData_t* const parsedData = &modelAsset->parsedData;
     switch (setting)
     {
         case eModelExportSetting::MODEL_CAST:
@@ -1514,6 +1486,10 @@ bool ExportModelAsset(CAsset* const asset, const int setting)
         case eModelExportSetting::MODEL_RMDL:
         {
             return ExportRawModelAsset(modelAsset, exportPath, streamedData.get());
+        }
+        case eModelExportSetting::MODEL_SMD:
+        {
+            return ExportModelSMD(parsedData, exportPath);
         }
         case eModelExportSetting::MODEL_STL_VALVE_PHYSICS:
         {
@@ -1549,6 +1525,8 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
 
     ModelAsset* const modelAsset = reinterpret_cast<ModelAsset*>(pakAsset->extraData());
     assertm(modelAsset, "Extra data should be valid at this point.");
+    if (!modelAsset)
+        return nullptr;
 
     CDXDrawData* const drawData = modelAsset->drawData;
     if (!drawData)
@@ -1582,6 +1560,7 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
     ImGui::Text("LODs: %llu", parsedData->lods.size());
     ImGui::Text("Rigs: %i", modelAsset->numAnimRigs);
     ImGui::Text("Sequences: %i", modelAsset->numAnimSeqs);
+    ImGui::Text("Local Sequences: %i", modelAsset->parsedData.NumLocalSeq());
 
     if (parsedData->skins.size())
     {

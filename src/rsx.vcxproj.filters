@@ -76,6 +76,12 @@
     <Filter Include="game\model">
       <UniqueIdentifier>{4935c4ef-7853-42ff-ac58-a875336d31d8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="core\cache">
+      <UniqueIdentifier>{b5afe96b-79b1-4834-881a-a2d5d23bae27}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\bluepoint">
+      <UniqueIdentifier>{9d5d3372-940a-4085-8c52-1e8611c120dc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -354,6 +360,21 @@
     <ClInclude Include="game\rtech\assets\map.h">
       <Filter>game\rtech\assets</Filter>
     </ClInclude>
+    <ClInclude Include="core\cache\cachedb.h">
+      <Filter>core\cache</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\particle_script.h">
+      <Filter>game\rtech\assets</Filter>
+    </ClInclude>
+    <ClInclude Include="core\mdl\smd.h">
+      <Filter>core\mdl</Filter>
+    </ClInclude>
+    <ClInclude Include="game\bluepoint\bp_pakfile.h">
+      <Filter>game\bluepoint</Filter>
+    </ClInclude>
+    <ClInclude Include="core\utils\cli_parser.h">
+      <Filter>core\utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -598,6 +619,21 @@
     </ClCompile>
     <ClCompile Include="game\rtech\assets\map.cpp">
       <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\cache\cachedb.cpp">
+      <Filter>core\cache</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\particle_script.cpp">
+      <Filter>game\rtech\assets</Filter>
+    </ClCompile>
+    <ClCompile Include="core\mdl\smd.cpp">
+      <Filter>core\mdl</Filter>
+    </ClCompile>
+    <ClCompile Include="game\bluepoint\bp_pakfile.cpp">
+      <Filter>game\bluepoint</Filter>
+    </ClCompile>
+    <ClCompile Include="core\filehandling\bpk.cpp">
+      <Filter>core\filehandling</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

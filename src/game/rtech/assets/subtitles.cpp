@@ -31,8 +31,10 @@ void LoadSubtitlesAsset(CAssetContainer* const pak, CAsset* const asset)
 	language = language.substr(10, language.length() - 10);
 	const std::string name = "subtitles/subtitles_" + language + ".rpak";
 
+	assertm(RTech::StringToGuid(name.c_str()) == pakAsset->guid(), "invalid name");
+
 	pakAsset->setExtraData(subtitlesAsset);
-	pakAsset->SetAssetName(name);
+	pakAsset->SetAssetName(name, true);
 }
 
 void PostLoadSubtitlesAsset(CAssetContainer* const pak, CAsset* const asset)
@@ -63,21 +65,25 @@ void PostLoadSubtitlesAsset(CAssetContainer* const pak, CAsset* const asset)
 
 		char* entryStr = subtitlesAsset->strings + entry->stringOffset;
 
+		int values[3] { 255, 255, 255 };
+		const char* string = nullptr;
+
+		// todo regex ?
+		// <delay>
+		// <len>
 		if (!strncmp(entryStr, "<clr:", 5))
 		{
-			int values[3];
 			sscanf_s(entryStr, "<clr:%i,%i,%i>", &values[0], &values[1], &values[2]);
 
-			const char* string = strchr(entryStr, '>') + 1;
-
-			subtitlesAsset->parsed.emplace_back(Vector(static_cast<float>(values[0]), static_cast<float>(values[1]), static_cast<float>(values[2])), entry->hash, string);
+			string = strchr(entryStr, '>') + 1;
 		}
 		else
 		{
-			subtitlesAsset->parsed.emplace_back(Vector(255.0f), entry->hash, entryStr);
-			assertm(false, "checking checking checking"); // minor spelling mistakes mspainish
+			string = entryStr;
+			//assertm(false, "checking checking checking"); // minor spelling mistakes mspainish
 		}
 
+		subtitlesAsset->parsed.emplace_back(Vector(static_cast<float>(values[0]), static_cast<float>(values[1]), static_cast<float>(values[2])), entry->hash, string);
 		assertm(subtitlesAsset->parsed.size() <= static_cast<size_t>(subtitlesAsset->stringCount), "more strings than stringCount");
 	}
 }

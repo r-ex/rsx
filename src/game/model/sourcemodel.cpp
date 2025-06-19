@@ -7,7 +7,7 @@
 #include <thirdparty/imgui/misc/imgui_utility.h>
 
 extern CDXParentHandler* g_dxHandler;
-extern CBufferManager* g_BufferManager;
+extern CBufferManager g_BufferManager;
 extern ExportSettings_t g_ExportSettings;
 
 static const char* const s_PathPrefixMDL = s_AssetTypePaths.find(AssetType_t::MDL)->second;
@@ -78,7 +78,7 @@ void ParseSourceModelVertexData(ModelParsedData_t* const parsedData, StudioLoose
     constexpr size_t maxVertexBufferSize = maxVertexDataSize * s_MaxStudioVerts;
 
     // needed due to how vtx is parsed!
-    CManagedBuffer* const   parseBuf = g_BufferManager->ClaimBuffer();
+    CManagedBuffer* const   parseBuf = g_BufferManager.ClaimBuffer();
 
     Vertex_t* const         parseVertices = reinterpret_cast<Vertex_t*>         (parseBuf->Buffer() + maxVertexBufferSize);
     Vector2D* const         parseTexcoords = reinterpret_cast<Vector2D*>        (&parseVertices[s_MaxStudioVerts]);
@@ -138,7 +138,7 @@ void ParseSourceModelVertexData(ModelParsedData_t* const parsedData, StudioLoose
                         pVVC->PerLODVertexBuffer(lodIdx, pVVD->numFixups, pVVD->GetFixupData(0), colors, uv2s, baseVertexOffset, baseVertexOffset + studioVertCount);
 
                     // reserve a buffer
-                    CManagedBuffer* const buffer = g_BufferManager->ClaimBuffer();
+                    CManagedBuffer* const buffer = g_BufferManager.ClaimBuffer();
 
                     CMeshData* meshVertexData = reinterpret_cast<CMeshData*>(buffer->Buffer());
                     meshVertexData->InitWriter();
@@ -216,7 +216,7 @@ void ParseSourceModelVertexData(ModelParsedData_t* const parsedData, StudioLoose
                     parsedData->meshVertexData.addBack(reinterpret_cast<char*>(meshVertexData), meshVertexData->GetSize());
 
                     // relieve buffer
-                    g_BufferManager->RelieveBuffer(buffer);
+                    g_BufferManager.RelieveBuffer(buffer);
                 }
 
                 lodData.models.push_back(modelData);
@@ -236,7 +236,7 @@ void ParseSourceModelVertexData(ModelParsedData_t* const parsedData, StudioLoose
         }
     }
 
-    g_BufferManager->RelieveBuffer(parseBuf);
+    g_BufferManager.RelieveBuffer(parseBuf);
 }
 
 template<typename mstudiotexture_t>
@@ -312,11 +312,11 @@ void LoadSourceModelAsset(CAssetContainer* container, CAsset* asset)
     {
         r1::studiohdr_t* const pStudioHdr = reinterpret_cast<r1::studiohdr_t* const>(srcMdlAsset->GetAssetData());
 
-        CManagedBuffer* buffer = g_BufferManager->ClaimBuffer();
+        CManagedBuffer* buffer = g_BufferManager.ClaimBuffer();
 
         looseData = new StudioLooseData_t(srcMdlSource->GetFilePath(), pStudioHdr->pszName(), buffer->Buffer());
 
-        g_BufferManager->RelieveBuffer(buffer);
+        g_BufferManager.RelieveBuffer(buffer);
 
         // these are now managed by the asset
         srcMdlAsset->SetExtraData(looseData->VertBuf(), CSourceModelAsset::SRCMDL_VERT);
@@ -703,6 +703,10 @@ bool ExportSourceModelAsset(CAsset* const asset, const int setting)
     {
         return ExportModelRMAX(parsedData, exportPath);
     }
+    case eModelExportSetting::MODEL_SMD:
+    {
+        return ExportModelSMD(parsedData, exportPath);
+    }
     default:
     {
         assertm(false, "Export setting is not handled.");
@@ -775,8 +779,6 @@ void PostLoadSourceSequenceAsset(CAssetContainer* const container, CAsset* const
     const std::vector<ModelBone_t>* bones = srcSeqAsset->GetRig();
     assertm(!bones->empty(), "we should have bones at this point.");
 
-    const size_t boneCount = bones->size();
-
     seqdesc_t* const seqdesc = srcSeqAsset->GetSequence();
     switch (srcSeqAsset->GetAssetVersion().majorVer)
     {
@@ -786,114 +788,7 @@ void PostLoadSourceSequenceAsset(CAssetContainer* const container, CAsset* const
     }
     case 53:
     {
-        const r2::studiohdr_t* const pStudioHdr = reinterpret_cast<const r2::studiohdr_t* const>(srcMdlAsset->GetAssetData());
-
-        for (int i = 0; i < seqdesc->AnimCount(); i++)
-        {
-            animdesc_t* const animdesc = &seqdesc->anims.at(i);
-
-            // no point to allocate memory on empty animations!
-            CAnimData animData(boneCount, animdesc->numframes);
-            animData.ReserveVector();
-
-            for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
-            {
-                const float cycle = animdesc->numframes > 1 ? static_cast<float>(frameIdx) / static_cast<float>(animdesc->numframes - 1) : 0.0f;
-                assertm(isfinite(cycle), "cycle was nan");
-
-                float fFrame = cycle * static_cast<float>(animdesc->numframes - 1);
-
-                const int iFrame = static_cast<int>(fFrame);
-                const float s = (fFrame - static_cast<float>(iFrame));
-
-                int iLocalFrame = iFrame;
-
-                const r2::mstudio_rle_anim_t* panim = reinterpret_cast<const r2::mstudio_rle_anim_t*>(animdesc->pAnimdataNoStall(&iLocalFrame));
-
-                for (int boneIdx = 0; boneIdx < boneCount; boneIdx++)
-                {
-                    const ModelBone_t* const bone = &bones->at(boneIdx);
-
-                    Vector pos;
-                    Quaternion q;
-                    Vector scale;
-
-                    // r2 animations will always have position
-                    uint8_t boneFlags = CAnimDataBone::ANIMDATA_POS 
-                                        | (panim->flags & r2::RleFlags_t::STUDIO_ANIM_NOROT ? 0 : CAnimDataBone::ANIMDATA_ROT)
-                                        | (seqdesc->flags & 0x20000 ? CAnimDataBone::ANIMDATA_SCL : 0);
-
-                    if (panim && panim->bone == boneIdx)
-                    {
-                        // need to add a bool here, we do not want the interpolated values (inbetween frames)
-                        r2::CalcBonePosition(iLocalFrame, s, pStudioHdr->pBone(panim->bone), pStudioHdr->pLinearBones(), panim, pos);
-                        r2::CalcBoneQuaternion(iLocalFrame, s, pStudioHdr->pBone(panim->bone), pStudioHdr->pLinearBones(), panim, q);
-                        r2::CalcBoneScale(iLocalFrame, s, pStudioHdr->pBone(panim->bone)->scale, pStudioHdr->pBone(panim->bone)->scalescale, panim, scale);
-
-                        panim = panim->pNext();
-                    }
-                    else
-                    {
-                        if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA)
-                        {
-                            pos.Init(0.0f, 0.0f, 0.0f);
-                            q.Init(0.0f, 0.0f, 0.0f, 1.0f);
-                            scale.Init(1.0f, 1.0f, 1.0f);
-                        }
-                        else
-                        {
-                            pos = bone->pos;
-                            q = bone->quat;
-                            scale = bone->scale;
-                        }
-                    }
-
-                    // adjust the origin bone
-                    // do after we get anim data, so our rotation does not get overwritten
-                    if (boneIdx == 0)
-                    {
-                        QAngle vecAngleBase(q);
-
-                        if (nullptr != animdesc->movement && animdesc->flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
-                        {
-                            Vector vecPos;
-                            QAngle vecAngle;
-
-                            r1::Studio_AnimPosition(animdesc, cycle, vecPos, vecAngle);
-
-                            pos += vecPos; // add our base movement position to our base position 
-                            vecAngleBase.y += (vecAngle.y);
-                        }
-
-                        vecAngleBase.y += -90; // rotate -90 degree on the yaw axis
-
-                        // adjust position as we are rotating on the Z axis
-                        const float x = pos.x;
-                        const float y = pos.y;
-
-                        pos.x = y;
-                        pos.y = -x;
-
-                        AngleQuaternion(vecAngleBase, q);
-
-                        // has pos/rot data regardless since we just adjusted pos/rot
-                        boneFlags |= (CAnimDataBone::ANIMDATA_POS | CAnimDataBone::ANIMDATA_ROT);
-                    }
-
-                    CAnimDataBone& animDataBone = animData.GetBone(boneIdx);
-                    animDataBone.SetFlags(boneFlags);
-                    animDataBone.SetFrame(frameIdx, pos, q, scale);
-                }
-            }
-
-            // parse into memory and compress
-            CManagedBuffer* buffer = g_BufferManager->ClaimBuffer();
-
-            const size_t sizeInMem = animData.ToMemory(buffer->Buffer());
-            animdesc->parsedBufferIndex = seqdesc->parsedData.addBack(buffer->Buffer(), sizeInMem);
-
-            g_BufferManager->RelieveBuffer(buffer);
-        }
+        ParseSeqDesc_R2_RLE(seqdesc, bones, reinterpret_cast<const r2::studiohdr_t* const>(srcMdlAsset->GetAssetData()));
 
         break;
     }
@@ -975,23 +870,7 @@ bool ExportSourceSequenceAsset(CAsset* const asset, const int setting)
 
     std::filesystem::path exportPathCop = exportPath;
 
-    switch (settingFixup)
-    {
-
-    case eAnimSeqExportSetting::ANIMSEQ_CAST:
-    {
-        return ExportSeqDescCast(srcSeqAsset->GetSequence(), exportPathCop, srcMdlAsset->GetAssetName().c_str(), bones, asset->GetAssetGUID());
-    }
-    case eAnimSeqExportSetting::ANIMSEQ_RMAX:
-    {
-        return ExportSeqDescRMAX(srcSeqAsset->GetSequence(), exportPathCop, srcMdlAsset->GetAssetName().c_str(), bones);
-    }
-    default:
-    {
-        assertm(false, "Export setting is not handled.");
-        return false;
-    }
-    }
+    return ExportSeqDesc(settingFixup, srcSeqAsset->GetSequence(), exportPath, srcMdlAsset->GetAssetName().c_str(), bones, asset->GetAssetGUID());
 }
 
 void InitSourceSequenceAssetType()

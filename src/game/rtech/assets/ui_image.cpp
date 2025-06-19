@@ -31,12 +31,13 @@ void LoadUIImageAsset(CAssetContainer* const pak, CAsset* const asset)
         if (!name.ends_with(".rpak"))
             name += ".rpak";
 
-        pakAsset->SetAssetName(name);
+        pakAsset->SetAssetName(name, true);
     }
-    else
-    {
-        pakAsset->SetAssetName(std::format("ui_image/0x{:X}.rpak", pakAsset->data()->guid));
-    }
+    //else
+    //{
+    //    // first give a base name and then try and fetch from the cache if possible
+    //    pakAsset->SetAssetName(std::format("ui_image/0x{:X}.rpak", pakAsset->data()->guid));
+    //}
 
     // uiia can't be in opt starpak, LoadUIIAAsset calls this to get the streamedOffset // hdr->streamedOffset = *a4 >> 12, a4 is an array which consists of starpak, opstarpak.
     assertm(pakAsset->getStarPakStreamEntry(true).offset == 0u, "Opt starpak entry for uiia??");
@@ -208,6 +209,19 @@ void LoadUIImageAsset(CAssetContainer* const pak, CAsset* const asset)
     GetNumOfBcBlocks(uiAsset, eUIImageTileType::TYPE_LQ);
 
     pakAsset->setExtraData(uiAsset);
+}
+
+void PostLoadUIImageAsset(CAssetContainer* container, CAsset* asset)
+{
+    UNUSED(container);
+
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    assertm(pakAsset->extraData(), "extra data should be valid");
+    UIImageAsset* const uiAsset = reinterpret_cast<UIImageAsset*>(pakAsset->extraData());
+
+    if (!uiAsset->name)
+        pakAsset->SetAssetNameFromCache();
 }
 
 // Or swizzle work..
@@ -788,7 +802,7 @@ void InitUIImageAssetType()
         .type = 'aiiu',
         .headerAlignment = 8,
         .loadFunc = LoadUIImageAsset,
-        .postLoadFunc = nullptr,
+        .postLoadFunc = PostLoadUIImageAsset,
         .previewFunc = PreviewUIImageAsset,
         .e = { ExportUIImageAsset, 0, settings, ARRSIZE(settings) },
     };

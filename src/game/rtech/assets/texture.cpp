@@ -57,8 +57,11 @@ void LoadTextureAsset(CAssetContainer* const pak, CAsset* const asset)
     {
         std::string name = FormatTextureAssetName(txtrAsset->name);
 
-        pakAsset->SetAssetName(name);
+        pakAsset->SetAssetName(name, true);
     }
+
+    // [rika]: verify we know this texture format
+    assertm(txtrAsset->imgFormat < eTextureFormat::TEX_FMT_UNKNOWN, "unaccounted texture format!");
 
 #ifdef _DEBUG
     if (txtrAsset->type != _UNUSED && s_TextureTypeMap.count(txtrAsset->type) == 0)
@@ -92,18 +95,37 @@ void LoadTextureAsset(CAssetContainer* const pak, CAsset* const asset)
         else
             mip.type = eTextureMipType::RPak;
 
-        const uint8_t x = s_pBytesPerPixel[txtrAsset->imgFormat].first;
-        const uint8_t y = s_pBytesPerPixel[txtrAsset->imgFormat].second;
+        const uint16_t fmtIdx = txtrAsset->imgFormat * 3;
+
+        const uint8_t x = s_pBytesPerPixel[fmtIdx];
+        const uint8_t yw = s_pBytesPerPixel[fmtIdx + 1];
+        const uint8_t yh = s_pBytesPerPixel[fmtIdx + 2];
 
         const uint16_t mipWidth = static_cast<uint16_t>(std::max(1, (txtrAsset->width >> i)));
         const uint16_t mipHeight = static_cast<uint16_t>(std::max(1, (txtrAsset->height >> i)));
 
-        const uint32_t bppWidth = (y + (mipWidth - 1)) >> (y >> 1);
-        const uint32_t bppHeight = (y + (mipHeight - 1)) >> (y >> 1);
-        const uint32_t sliceWidth = x * (y >> (y >> 1));
+        // [rika]: retail divides by y, old shifts right, both yield the same result
+        const uint16_t bppWidth = (yw + (mipWidth - 1)) / yw;
+        const uint16_t bppHeight = (yh + (mipHeight - 1)) / yh;
+        const uint32_t sliceWidth = x * (yw >> (yw >> 1));
 
         const uint32_t pitch = sliceWidth * bppWidth;
         const uint32_t slicePitch = x * bppWidth * bppHeight;
+
+        // [rika]: nothing wrong with this code, the game just handles it different now, and the old code would not support some texture formats (astc, maybe others since the array is MASSIVE now, 304 formats as of r5_250)
+        /*const uint8_t x = s_pBytesPerPixel[txtrAsset->imgFormat].first;
+        const uint8_t y = s_pBytesPerPixel[txtrAsset->imgFormat].second;
+        const uint8_t z = (y >> 1); // half of y, in retail this is stored in the exe within the s_pBytesPerPixel array
+
+        const uint16_t mipWidth = static_cast<uint16_t>(std::max(1, (txtrAsset->width >> i)));
+        const uint16_t mipHeight = static_cast<uint16_t>(std::max(1, (txtrAsset->height >> i)));
+
+        const uint32_t bppWidth = (y + (mipWidth - 1)) >> z;
+        const uint32_t bppHeight = (y + (mipHeight - 1)) >> z;
+        const uint32_t sliceWidth = x * (y >> z);
+
+        const uint32_t pitch = sliceWidth * bppWidth;
+        const uint32_t slicePitch = x * bppWidth * bppHeight;*/
 
         // for swizzling the stored image is aligned.
         uint32_t slicePitchData = slicePitch;
@@ -121,12 +143,14 @@ void LoadTextureAsset(CAssetContainer* const pak, CAsset* const asset)
             const uint16_t mipWidthData = static_cast<uint16_t>(IALIGN(blocksX, s_SwizzleChunkSizePS4) * pixbl);
             const uint16_t mipHeightData = static_cast<uint16_t>(IALIGN(blocksY, s_SwizzleChunkSizePS4) * pixbl);
 
-            const uint32_t bppWidthData = (y + (mipWidthData - 1)) >> (y >> 1);
-            const uint32_t bppHeightData = (y + (mipHeightData - 1)) >> (y >> 1);
+            const uint32_t bppWidthData = (yw + (mipWidthData - 1)) / yw;
+            const uint32_t bppHeightData = (yh + (mipHeightData - 1)) / yh;
 
             slicePitchData = x * bppWidthData * bppHeightData;
+
+            break;
         }
-#ifdef SUPPORT_SWITCH
+#ifdef SWITCH_SWIZZLE
         // switch is weird, blocks within chunks within sections, we need to align for sectors.
         case eTextureSwizzle::SWIZZLE_SWITCH:
         {
@@ -167,17 +191,20 @@ void LoadTextureAsset(CAssetContainer* const pak, CAsset* const asset)
             const uint16_t mipWidthData = static_cast<uint16_t>(blocksXAligned * pixbl);
             const uint16_t mipHeightData = static_cast<uint16_t>(blocksYAligned * pixbl);
 
-            const uint32_t bppWidthData = (y + (mipWidthData - 1)) >> (y >> 1);
-            const uint32_t bppHeightData = (y + (mipHeightData - 1)) >> (y >> 1);
+            const uint32_t bppWidthData = (yw + (mipWidthData - 1)) / yw;
+            const uint32_t bppHeightData = (yh + (mipHeightData - 1)) / yh;
 
             slicePitchData = x * bppWidthData * bppHeightData;
+
+            break;
         }
 #endif
         default:
             break;
         }
 
-        size_t sizeSingle = IALIGN(slicePitchData, s_MipAligment[txtrAsset->swizzle]); // hard coded for now, however this will vary in the future (swizzling)
+        // [rika]: if our value is 0, the alignment macro will align to 0, so set the min size if 0
+        size_t sizeSingle = slicePitchData ? IALIGN(slicePitchData, s_MipAligment[txtrAsset->swizzle]) : s_MipAligment[txtrAsset->swizzle];
         size_t sizeAbsolute = sizeSingle * txtrAsset->arraySize;
 
         mip.isLoaded = true;
@@ -315,9 +342,23 @@ void LoadTextureAsset(CAssetContainer* const pak, CAsset* const asset)
     pakAsset->setExtraData(txtrAsset);
 }
 
+void PostLoadTextureAsset(CAssetContainer* container, CAsset* asset)
+{
+    UNUSED(container);
+
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+    const TextureAsset* const txtrAsset = reinterpret_cast<TextureAsset*>(pakAsset->extraData());
+
+    if (!txtrAsset->name)
+        pakAsset->SetAssetNameFromCache();
+}
+
 extern CDXParentHandler* g_dxHandler;
 std::shared_ptr<CTexture> CreateTextureFromMip(CPakAsset* const asset, const TextureMip_t* const mip, const DXGI_FORMAT format, const size_t arrayIdx)
 {
+    if (format == DXGI_FORMAT::DXGI_FORMAT_UNKNOWN)
+        return nullptr;
+
     // Texture isn't multiple of 4, most textures are BC which requires the width n height to be multiple of 4 causing a crash.
     if (mip->width < 3 || mip->height < 3)
         return nullptr;
@@ -412,7 +453,6 @@ void* PreviewTextureAsset(CAsset* const asset, const bool firstFrameForAsset)
     static int selectedArrayIndex = 0;
     static int lastSelectedArrayIndex = 0;
     static std::vector<std::string> previewArrays;
-    static std::string curPakStem;
 
     static constexpr const char* const mipId[] =
     {
@@ -428,6 +468,8 @@ void* PreviewTextureAsset(CAsset* const asset, const bool firstFrameForAsset)
         "SNOWFLAKE",
         "OODLE", // (n)oodle
     };
+
+    static std::string currContainerStem[static_cast<uint8_t>(eTextureMipType::_COUNT)];
 
     static uint8_t previewMipSize = 0;
     if (firstFrameForAsset) // Reset if new asset.
@@ -451,6 +493,9 @@ void* PreviewTextureAsset(CAsset* const asset, const bool firstFrameForAsset)
         selectedMip.index = 0xff;
         selectedMipTexture.reset();
 
+        for (size_t i = 0; i < ARRAYSIZE(currContainerStem); i++)
+            currContainerStem[i].clear();
+
         uint8_t mipIdx = 0;
         for (auto& mip : txtrAsset->mipArray)
         {
@@ -466,18 +511,19 @@ void* PreviewTextureAsset(CAsset* const asset, const bool firstFrameForAsset)
             previewData.comp = mip.compType;
             previewData.compName = mipComp[mip.compType];
 
-            if (mip.type == eTextureMipType::RPak)
-            {
-                if (!curPakStem.empty())
-                    previewData.dataOrigin = curPakStem.c_str();
-                else
-                {
-                    curPakStem = asset->GetContainerFileName();
-                    previewData.dataOrigin = curPakStem.c_str();
-                }
-            }
+            std::string& targetStem = currContainerStem[static_cast<uint8_t>(mip.type)];
+
+            if (!targetStem.empty())
+                previewData.dataOrigin = targetStem.c_str();
             else
-                previewData.dataOrigin = pakAsset->getStarPakName(mip.type == eTextureMipType::OptStarPak);
+            {
+                if (mip.type == eTextureMipType::RPak)
+                    targetStem = asset->GetContainerFileName();
+                else
+                    targetStem = pakAsset->getStarPakName(mip.type == eTextureMipType::OptStarPak);
+
+                previewData.dataOrigin = targetStem.c_str();
+            }
 
             mipIdx++;
         }
@@ -1015,7 +1061,7 @@ void InitTextureAssetType()
         .type = 'rtxt',
         .headerAlignment = 8,
         .loadFunc = LoadTextureAsset,
-        .postLoadFunc = nullptr,
+        .postLoadFunc = PostLoadTextureAsset,
         .previewFunc = PreviewTextureAsset,
         .e = { ExportTextureAsset, 0, settings, ARRSIZE(settings) }
     };
@@ -1069,7 +1115,7 @@ std::unique_ptr<char[]> UnswizlePS4(const TextureMip_t* const mip, const DXGI_FO
     return std::move(txtrDataOut);
 }
 
-#ifdef SUPPORT_SWITCH
+#ifdef SWITCH_SWIZZLE
 std::unique_ptr<char[]> UnswizleSwitch(const TextureMip_t* const mip, const DXGI_FORMAT format, std::unique_ptr<char[]> txtrData)
 {
     std::unique_ptr<char[]> txtrDataOut = std::make_unique<char[]>(mip->sizeSingle);
@@ -1186,7 +1232,7 @@ std::unique_ptr<char[]> GetTextureDataForMip(CPakAsset* const asset, const Textu
             txtrData = UnswizlePS4(mip, format, std::move(txtrData));
             break;
         }
-#ifdef SUPPORT_SWITCH
+#ifdef SWITCH_SWIZZLE
         case eTextureSwizzle::SWIZZLE_SWITCH:
         {
             txtrData = UnswizleSwitch(mip, format, std::move(txtrData));

@@ -11,64 +11,83 @@ void LoadUIImageAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
 {
 	UNUSED(pak);
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+    const int version = pakAsset->version();
 
-    if (pakAsset->version() < 10)
+    UIImageAtlasAsset* uiAsset = nullptr;
+    switch (version)
     {
-        assertm(false, "Non handled uimg version.");
-        return;
+    case 10:
+    case 11:
+    {
+        UIImageAtlasAssetHeader_v10_t* hdr = reinterpret_cast<UIImageAtlasAssetHeader_v10_t*>(pakAsset->header());
+        uiAsset = new UIImageAtlasAsset(hdr);
+
+        break;
+    }
+    default:
+    {
+        assertm(false, "unaccounted asset version, will cause major issues!");
+        break;
+    }
     }
 
-    UIImageAtlasAssetHeader_v10_t* v10 = reinterpret_cast<UIImageAtlasAssetHeader_v10_t*>(pakAsset->header());
-    UIImageAtlasAsset* uiAsset = new UIImageAtlasAsset(v10);
+    assertm(pakAsset->cpu(), "no cpu data page");
+    const UIImageAtlasBounds_t* const bounds = reinterpret_cast<const UIImageAtlasBounds_t* const>(pakAsset->cpu());
 
-	// Copy of page ptr since we don't wanna mess up the internal ptr.
-	PagePtr_t dataPage = pakAsset->data()->dataPagePtr;
-	if (IS_PAGE_PTR_INVALID(dataPage))
-		return;
+    // [rika]: allocate in one go because we know how many textures there are upfront
+    uiAsset->imageArray.reserve(uiAsset->textureCount);
 
-	PagePtr_t imgOffsets = uiAsset->textureOffsets;
-	if (IS_PAGE_PTR_INVALID(imgOffsets))
-		return;
-
-	PagePtr_t imgHashes = uiAsset->textureHashes;
-	if (IS_PAGE_PTR_INVALID(imgHashes))
-		return;
-
-	PagePtr_t imgDimensions = uiAsset->textureDimensions;
-	if (IS_PAGE_PTR_INVALID(imgDimensions))
-		return;
-
-	PagePtr_t imgNames = uiAsset->textureNames;
 	for (uint16_t i = 0; i < uiAsset->textureCount; ++i)
 	{
 		UIAtlasImage img = {};
 
-		const UIAtlasImageUV uv = READ_DEREF_OFFSET(dataPage, UIAtlasImageUV);
-		img.uv = uv;
+        // [rika]: this should be used for preview
+        img.offsets = uiAsset->textureOffsets + i;
 
-		img.posX = static_cast<uint16_t>(uv.uv0x * static_cast<float>(uiAsset->width));
-		img.posY = static_cast<uint16_t>(uv.uv0y * static_cast<float>(uiAsset->height));
+        const UIImageAtlasDimension_t* const dimensions = uiAsset->textureDimensions + i;
+        img.dimensionsWidth = dimensions->width;
+        img.dimensionsHeight = dimensions->height;
 
-		const UIAtlasImageOffset offsets = READ_DEREF_OFFSET(imgOffsets, UIAtlasImageOffset);
-		img.offsets = offsets;
+        // for fetching this from texture
+        img.bounds = bounds + i;
 
-		img.width = READ_DEREF_OFFSET(imgDimensions, uint16_t);
-		img.height = READ_DEREF_OFFSET(imgDimensions, uint16_t);
+        // [rika]: should this have the same rounding as below ? todo study this
+		img.posX = static_cast<uint16_t>(img.bounds->minX * static_cast<float>(uiAsset->width));
+		img.posY = static_cast<uint16_t>(img.bounds->minY * static_cast<float>(uiAsset->height));
 
-        // If these are not 0 we need have different sizes than the actual read dimensions??
-        // [rika]: this can cause the textures dimensions to be invalid, there is probably something else going on here
-		if (uv.uv1x != 0)
-			img.width = static_cast<uint16_t>(static_cast<float>(uiAsset->width) * uv.uv1x);
+        // [rika]: size within the image, SampleLevel (shader) rounds to nearest fixed point (source: trust me bro), hence the + 0.5f
+        // note: while at first glance it seems everything is fine, if for some reason artifacting or bad exporting happens check this first
+        img.width = static_cast<uint16_t>(img.bounds->sizeX * static_cast<float>(uiAsset->width) + 0.5f);
+        img.height = static_cast<uint16_t>(img.bounds->sizeY * static_cast<float>(uiAsset->height) + 0.5f);
 
-		if (uv.uv1y != 0)
-			img.height = static_cast<uint16_t>(static_cast<float>(uiAsset->height) * uv.uv1y);
+        const char* path = nullptr;
 
-		img.pathHash = READ_DEREF_OFFSET(imgHashes, uint32_t);
-		img.pathTableOffset = READ_DEREF_OFFSET(imgHashes, uint32_t);
+        // [rika]: pathTableOffset should be 0 without names, but we double check if textureNames is a valid ptr after just to be sure
+        switch (version)
+        {
+        case 10:
+        {
+            const UIImageAtlasHash_v10_t* const imgHash = uiAsset->pTextureHash_V10(i);
 
-		if (!IS_PAGE_PTR_INVALID(imgNames))
+            img.pathHash = imgHash->pathHash;
+            path = uiAsset->textureNames + imgHash->pathTableOffset;
+
+            break;
+        }
+        case 11:
+        {
+            const UIImageAtlasHash_v11_t* const imgHash = uiAsset->pTextureHash_V11(i);
+
+            img.pathHash = imgHash->pathHash;
+            path = uiAsset->textureNames + imgHash->pathTableOffset;
+
+            break;
+        }
+        }
+
+		if (uiAsset->textureNames && path)
 		{
-			img.path = READ_OFFSET_STRING(imgNames);
+			img.path = path;
 		}
         else
         {
@@ -81,8 +100,13 @@ void LoadUIImageAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
 
     // Setup image container for root image.
     UIAtlasImage rootImg = {};
+
     rootImg.width = uiAsset->width;
     rootImg.height = uiAsset->height;
+
+    rootImg.dimensionsWidth = uiAsset->width;
+    rootImg.dimensionsHeight = uiAsset->height;
+
     uiAsset->imageArray.push_back(rootImg);
 
 	pakAsset->setExtraData(uiAsset);
@@ -94,11 +118,6 @@ void PostLoadUIImageAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
     UNUSED(pak);
 
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
-    if (pakAsset->version() < 10)
-    {
-        assertm(false, "Non handled uimg version.");
-        return;
-    }
 
     // Setup main texture.
     UIImageAtlasAsset* const uiAsset = reinterpret_cast<UIImageAtlasAsset*>(pakAsset->extraData());
@@ -114,16 +133,25 @@ void PostLoadUIImageAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
     {
         std::string atlasName = "ui_image_atlas/" + std::string(txtrAsset->name) + ".rpak";
 
-        if(pakAsset->data()->guid == RTech::StringToGuid(atlasName.c_str()))
-            pakAsset->SetAssetName(atlasName);
+        assertm(pakAsset->data()->guid == RTech::StringToGuid(atlasName.c_str()), "hashed name for atlas did not match existing guid\n");
 
-        //assertm(asset->data()->guid == RTech::StringToGuid(atlasName.c_str()), "hashed name for atlas did not match existing guid\n");
+        pakAsset->SetAssetName(atlasName, true);
+    }
+    else
+    {
+        pakAsset->SetAssetNameFromCache();
     }
 
     assertm(txtrAsset->mipArray.size() >= 1, "Mip array should at least contain idx 0.");
     TextureMip_t* const highestMip = &txtrAsset->mipArray[0];
 
     uiAsset->format = s_PakToDxgiFormat[txtrAsset->imgFormat];
+
+    if (uiAsset->format == DXGI_FORMAT::DXGI_FORMAT_UNKNOWN)
+    {
+        assertm(false, "unknown format");
+        return;
+    }
 
     std::unique_ptr<char[]> txtrData = GetTextureDataForMip(textureAsset, highestMip, uiAsset->format); // parse texture through this mip function instead of copying, that way if swizzling is present it gets fixed.
 
@@ -143,17 +171,24 @@ struct UITexturePreviewData_t
         TPC_Index, // base should be -1
         TPC_Dimensions,
         TPC_Position,
+        TPC_RenderSize,
         TPC_Name,
 
         _TPC_COUNT,
     };
 
     const std::string* name;
+
     uint16_t width;
     uint16_t height;
+
     uint16_t posX;
     uint16_t posY;
     int index;
+
+    // data used to render this image in game
+    uint16_t renderWidth;
+    uint16_t renderHeight;
 
     const bool operator==(const UITexturePreviewData_t& in)
     {
@@ -221,17 +256,22 @@ void* PreviewUIImageAtlasAsset(CAsset* const asset, const bool firstFrameForAsse
     static std::shared_ptr<CTexture> selectedUITexture = nullptr;
     static std::vector<UITexturePreviewData_t> previewTextures;
 
+    // TODO: ui_font_atlas and ui_image_atlas share this lambda, should we try to make it a function?
+    // TODO: parse and preview into render size
     auto CreateTextureForImage = [](UIImageAtlasAsset* const uiAsset, const UIAtlasImage* const uiImage) -> std::shared_ptr<CTexture>
     {
         assertm(uiAsset->rawTxtr, "Atlas texture wasn't created yet.");
         assertm(uiAsset->convertedTxtr, "Converted atlas texture wasn't created yet.");
+
+        if (!uiAsset->rawTxtr || !uiAsset->convertedTxtr)
+            return nullptr;
 
         // This will be the main texture.
         if (uiImage->width == uiAsset->width && uiImage->height == uiImage->height)
             return uiAsset->rawTxtr;
 
         // invalid image
-        if (uiImage->width * uiImage->height == 0)
+        if (!uiImage->width || !uiImage->height)
             return nullptr;
 
         // Create texture / shader and get slice for image.
@@ -264,6 +304,9 @@ void* PreviewUIImageAtlasAsset(CAsset* const asset, const bool firstFrameForAsse
             previewData.posX = img.posX;
             previewData.posY = img.posY;
 
+            previewData.renderWidth = img.dimensionsWidth;
+            previewData.renderHeight = img.dimensionsHeight;
+
             previewData.name = &img.path;
 
             index++;
@@ -289,6 +332,7 @@ void* PreviewUIImageAtlasAsset(CAsset* const asset, const bool firstFrameForAsse
         ImGui::TableSetupColumn("Index", ImGuiTableColumnFlags_DefaultSort | ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoHide, 0.0f, UITexturePreviewData_t::eColumnID::TPC_Index);
         ImGui::TableSetupColumn("Dimensions", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed, 0.0f, UITexturePreviewData_t::eColumnID::TPC_Dimensions);
         ImGui::TableSetupColumn("Positions", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed, 0.0f, UITexturePreviewData_t::eColumnID::TPC_Position);
+        ImGui::TableSetupColumn("Render Size", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed, 0.0f, UITexturePreviewData_t::eColumnID::TPC_Dimensions);
         ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_NoResize | ImGuiTableColumnFlags_WidthFixed, 0.0f, UITexturePreviewData_t::eColumnID::TPC_Name);
         ImGui::TableSetupScrollFreeze(1, 1);
 
@@ -325,15 +369,17 @@ void* PreviewUIImageAtlasAsset(CAsset* const asset, const bool firstFrameForAsse
 
             if (ImGui::TableSetColumnIndex(UITexturePreviewData_t::eColumnID::TPC_Dimensions))
             {
-                if (item->width > 0 && item->height > 0)
-                    ImGui::Text("%i x %i", item->width, item->height);
-                else
-                    ImGui::TextUnformatted("N/A");
+                ImGui::Text("%i x %i", item->width, item->height);
             }
 
             if (ImGui::TableSetColumnIndex(UITexturePreviewData_t::eColumnID::TPC_Position))
             {
                 ImGui::Text("(%i, %i)", item->posX, item->posY);
+            }
+
+            if (ImGui::TableSetColumnIndex(UITexturePreviewData_t::eColumnID::TPC_RenderSize))
+            {
+                ImGui::Text("%i x %i", item->renderWidth, item->renderHeight);
             }
 
             if (ImGui::TableSetColumnIndex(UITexturePreviewData_t::eColumnID::TPC_Name))
@@ -518,6 +564,8 @@ bool ExportUIImageAtlasAsset(CAsset* const asset, const int setting)
                 return false;
             }
             currentPath.concat(std::format("\\{}.dds", itemPath.filename().string()));
+
+            printf("Format = %d\n", (int)uiAsset->format);
 
             std::unique_ptr<CTexture> sliceData = std::make_unique<CTexture>(nullptr, 0u, it->width, it->height, (IsSRGB(uiAsset->format) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM), 1u, 1u);
             sliceData->CopySourceTextureSlice(uiAsset->convertedTxtr.get(), static_cast<size_t>(it->posX), static_cast<size_t>(it->posY), it->width, it->height, 0u, 0u);

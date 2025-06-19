@@ -52,16 +52,15 @@ struct ModelAssetHeader_v9_t
 	int componentDataSize; // size of individual mdl components pre-baking (vtx, vvd, etc.)
 	int streamingDataSize; // size of VG data post-baking
 
-	uint64_t unk3;
-	uint64_t unk4;
-	uint32_t unk5;
+	uint64_t unk_4C;
+	uint64_t unk_54;
+	uint32_t unk_5C;
 
 	int numAnimSeqs;
 	AssetGuid_t* animSeqs;
 
-	char gap_unk6[8];
+	char gap_6C[8];
 };
-
 static_assert(sizeof(ModelAssetHeader_v9_t) == 120);
 
 struct ModelAssetHeader_v12_1_t
@@ -91,6 +90,7 @@ struct ModelAssetHeader_v12_1_t
 
 	char gap_60[8];
 };
+static_assert(sizeof(ModelAssetHeader_v12_1_t) == 104);
 
 struct ModelAssetHeader_v13_t
 {
@@ -114,13 +114,13 @@ struct ModelAssetHeader_v13_t
 	Vector bbox_min;
 	Vector bbox_max;
 
-	char gap_unk[8];
+	char gap_64[8];
 
 	// number of anim sequences directly associated with this model
 	int numAnimSeqs;
 	AssetGuid_t* animSeqs;
 
-	char gap_unk1[8];
+	char gap_78[8];
 };
 static_assert(sizeof(ModelAssetHeader_v13_t) == 128);
 
@@ -172,6 +172,7 @@ enum class eMDLVersion : int
 	VERSION_12_1,
 	VERSION_12_2,
 	VERSION_12_3,
+	VERSION_12_4,
 	VERSION_13,
 	VERSION_13_1,
 	VERSION_14,
@@ -230,11 +231,14 @@ inline const eMDLVersion GetModelVersionFromAsset(CPakAsset* const asset)
 		if ((pMDL[102] == sizeof(r5::studiohdr_v12_3_t) || pMDL[41] == sizeof(r5::studiohdr_v12_3_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
 			return eMDLVersion::VERSION_12_3;
 
-		return out;
+		if ((pMDL[102] == sizeof(r5::studiohdr_v12_4_t) || pMDL[41] == sizeof(r5::studiohdr_v12_4_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
+			return eMDLVersion::VERSION_12_4;
+
+		return eMDLVersion::VERSION_UNK;
 	}
 	case eMDLVersion::VERSION_13:
 	{
-		const r5::studiohdr_v12_3_t* const pHdr = reinterpret_cast<const r5::studiohdr_v12_3_t* const>(pMDL);
+		const r5::studiohdr_v12_4_t* const pHdr = reinterpret_cast<const r5::studiohdr_v12_4_t* const>(pMDL);
 
 		if (pHdr->numbodyparts == 0)
 			return out;
@@ -285,6 +289,9 @@ inline const eMDLVersion GetModelPakVersion(const int* const pHdr)
 
 	if (pHdr[102] == sizeof(r5::studiohdr_v12_3_t) || pHdr[41] == sizeof(r5::studiohdr_v12_3_t))
 		return eMDLVersion::VERSION_12_3;
+
+	if (pHdr[102] == sizeof(r5::studiohdr_v12_4_t) || pHdr[41] == sizeof(r5::studiohdr_v12_4_t))
+		return eMDLVersion::VERSION_12_4;
 	
 	if (pHdr[104] == sizeof(r5::studiohdr_v14_t) || pHdr[41] == sizeof(r5::studiohdr_v14_t))
 		return eMDLVersion::VERSION_14;
@@ -330,6 +337,7 @@ public:
 			break;
 		}
 		case eMDLVersion::VERSION_12_3:
+		case eMDLVersion::VERSION_12_4:
 		{
 			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
 			break;

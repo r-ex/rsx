@@ -4,8 +4,6 @@
 
 extern ExportSettings_t g_ExportSettings;
 
-static const char* const s_PathPrefixRTK = s_AssetTypePaths.find(AssetType_t::RTK)->second;
-
 void LoadMapAsset(CAssetContainer* container, CAsset* asset)
 {
     CPakFile* const pak = static_cast<CPakFile* const>(container);
@@ -15,7 +13,7 @@ void LoadMapAsset(CAssetContainer* container, CAsset* asset)
     const uint64_t guidFromString = RTech::StringToGuid(assetName.c_str());
 
     if (guidFromString == asset->GetAssetGUID())
-        pakAsset->SetAssetName(assetName);
+        pakAsset->SetAssetName(assetName, true);
 }
 
 void InitMapAssetType()

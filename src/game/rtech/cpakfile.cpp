@@ -569,13 +569,13 @@ const bool CPakFile::DecompressFileBuffer(const char* fileBuffer, std::shared_pt
         return false;
     }
 
-    if ((header->flags & 0x300) == 0)
+    if ((header->flags & PAK_HEADER_FLAGS_COMPRESSED) == 0)
     {
         delete header;
         return true;
     }
 
-    if (header->flags & 0x100) // standard pakfile compression
+    if (header->flags & PAK_HEADER_FLAGS_RTECH_ENCODED) // standard pakfile compression
     {
         std::shared_ptr<char[]> dcmpBuf = std::shared_ptr<char[]>(new char[header->dcmpSize] {});
 
@@ -604,22 +604,30 @@ const bool CPakFile::DecompressFileBuffer(const char* fileBuffer, std::shared_pt
             return false;
         }
     }
-    else if (header->flags & 0x200)
+    else if (header->flags & PAK_HEADER_FLAGS_OODLE_ENCODED)
     {
-        std::shared_ptr<char[]> dcmpBuf = std::shared_ptr<char[]>(new char[header->dcmpSize + header->pakHdrSize] {});
+        // [rika]: dcmpSize is decompressed pak's size (header & oodle compression), this buffer is for the decompresed pakfile.
+        std::shared_ptr<char[]> dcmpBuf = std::shared_ptr<char[]>(new char[header->dcmpSize] {});
 
-        const size_t compressedDataSize = header->cmpSize;
+        const size_t compressedDataSize = header->cmpSize; // [rika]: cmpSize is the size of all compresed data in the pakfile (does not include header).
 
         // allocate a buffer for just the compressed file data
         // since the oodle decomp util func needs just the compressed data
         std::unique_ptr<char[]> cmpBuf = std::make_unique<char[]>(compressedDataSize);
         memcpy_s(cmpBuf.get(), compressedDataSize, fileBuffer + header->pakHdrSize, compressedDataSize);
 
-        uint64_t decodeSize = header->dcmpSize;
+        uint64_t decodeSize = header->dcmpSize - header->pakHdrSize; // [rika]: since dcmpSize is the decompresed pakfile's size, we need the decompresed data size, subtract the pakfile header to get it.
+
+        // Get compressed buffer qword to make sure that the compressed and decompressed buffer are not the same
+        // (based on my very scientific method of checking one qword)
+        // [rika]: this can probably be removed now
+        const uint64_t cmpBufQWord = *reinterpret_cast<uint64_t*>(cmpBuf.get());
 
         std::unique_ptr<char[]> data = RTech::DecompressStreamedBuffer(std::move(cmpBuf), decodeSize, eCompressionType::OODLE);
 
-        if (decodeSize == 0 || data.get() == nullptr)
+        const uint64_t dcmpBufQWord = *reinterpret_cast<uint64_t*>(data.get());
+
+        if (decodeSize == 0 || data.get() == nullptr || cmpBufQWord == dcmpBufQWord)
         {
             delete header;
             return false;
@@ -641,6 +649,13 @@ const bool CPakFile::DecompressFileBuffer(const char* fileBuffer, std::shared_pt
 
         // overwrite the provided buffer with the newly allocated and populated buffer
         *outBuffer = dcmpBuf;
+    }
+    else if (header->flags & PAK_HEADER_FLAGS_ZSTD_ENCODED)
+    {
+        assertm(false, "zstd compression unsupported");
+
+        delete header;
+        return false;
     }
 
     delete header;

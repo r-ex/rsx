@@ -19,6 +19,8 @@ void LoadMaterialSnapshotAsset(CAssetContainer* const container, CAsset* const a
     {
     case 1:
     {
+        assertm(pakAsset->data()->headerStructSize == sizeof(MaterialSnapshotAssetHeader_v1_t), "incorrect header");
+
         const MaterialSnapshotAssetHeader_v1_t* const hdr = reinterpret_cast<const MaterialSnapshotAssetHeader_v1_t* const>(pakAsset->header());
         snapshotAsset = new MaterialSnapshotAsset(hdr);
         break;
@@ -45,6 +47,9 @@ void PostLoadMaterialSnapshotAsset(CAssetContainer* const container, CAsset* con
     CPakAsset* const shaderSetAsset = g_assetData.FindAssetByGUID<CPakAsset>(snapshotAsset->shaderSet);
     if (shaderSetAsset)
         snapshotAsset->shaderSetAsset = shaderSetAsset;
+
+    // [rika]: has no name var
+    pakAsset->SetAssetNameFromCache();
 }
 
 void* PreviewMaterialSnapshotAsset(CAsset* const asset, const bool firstFrameForAsset)

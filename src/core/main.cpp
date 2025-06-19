@@ -8,6 +8,9 @@
 
 #include <core/render/dx.h>
 #include <core/input/input.h>
+#include <core/cache/cachedb.h>
+#include <core/utils/cli_parser.h>
+#include <core/filehandling/load.h>
 
 #include <core/splash.h>
 #include <core/window.h>
@@ -16,12 +19,12 @@
 CDXParentHandler* g_dxHandler;
 std::atomic<uint32_t> maxConcurrentThreads = 1u;
 
+CBufferManager g_BufferManager; // called constructor on init.
+
 // Handle CLI to only init certain asset types.
-static void HandleAssetRegistration(int argc, char* const argv[])
+static void HandleAssetRegistration(const CCommandLine* const cli)
 {
-    UNUSED(argc);
-    UNUSED(argv);
-    
+    UNUSED(cli);
 
     // import func
     // model
@@ -46,7 +49,7 @@ static void HandleAssetRegistration(int argc, char* const argv[])
 
     // particle (texture)
     extern void InitEffectAssetType();
-    // rpsk
+    extern void InitParticleScriptAssetType();
     
     // dx/shader
     extern void InitShaderAssetType();
@@ -82,6 +85,9 @@ static void HandleAssetRegistration(int argc, char* const argv[])
     // audio
     extern void InitAudioSourceAssetType();
 
+    // bluepoint
+    extern void InitBluepointWrappedFileAssetType();
+
 
     // call func
     // model
@@ -106,7 +112,7 @@ static void HandleAssetRegistration(int argc, char* const argv[])
 
     // particle (texture)
     InitEffectAssetType();
-    // rpsk
+    InitParticleScriptAssetType();
 
     // dx/shader
     InitShaderAssetType();
@@ -141,16 +147,32 @@ static void HandleAssetRegistration(int argc, char* const argv[])
 
     // audio
     InitAudioSourceAssetType();
+
+    // bluepoint
+    InitBluepointWrappedFileAssetType();
 }
 
 int main(int argc, char* argv[])
 {
+    CCommandLine cli(argc, argv);
+
+    // we want the visual studio debugger to be able to control the working directory
+#if defined(NDEBUG)
+    // this is needed to properly support drag'n'drop, it changes the current working directory to the file you drag into the exe
+    if (!RestoreCurrentWorkingDirectory())
+    {
+        return EXIT_FAILURE;
+    }
+#endif // #if defined(NDEBUG)
+
 #ifdef EXCEPTION_HANDLER
     g_CrashHandler.Init();
 #endif
 
+    g_cacheDBManager.LoadFromFile((std::filesystem::current_path() / "rsx_cache_db.bin").string());
+
     // init pak asset types
-    HandleAssetRegistration(argc, argv);
+    HandleAssetRegistration(&cli);
 
     // get max con-current threads.
     maxConcurrentThreads = std::max(1u, CThread::GetConCurrentThreads());
@@ -185,6 +207,9 @@ int main(int argc, char* argv[])
     ImGui_ImplWin32_Init(windowHandle);
     ImGui_ImplDX11_Init(g_dxHandler->GetDevice(), g_dxHandler->GetDeviceContext());
 
+    // call after initializing dx and gui otherwise you will crash
+    HandleLoadFromCommandLine(&cli);
+
     MSG msg = {};
     while (msg.message != WM_QUIT)
     {
@@ -199,6 +224,8 @@ int main(int argc, char* argv[])
 
         HandleRenderFrame();
     }
+
+    g_cacheDBManager.SaveToFile((std::filesystem::current_path() / "rsx_cache_db.bin").string());
 
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();

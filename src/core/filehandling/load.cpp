@@ -1,12 +1,13 @@
 #include <pch.h>
 #include <core/filehandling/load.h>
 #include <core/filehandling/export.h>
+#include <core/utils/cli_parser.h>
 
-extern CBufferManager* g_BufferManager;
+extern CBufferManager g_BufferManager;
 
 extern std::atomic<bool> inJobAction;
 
-void HandleFileLoad(std::vector<std::string> filePaths)
+static void HandleFileLoad(std::vector<std::string> filePaths)
 {
     std::vector<std::string> pathsByExtension[CAsset::ContainerType::_COUNT];
 
@@ -20,12 +21,18 @@ void HandleFileLoad(std::vector<std::string> filePaths)
             pathsByExtension[CAsset::ContainerType::AUDIO].emplace_back(path);
         else if (extension == ".mdl")
             pathsByExtension[CAsset::ContainerType::MDL].emplace_back(path);
+        else if (extension == ".bpk")
+            pathsByExtension[CAsset::ContainerType::BP_PAK].emplace_back(path);
         else
             Log("Invalid file extension found in path: %s.\n", path.c_str());
     }
 
     for (uint32_t i = 0; i < CAsset::ContainerType::_COUNT; ++i)
     {
+        // [rika]: we should skip a function if we don't have files for it
+        if (pathsByExtension[i].empty())
+            continue;
+
         switch (i)
         {
         case CAsset::ContainerType::PAK:
@@ -35,7 +42,10 @@ void HandleFileLoad(std::vector<std::string> filePaths)
             HandleMBNKLoad(pathsByExtension[i]);
             break;
         case CAsset::ContainerType::MDL:
-            HandleModelLoad(pathsByExtension[i]);
+            HandleMDLLoad(pathsByExtension[i]);
+            break;
+        case CAsset::ContainerType::BP_PAK:
+            HandleBPKLoad(pathsByExtension[i]);
             break;
         }
     }
@@ -43,20 +53,34 @@ void HandleFileLoad(std::vector<std::string> filePaths)
     g_assetData.ProcessAssetsPostLoad();
 }
 
+void HandleLoadFromCommandLine(const CCommandLine* const cli)
+{
+    std::vector<std::string> filePaths;
+    for (int i = 1; i < cli->GetArgC(); ++i) // we skip 0 since its selfpath
+    {
+        std::filesystem::path path = std::filesystem::path(cli->GetParamValue(i));
+        if (std::filesystem::exists(path) && std::filesystem::is_regular_file(path))
+        {
+            filePaths.emplace_back(path.string());
+        }
+    }
+
+    CThread(HandleFileLoad, std::move(filePaths)).detach();
+}
+
 void HandleOpenFileDialog(const HWND windowHandle)
 {
     // We are in pak load now.
     inJobAction = true;
 
-    g_BufferManager = new CBufferManager();
-    CManagedBuffer* fileNames = g_BufferManager->ClaimBuffer();
+    CManagedBuffer* fileNames = g_BufferManager.ClaimBuffer();
     memset(fileNames->Buffer(), 0, CBufferManager::MaxBufferSize());
 
     OPENFILENAMEA openFileName = {};
 
     openFileName.lStructSize = sizeof(OPENFILENAMEA);
     openFileName.hwndOwner = windowHandle;
-    openFileName.lpstrFilter = "reSource Asset Files (*.rpak, *.mbnk, *.mdl)\0*.RPAK;*.MBNK;*.MDL\0";
+    openFileName.lpstrFilter = "reSource Asset Files (*.rpak, *.mbnk, *.mdl)\0*.RPAK;*.MBNK;*.MDL;*.BPK\0";
     openFileName.lpstrFile = fileNames->Buffer();
     openFileName.nMaxFile = static_cast<DWORD>(CBufferManager::MaxBufferSize());
     openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_NOCHANGEDIR;
@@ -89,8 +113,7 @@ void HandleOpenFileDialog(const HWND windowHandle)
         HandleFileLoad(std::move(filePaths));
     }
 
-    g_BufferManager->RelieveBuffer(fileNames);
-    delete g_BufferManager;
+    g_BufferManager.RelieveBuffer(fileNames);
 
     // We are done with pak loading.
     inJobAction = false;

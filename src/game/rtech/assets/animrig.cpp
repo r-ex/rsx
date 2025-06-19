@@ -12,47 +12,6 @@
 
 extern ExportSettings_t g_ExportSettings;
 
-static void ParseRigBoneData_v8(CPakAsset* const asset, AnimRigAsset* const modelAsset)
-{
-    UNUSED(asset);
-
-    const r5::mstudiobone_v8_t* const bones = reinterpret_cast<r5::mstudiobone_v8_t*>((char*)modelAsset->data + modelAsset->studiohdr.boneOffset);
-    modelAsset->bones.resize(modelAsset->studiohdr.boneCount);
-
-    for (int i = 0; i < modelAsset->studiohdr.boneCount; i++)
-    {
-        modelAsset->bones.at(i) = ModelBone_t(&bones[i]);
-    }
-}
-
-static void ParseRigBoneData_v12_1(CPakAsset* const asset, AnimRigAsset* const modelAsset)
-{
-    UNUSED(asset);
-
-    const r5::mstudiobone_v12_1_t* const bones = reinterpret_cast<r5::mstudiobone_v12_1_t*>((char*)modelAsset->data + modelAsset->studiohdr.boneOffset);
-    modelAsset->bones.resize(modelAsset->studiohdr.boneCount);
-
-    for (int i = 0; i < modelAsset->studiohdr.boneCount; i++)
-    {
-        modelAsset->bones.at(i) = ModelBone_t(&bones[i]);
-    }
-}
-
-static void ParseRigBoneData_v16(CPakAsset* const asset, AnimRigAsset* const modelAsset)
-{
-    UNUSED(asset);
-
-    const r5::mstudiobonehdr_v16_t* const bonehdrs = reinterpret_cast<r5::mstudiobonehdr_v16_t*>((char*)modelAsset->data + modelAsset->studiohdr.boneOffset);
-    const r5::mstudiobonedata_v16_t* const bonedata = reinterpret_cast<r5::mstudiobonedata_v16_t*>((char*)modelAsset->data + modelAsset->studiohdr.boneDataOffset);
-
-    modelAsset->bones.resize(modelAsset->studiohdr.boneCount);
-
-    for (int i = 0; i < modelAsset->studiohdr.boneCount; i++)
-    {
-        modelAsset->bones.at(i) = ModelBone_t(&bonehdrs[i], &bonedata[i]);
-    }
-}
-
 void LoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
 {
     UNUSED(pak);
@@ -65,21 +24,20 @@ void LoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
     case 4:
     {
         AnimRigAssetHeader_v4_t* const hdr = reinterpret_cast<AnimRigAssetHeader_v4_t*>(pakAsset->header());
-        arigAsset = new AnimRigAsset(hdr);
+        arigAsset = new AnimRigAsset(hdr, GetModelPakVersion(reinterpret_cast<const int* const>(hdr->data)));
         break;
     }
     case 5:
     case 6:
     {
         AnimRigAssetHeader_v5_t* const hdr = reinterpret_cast<AnimRigAssetHeader_v5_t*>(pakAsset->header());
-        arigAsset = new AnimRigAsset(hdr);
+        arigAsset = new AnimRigAsset(hdr, GetModelPakVersion(reinterpret_cast<const int* const>(hdr->data)));
         break;
     }
     default:
         return;
     }
 
-    arigAsset->studioVersion = GetModelPakVersion(reinterpret_cast<const int* const>(arigAsset->data));
     switch (arigAsset->studioVersion)
     {
     case eMDLVersion::VERSION_8:
@@ -88,81 +46,51 @@ void LoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
     case eMDLVersion::VERSION_11:
     case eMDLVersion::VERSION_12:
     {
-        r5::studiohdr_v8_t* const pHdr = reinterpret_cast<r5::studiohdr_v8_t*>(arigAsset->data);
-        arigAsset->studiohdr = studiohdr_generic_t(pHdr);
-
-        ParseRigBoneData_v8(pakAsset, arigAsset);
+        ParseModelBoneData_v8(arigAsset->GetParsedData());
+        ParseModelSequenceData_NoStall(arigAsset->GetParsedData(), reinterpret_cast<char* const>(arigAsset->data));
 
         break;
     }
     case eMDLVersion::VERSION_12_1:
-    {
-        r5::studiohdr_v12_1_t* const pHdr = reinterpret_cast<r5::studiohdr_v12_1_t*>(arigAsset->data);
-        arigAsset->studiohdr = studiohdr_generic_t(pHdr);
-
-        ParseRigBoneData_v12_1(pakAsset, arigAsset);
-
-        break;
-    }
     case eMDLVersion::VERSION_12_2:
-    {
-        r5::studiohdr_v12_2_t* const pHdr = reinterpret_cast<r5::studiohdr_v12_2_t*>(arigAsset->data);
-        arigAsset->studiohdr = studiohdr_generic_t(pHdr);
-
-        ParseRigBoneData_v12_1(pakAsset, arigAsset);
-
-        break;
-    }
     case eMDLVersion::VERSION_12_3:
+    case eMDLVersion::VERSION_12_4:
     case eMDLVersion::VERSION_13:
     case eMDLVersion::VERSION_13_1:
-    {
-        r5::studiohdr_v12_3_t* const pHdr = reinterpret_cast<r5::studiohdr_v12_3_t*>(arigAsset->data);
-        arigAsset->studiohdr = studiohdr_generic_t(pHdr);
-
-        ParseRigBoneData_v12_1(pakAsset, arigAsset);
-
-        break;
-    }
     case eMDLVersion::VERSION_14:
     case eMDLVersion::VERSION_14_1:
     case eMDLVersion::VERSION_15:
     {
-        r5::studiohdr_v14_t* const pHdr = reinterpret_cast<r5::studiohdr_v14_t*>(arigAsset->data);
-        arigAsset->studiohdr = studiohdr_generic_t(pHdr);
-
-        ParseRigBoneData_v12_1(pakAsset, arigAsset);
+        ParseModelBoneData_v12_1(arigAsset->GetParsedData());
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v8_t>(arigAsset->GetParsedData(), reinterpret_cast<char* const>(arigAsset->data));
 
         break;
     }
     case eMDLVersion::VERSION_16:
+    case eMDLVersion::VERSION_17:
     {
-        r5::studiohdr_v16_t* const pHdr = reinterpret_cast<r5::studiohdr_v16_t*>(arigAsset->data);
-        arigAsset->dataSize = FIX_OFFSET(pHdr->boneDataOffset) + (pHdr->boneCount * sizeof(r5::mstudiobonedata_v16_t));
-        arigAsset->studiohdr = studiohdr_generic_t(pHdr, 0, arigAsset->dataSize);
-
-        ParseRigBoneData_v16(pakAsset, arigAsset);
+        ParseModelBoneData_v16(arigAsset->GetParsedData());
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v16_t>(arigAsset->GetParsedData(), reinterpret_cast<char* const>(arigAsset->data));
 
         break;
     }
-    case eMDLVersion::VERSION_17:
     case eMDLVersion::VERSION_18:
     {
-        r5::studiohdr_v17_t* const pHdr = reinterpret_cast<r5::studiohdr_v17_t*>(arigAsset->data);
-        arigAsset->dataSize = FIX_OFFSET(pHdr->boneDataOffset) + (pHdr->boneCount * sizeof(r5::mstudiobonedata_v16_t));
-        arigAsset->studiohdr = studiohdr_generic_t(reinterpret_cast<r5::studiohdr_v16_t*>(pHdr), 0, arigAsset->dataSize);
-
-        ParseRigBoneData_v16(pakAsset, arigAsset);
+        ParseModelBoneData_v16(arigAsset->GetParsedData());
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v18_t>(arigAsset->GetParsedData(), reinterpret_cast<char* const>(arigAsset->data));
 
         break;
     }
     case eMDLVersion::VERSION_UNK:
     default:
+    {
+        assertm(false, "bad stuff happened!");
         break;
+    }
     }
 
     assertm(arigAsset->name, "Rig had no name.");
-    pakAsset->SetAssetName(arigAsset->name);
+    pakAsset->SetAssetName(arigAsset->name, true);
     pakAsset->setExtraData(arigAsset);
 }
 
@@ -174,6 +102,8 @@ void PostLoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
 
     AnimRigAsset* const arigAsset = reinterpret_cast<AnimRigAsset*>(pakAsset->extraData());
     assertm(nullptr != arigAsset, "extra data should be valid by this point.");
+    if (!arigAsset)
+        return;
 
     // parse sequences for children
     const uint64_t* const guids = reinterpret_cast<const uint64_t*>(arigAsset->animSeqs);
@@ -200,7 +130,7 @@ static bool ExportRawAnimRigAsset(CPakAsset* const asset, const AnimRigAsset* co
     UNUSED(asset);
 
     StreamIO rigOut(exportPath.string(), eStreamIOMode::Write);
-    rigOut.write(reinterpret_cast<const char*>(animRigAsset->data), animRigAsset->dataSize);
+    rigOut.write(reinterpret_cast<const char*>(animRigAsset->data), animRigAsset->pStudioHdr()->length);
     rigOut.close();
 
     // make a manifest of this assets dependencies
@@ -213,71 +143,15 @@ static bool ExportRawAnimRigAsset(CPakAsset* const asset, const AnimRigAsset* co
     return true;
 }
 
-static bool ExportRMAXAnimRigAsset(CPakAsset* const asset, const AnimRigAsset* const animRigAsset, std::filesystem::path& exportPath)
-{
-    UNUSED(asset);
-
-    const std::string fileNameBase = exportPath.stem().string();
-
-    const std::string tmpName = std::format("{}.rmax", fileNameBase);
-    exportPath.replace_filename(tmpName);
-
-    rmax::RMAXExporter rmaxFile(exportPath, fileNameBase.c_str(), fileNameBase.c_str());
-
-    // do bones
-    rmaxFile.ReserveBones(animRigAsset->bones.size());
-    for (auto& bone : animRigAsset->bones)
-        rmaxFile.AddBone(bone.name, bone.parentIndex, bone.pos, bone.quat, bone.scale);
-
-    rmaxFile.ToFile();
-
-    return true;
-}
-
-static bool ExportCastAnimRigAsset(CPakAsset* const asset, const AnimRigAsset* const animRigAsset, std::filesystem::path& exportPath)
-{
-    const std::string fileNameBase = exportPath.stem().string();
-    const std::string tmpName(std::format("{}.cast", fileNameBase));
-    exportPath.replace_filename(tmpName);
-
-    cast::CastExporter cast(exportPath.string());
-
-    // cast
-    cast::CastNode* const rootNode = cast.GetChild(0); // we only have one root node, no hash
-    cast::CastNode* const modelNode = rootNode->AddChild(cast::CastId::Model, asset->data()->guid);
-
-    // [rika]: we can predict how big this vector needs to be, however resizing it will make adding new members a pain.
-    const size_t modelChildrenCount = 1; // skeleton (one)
-    modelNode->ReserveChildren(modelChildrenCount);
-
-    // do skeleton
-    {
-        const size_t boneCount = animRigAsset->bones.size();
-
-        cast::CastNode* const skelNode = modelNode->AddChild(cast::CastId::Skeleton, RTech::StringToGuid(fileNameBase.c_str()));
-        skelNode->ReserveChildren(boneCount);
-
-        // uses hashes for lookup, still gets bone parents by index :clown:
-        for (size_t i = 0; i < boneCount; i++)
-        {
-            const ModelBone_t* const boneData = &animRigAsset->bones.at(i);
-
-            cast::CastNodeBone boneNode(skelNode);
-            boneNode.MakeBone(boneData->name, boneData->parentIndex, &boneData->pos, &boneData->quat, false);
-        }
-    }
-
-    cast.ToFile();
-
-    return true;
-}
-
 static const char* const s_PathPrefixARIG = s_AssetTypePaths.find(AssetType_t::ARIG)->second;
 bool ExportAnimRigAsset(CAsset* const asset, const int setting)
 {
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
     const AnimRigAsset* const animRigAsset = reinterpret_cast<AnimRigAsset*>(pakAsset->extraData());
     assertm(animRigAsset, "Extra data should be valid at this point.");
+    if (!animRigAsset)
+        return false;
+
     assertm(animRigAsset->name, "No name for anim rig.");
 
     // Create exported path + asset path.
@@ -297,52 +171,35 @@ bool ExportAnimRigAsset(CAsset* const asset, const int setting)
         return false;
     }
 
-    // [rika]: needs setting to toggle this
+    const ModelParsedData_t* const parsedData = &animRigAsset->parsedData;
+
     if (g_ExportSettings.exportRigSequences && animRigAsset->numAnimSeqs > 0)
     {
-        auto aseqAssetBinding = g_assetData.m_assetTypeBindings.find('qesa');
+        if (!ExportAnimSeqFromAsset(exportPath, rigStem, animRigAsset->name, animRigAsset->numAnimSeqs, animRigAsset->animSeqs, animRigAsset->GetRig()))
+            return false;
+    }
 
+    if (g_ExportSettings.exportRigSequences && parsedData->NumLocalSeq() > 0)
+    {
+        std::filesystem::path outputPath(exportPath);
+        outputPath.append(std::format("anims_{}/temp", rigStem));
+
+        if (!CreateDirectories(outputPath.parent_path()))
+        {
+            assertm(false, "Failed to create directory.");
+            return false;
+        }
+
+        auto aseqAssetBinding = g_assetData.m_assetTypeBindings.find('qesa');
         assertm(aseqAssetBinding != g_assetData.m_assetTypeBindings.end(), "Unable to find asset type binding for \"aseq\" assets");
 
-        if (aseqAssetBinding != g_assetData.m_assetTypeBindings.end())
+        for (int i = 0; i < parsedData->NumLocalSeq(); i++)
         {
-            std::filesystem::path outputPath(exportPath);
-            outputPath.append(std::format("anims_{}/temp", rigStem));
+            const seqdesc_t* const seqdesc = parsedData->LocalSeq(i);
 
-            if (!CreateDirectories(outputPath.parent_path()))
-            {
-                assertm(false, "Failed to create directory.");
-                return false;
-            }
+            outputPath.replace_filename(seqdesc->szlabel);
 
-            std::atomic<uint32_t> remainingSeqs = 0; // we don't actually need thread safe here
-            const ProgressBarEvent_t* const seqExportProgress = g_pImGuiHandler->AddProgressBarEvent("Exporting Sequences..", static_cast<uint32_t>(animRigAsset->numAnimSeqs), &remainingSeqs, true);
-            for (int i = 0; i < animRigAsset->numAnimSeqs; i++)
-            {
-                const uint64_t guid = animRigAsset->animSeqs[i].guid;
-
-                CPakAsset* const animSeq = g_assetData.FindAssetByGUID<CPakAsset>(guid);
-
-                if (nullptr == animSeq)
-                {
-                    Log("RRIG EXPORT: animseq asset 0x%llX was not loaded, skipping...\n", guid);
-
-                    continue;
-                }
-
-                const AnimSeqAsset* const animSeqAsset = reinterpret_cast<AnimSeqAsset*>(animSeq->extraData());
-
-                // skip this animation if for some reason it has not been parsed. if a loaded mdl/animrig has sequence children, it should always be parsed. possibly move this to an assert.
-                if (!animSeqAsset->animationParsed)
-                    continue;
-
-                outputPath.replace_filename(std::filesystem::path(animSeqAsset->name).filename());
-
-                ExportAnimSeqAsset(animSeq, aseqAssetBinding->second.e.exportSetting, animSeqAsset, outputPath, animRigAsset->name, &animRigAsset->bones);
-
-                ++remainingSeqs;
-            }
-            g_pImGuiHandler->FinishProgressBarEvent(seqExportProgress);
+            ExportSeqDesc(aseqAssetBinding->second.e.exportSetting, seqdesc, outputPath, animRigAsset->name, animRigAsset->GetRig(), RTech::StringToGuid(seqdesc->szlabel));
         }
     }
 
@@ -354,15 +211,19 @@ bool ExportAnimRigAsset(CAsset* const asset, const int setting)
     {
     case eAnimRigExportSetting::ANIMRIG_CAST:
     {
-        return ExportCastAnimRigAsset(pakAsset, animRigAsset, exportPath);
+        return ExportModelCast(parsedData, exportPath, asset->GetAssetGUID());
     }
     case eAnimRigExportSetting::ANIMRIG_RMAX:
     {
-        return ExportRMAXAnimRigAsset(pakAsset, animRigAsset, exportPath);
+        return ExportModelRMAX(parsedData, exportPath);
     }
     case eAnimRigExportSetting::ANIMRIG_RRIG:
     {
         return ExportRawAnimRigAsset(pakAsset, animRigAsset, exportPath);
+    }
+    case eAnimRigExportSetting::ANIMRIG_SMD:
+    {
+        return ExportModelSMD(parsedData, exportPath);
     }
     default:
     {

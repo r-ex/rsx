@@ -21,6 +21,16 @@ void LoadPatchMasterAsset(CAssetContainer* pak, CAsset* asset)
     }
 }
 
+void PostLoadPatchMasterAsset(CAssetContainer* const container, CAsset* const asset)
+{
+    UNUSED(container);
+
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    // [rika]: has no name var
+    pakAsset->SetAssetNameFromCache();
+}
+
 void InitPatchMasterAssetType()
 {
     AssetTypeBinding_t type =
@@ -28,7 +38,7 @@ void InitPatchMasterAssetType()
         .type = 'hctP',
         .headerAlignment = 8,
         .loadFunc = LoadPatchMasterAsset,
-        .postLoadFunc = nullptr,
+        .postLoadFunc = PostLoadPatchMasterAsset,
         .previewFunc = nullptr,
         .e = { nullptr, 0, nullptr, 0ull },
     };

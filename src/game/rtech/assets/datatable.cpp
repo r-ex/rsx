@@ -31,7 +31,6 @@ void LoadDatatableAsset(CAssetContainer* const pak, CAsset* const asset)
         return;
     }
 
-    // cached names when
     pakAsset->setExtraData(dtblAsset);
 }
 
@@ -284,6 +283,13 @@ bool ExportDatatableAsset(CAsset* const asset, const int setting)
     unreachable();
 }
 
+void PostLoadDatatableAsset(CAssetContainer* container, CAsset* asset)
+{
+    UNUSED(container);
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+    pakAsset->SetAssetNameFromCache();
+}
+
 void InitDatatableAssetType()
 {
     AssetTypeBinding_t type =
@@ -291,7 +297,7 @@ void InitDatatableAssetType()
         .type = 'lbtd',
         .headerAlignment = 8,
         .loadFunc = LoadDatatableAsset,
-        .postLoadFunc = nullptr,
+        .postLoadFunc = PostLoadDatatableAsset,
         .previewFunc = PreviewDatatableAsset,
         .e = { ExportDatatableAsset, 0, nullptr, 0ull },
     };

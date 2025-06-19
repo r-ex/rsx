@@ -5,6 +5,16 @@
 #include <game/rtech/utils/utils.h>
 #include <thirdparty/imgui/imgui.h>
 
+void PostLoadTextureAnimationAsset(CAssetContainer* const container, CAsset* const asset)
+{
+    UNUSED(container);
+
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    // [rika]: has no name var
+    pakAsset->SetAssetNameFromCache();
+}
+
 extern ExportSettings_t g_ExportSettings;
 static const char* const s_PathPrefixTXAN = s_AssetTypePaths.find(AssetType_t::TXAN)->second;
 
@@ -82,7 +92,7 @@ void InitTextureAnimationAssetType()
         .type = 'naxt',
         .headerAlignment = 8,
         .loadFunc = nullptr, // so far txan seems to have never changed, and is still version 1 in retail (R5pc_r5-230_J34_CL8040141_2024_11_27_12_52 as of time writing this).
-        .postLoadFunc = nullptr,
+        .postLoadFunc = PostLoadTextureAnimationAsset,
         .previewFunc = nullptr,
         .e = { ExportTextureAnimationAsset, 0, nullptr, 0ull },
     };

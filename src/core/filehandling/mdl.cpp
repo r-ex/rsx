@@ -8,7 +8,7 @@
 #include <game/rtech/assets/model.h>
 #include <game/model/sourcemodel.h>
 
-void HandleModelLoad(std::vector<std::string> filePaths)
+void HandleMDLLoad(std::vector<std::string> filePaths)
 {
     std::vector<uint64_t> guids; // assets to load
     guids.reserve(filePaths.size());

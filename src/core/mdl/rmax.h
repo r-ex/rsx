@@ -339,7 +339,7 @@ namespace rmax
 	class RMAXExporter
 	{
 	public:
-		RMAXExporter(const std::filesystem::path& pathIn, const char* const nameIn, const char* const nameSkelIn) : path(pathIn), name(nameIn), nameSkel(nameSkelIn) {};
+		RMAXExporter(const std::filesystem::path& pathIn, const char* const nameIn, const char* const nameSkelIn) : exportPath(pathIn), name(nameIn), nameSkel(nameSkelIn) {};
 
 		// to reduce allocations, not required for proper function
 		inline void ReserveBones(const size_t count) { bones.reserve(count); };
@@ -362,6 +362,8 @@ namespace rmax
 
 		inline void AddAnim(const char* nameIn, const uint16_t frameCountIn, const float frameRateIn, const uint16_t flagsIn, const size_t boneCountIn) { animations.emplace_back(this, nameIn, frameCountIn, frameRateIn, flagsIn, boneCountIn); };
 
+		inline void SetName(const std::string& str) { exportName = str; }
+
 		inline RMAXMaterial* const GetMaterialLast() { return &materials.back(); };
 		inline RMAXMesh* const GetMeshLast() { return &meshes.back(); };
 		inline Vertex_t* const GetVertexLast() { return &vertices.back(); };
@@ -372,10 +374,13 @@ namespace rmax
 		inline const size_t CollectionCount() const { return collections.size(); };
 		inline const size_t WeightCount() const { return weights.size(); };
 
+		void ResetMeshData();
+
 		bool ToFile() const;
 
 	private:
-		std::filesystem::path path;
+		std::filesystem::path exportPath;
+		std::string exportName;
 
 		const char* const name;
 		const char* const nameSkel; // name of the parent skeleton

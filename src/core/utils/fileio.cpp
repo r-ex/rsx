@@ -15,6 +15,22 @@ bool CreateDirectories(const std::filesystem::path& exportPath)
     return true;
 }
 
+bool RestoreCurrentWorkingDirectory()
+{
+    wchar_t processDirectory[MAX_PATH];
+    const DWORD processPathSize = GetModuleFileNameW(nullptr, processDirectory, MAX_PATH);
+    if (processPathSize == 0)
+    {
+        assertm(false, "failed to get process path.");
+        return false;
+    }
+
+    std::filesystem::path exePath(processDirectory);
+    std::filesystem::current_path(exePath.parent_path()); // this sets the current working directory
+
+    return true;
+}
+
 namespace FileSystem
 {
 

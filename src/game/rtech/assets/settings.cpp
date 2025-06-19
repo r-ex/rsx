@@ -34,7 +34,7 @@ void LoadSettingsAsset(CAssetContainer* pak, CAsset* asset)
 
 	if (settingsAsset)
 	{
-		pakAsset->SetAssetName(settingsAsset->name);
+		pakAsset->SetAssetName(settingsAsset->name, true);
 		pakAsset->setExtraData(settingsAsset);
 	}
 	// todo: error handling?

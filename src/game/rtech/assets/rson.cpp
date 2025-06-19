@@ -5,9 +5,9 @@
 
 extern ExportSettings_t g_ExportSettings;
 
-void LoadRSONAsset(CAssetContainer* const pak, CAsset* const asset)
+void LoadRSONAsset(CAssetContainer* const container, CAsset* const asset)
 {
-    UNUSED(pak);
+    UNUSED(container);
 
 	CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
 
@@ -31,6 +31,16 @@ void LoadRSONAsset(CAssetContainer* const pak, CAsset* const asset)
     rsonAsset->rawText = out.str();
 
     pakAsset->setExtraData(rsonAsset);
+}
+
+void PostLoadRSONAsset(CAssetContainer* const container, CAsset* const asset)
+{
+	UNUSED(container);
+
+	CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+	// [rika]: has no name var
+	pakAsset->SetAssetNameFromCache();
 }
 
 void* PreviewRSONAsset(CAsset* const asset, const bool firstFrameForAsset)
@@ -101,7 +111,7 @@ void InitRSONAssetType()
 		.type = 'nosr',
 		.headerAlignment = 8,
 		.loadFunc = LoadRSONAsset,
-		.postLoadFunc = nullptr,
+		.postLoadFunc = PostLoadRSONAsset,
 		.previewFunc = PreviewRSONAsset,
 		.e = { ExportRSONAsset, 0, nullptr, 0ull },
     };

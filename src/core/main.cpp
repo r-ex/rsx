@@ -200,7 +200,11 @@ int main(int argc, char* argv[])
     g_pImGuiHandler->SetupHandler();
 
     ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard /*| ImGuiConfigFlags_NavEnableGamepad*/;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard
+        /*| ImGuiConfigFlags_NavEnableGamepad*/
+        | ImGuiConfigFlags_DockingEnable
+        | ImGuiConfigFlags_ViewportsEnable
+        ;
 
     GImGui->NavDisableHighlight = true;
 
@@ -210,17 +214,20 @@ int main(int argc, char* argv[])
     // call after initializing dx and gui otherwise you will crash
     HandleLoadFromCommandLine(&cli);
 
-    MSG msg = {};
-    while (msg.message != WM_QUIT)
+    bool quit = false;
+    while (!quit)
     {
+        MSG msg;
         while (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
 
             if (msg.message == WM_QUIT)
-                break;
+                quit = true;
         }
+        if (quit)
+            break;
 
         HandleRenderFrame();
     }

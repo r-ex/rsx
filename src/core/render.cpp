@@ -238,6 +238,13 @@ void HandleRenderFrame()
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
+    // create a docking area across the entire viewport
+    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable)
+    {
+        ImGui::SetNextWindowBgAlpha(0.f);
+        ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode, 0);
+    }
+
     // while ImGui is using keyboard input, we should not accept any keyboard input, but we should also clear all  
     // existing key states, as otherwise we can end up moving forever (until ImGui loses focus) in model preview if
     // the movement keys are held when ImGui starts capturing keyboard
@@ -766,6 +773,11 @@ void HandleRenderFrame()
     }
 
     ImGui::Render();
+    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+    {
+        ImGui::UpdatePlatformWindows();
+        ImGui::RenderPlatformWindowsDefault();
+    }
 
     ID3D11RenderTargetView* const mainView = g_dxHandler->GetMainView();
     static constexpr float clear_color_with_alpha[4] = { 0.01f, 0.01f, 0.01f, 1.00f };

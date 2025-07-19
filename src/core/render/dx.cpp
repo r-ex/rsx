@@ -359,7 +359,7 @@ bool CDXParentHandler::SetupDeviceD3D()
     swapChainDesc.BufferCount = 2u;
     swapChainDesc.BufferDesc.Width = 0u;
     swapChainDesc.BufferDesc.Height = 0u;
-    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    swapChainDesc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
     swapChainDesc.BufferDesc.RefreshRate.Numerator = 60u;
     swapChainDesc.BufferDesc.RefreshRate.Denominator = 1u;
     swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;

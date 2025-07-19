@@ -104,6 +104,11 @@ private:
 
 extern ImGuiHandler* g_pImGuiHandler;
 
+namespace ImGui
+{
+    static void ProgressBarCentered(float fraction, const ImVec2& size_arg, const char* overlay);
+}
+
 #define UtilsConfig (&g_pImGuiHandler->cfg)
 #define FilterConfig (&g_pImGuiHandler->filter)
 

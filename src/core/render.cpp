@@ -780,7 +780,7 @@ void HandleRenderFrame()
     }
 
     ID3D11RenderTargetView* const mainView = g_dxHandler->GetMainView();
-    static constexpr float clear_color_with_alpha[4] = { 0.01f, 0.01f, 0.01f, 1.00f };
+    static constexpr float clear_color_with_alpha[4] = { 0.1f, 0.1f, 0.1f, 1.00f };
     g_dxHandler->GetDeviceContext()->OMSetRenderTargets(1, &mainView, g_dxHandler->GetDepthStencilView());
     g_dxHandler->GetDeviceContext()->ClearRenderTargetView(mainView, clear_color_with_alpha);
     g_dxHandler->GetDeviceContext()->ClearDepthStencilView(g_dxHandler->GetDepthStencilView(), D3D11_CLEAR_DEPTH, 1, 0);

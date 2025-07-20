@@ -388,34 +388,36 @@ bool    ImGui_ImplDX11_CreateDeviceObjects()
     // See https://github.com/ocornut/imgui/pull/638 for sources and details.
 
     // Create the vertex shader
+    // [DIVERGENCE START - Custom vertex shader]
+    // Shader taken from https://github.com/ocornut/imgui/issues/1724
     {
-        static const char* vertexShader =
-            "cbuffer vertexBuffer : register(b0) \
-            {\
-              float4x4 ProjectionMatrix; \
-            };\
-            struct VS_INPUT\
-            {\
-              float2 pos : POSITION;\
-              float4 col : COLOR0;\
-              float2 uv  : TEXCOORD0;\
-            };\
-            \
-            struct PS_INPUT\
-            {\
-              float4 pos : SV_POSITION;\
-              float4 col : COLOR0;\
-              float2 uv  : TEXCOORD0;\
-            };\
-            \
-            PS_INPUT main(VS_INPUT input)\
-            {\
-              PS_INPUT output;\
-              output.pos = mul( ProjectionMatrix, float4(input.pos.xy, 0.f, 1.f));\
-              output.col = input.col;\
-              output.uv  = input.uv;\
-              return output;\
-            }";
+        static const char vertexShader[] =
+            "cbuffer vertexBuffer : register(b0)\n"
+            "{\n"
+            "  float4x4 ProjectionMatrix;\n"
+            "};\n"
+            "struct VS_INPUT\n"
+            "{\n"
+            "  float2 pos : POSITION;\n"
+            "  float4 col : COLOR0;\n"
+            "  float2 uv : TEXCOORD0;\n"
+            "};\n"
+            "struct PS_INPUT\n"
+            "{\n"
+            "  float4 pos : SV_POSITION;\n"
+            "  float4 col : COLOR0;\n"
+            "  float2 uv : TEXCOORD0;\n"
+            "};\n"
+            "PS_INPUT main(VS_INPUT input)\n"
+            "{\n"
+            "  PS_INPUT output;\n"
+            "  output.pos = mul(ProjectionMatrix, float4(input.pos.xy, 0.0f, 1.0f));\n"
+            "  output.col.xyz = pow(abs(input.col.xyz), 2.2f);\n"
+            "  output.col.w = input.col.w;\n"
+            "  output.uv = input.uv;\n"
+            "  return output;\n"
+            "}\n";
+    // [DIVERGENCE END]
 
         ID3DBlob* vertexShaderBlob;
         if (FAILED(D3DCompile(vertexShader, strlen(vertexShader), nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vertexShaderBlob, nullptr)))
@@ -640,7 +642,9 @@ static void ImGui_ImplDX11_CreateWindow(ImGuiViewport* viewport)
     ZeroMemory(&sd, sizeof(sd));
     sd.BufferDesc.Width = (UINT)viewport->Size.x;
     sd.BufferDesc.Height = (UINT)viewport->Size.y;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    // [DIVERGENCE START - Change to DXGI_FORMAT_R16G16B16A16_FLOAT to match main window]
+    sd.BufferDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
+    // [DIVERGENCE END]
     sd.SampleDesc.Count = 1;
     sd.SampleDesc.Quality = 0;
     sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;

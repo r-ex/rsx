@@ -388,9 +388,9 @@ bool    ImGui_ImplDX11_CreateDeviceObjects()
     // See https://github.com/ocornut/imgui/pull/638 for sources and details.
 
     // Create the vertex shader
-    // [DIVERGENCE START - Custom vertex shader]
-    // Shader taken from https://github.com/ocornut/imgui/issues/1724
     {
+        // [DIVERGENCE START - Custom vertex shader]
+        // Shader taken from https://github.com/ocornut/imgui/issues/1724
         static const char vertexShader[] =
             "cbuffer vertexBuffer : register(b0)\n"
             "{\n"
@@ -417,7 +417,7 @@ bool    ImGui_ImplDX11_CreateDeviceObjects()
             "  output.uv = input.uv;\n"
             "  return output;\n"
             "}\n";
-    // [DIVERGENCE END]
+        // [DIVERGENCE END]
 
         ID3DBlob* vertexShaderBlob;
         if (FAILED(D3DCompile(vertexShader, strlen(vertexShader), nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vertexShaderBlob, nullptr)))

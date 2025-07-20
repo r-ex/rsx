@@ -390,27 +390,20 @@ void ImGuiHandler::HandleProgressBar()
         if (!event->slotIsUsed)
             continue;
 
-
-        ImVec2 winPos = ImGui::GetCursorPos();
-        const ImVec2 regAvail = ImGui::GetContentRegionAvail();
-        const ImVec2 winSize = ImGui::GetWindowSize();
-
-        constexpr ImVec2 eventWinSize = { 500, 84 };
-        winPos.x += ((ImGui::GetContentRegionAvail().x + eventWinSize.x) * 0.5f) + (winSize.x - regAvail.x) * (i * 0.5f);
-        winPos.y += ((ImGui::GetContentRegionAvail().y + eventWinSize.y) * 0.5f) + (winSize.y - regAvail.y) * (i * 0.5f);
-
         if (!foundTopLevelBar)
         {
-            ImGui::SetNextWindowSize(ImVec2{ 0, 0});
-            ImGui::SetNextWindowPos(winPos, ImGuiCond_Appearing);
-            if (!ImGui::Begin(event->eventName, nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoScrollWithMouse))
+            ImVec2 viewportCenter = ImGui::GetMainViewport()->GetWorkCenter();
+
+            ImGui::SetNextWindowSize(ImVec2(0, 0));
+            ImGui::SetNextWindowPos(viewportCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+            if (!ImGui::Begin(event->eventName, nullptr, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollWithMouse))
                 continue;
         }
         else
         {
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.f);
             ImGui::Separator();
-            ImGui::TextUnformatted(event->eventName);
+            ImGui::Text(event->eventName);
         }
 
         const uint32_t numEvents = event->eventNum;

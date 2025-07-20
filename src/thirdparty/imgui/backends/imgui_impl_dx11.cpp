@@ -417,11 +417,11 @@ bool    ImGui_ImplDX11_CreateDeviceObjects()
             "  output.uv = input.uv;\n"
             "  return output;\n"
             "}\n";
-        // [DIVERGENCE END]
 
         ID3DBlob* vertexShaderBlob;
-        if (FAILED(D3DCompile(vertexShader, strlen(vertexShader), nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vertexShaderBlob, nullptr)))
+        if (FAILED(D3DCompile(vertexShader, sizeof(vertexShader)-1, nullptr, nullptr, nullptr, "main", "vs_4_0", 0, 0, &vertexShaderBlob, nullptr)))
             return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
+        // [DIVERGENCE END]
         if (bd->pd3dDevice->CreateVertexShader(vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize(), nullptr, &bd->pVertexShader) != S_OK)
         {
             vertexShaderBlob->Release();
@@ -456,25 +456,27 @@ bool    ImGui_ImplDX11_CreateDeviceObjects()
 
     // Create the pixel shader
     {
-        static const char* pixelShader =
-            "struct PS_INPUT\
-            {\
-            float4 pos : SV_POSITION;\
-            float4 col : COLOR0;\
-            float2 uv  : TEXCOORD0;\
-            };\
-            sampler sampler0;\
-            Texture2D texture0;\
-            \
-            float4 main(PS_INPUT input) : SV_Target\
-            {\
-            float4 out_col = input.col * texture0.Sample(sampler0, input.uv); \
-            return out_col; \
-            }";
+        // [DIVERGENCE START - avoid using strlen on a static string]
+        static const char pixelShader[] =
+            "struct PS_INPUT\n"
+            "{\n"
+            "  float4 pos : SV_POSITION;\n"
+            "  float4 col : COLOR0;\n"
+            "  float2 uv : TEXCOORD0;\n"
+            "};\n"
+            "sampler sampler0;\n"
+            "Texture2D texture0;\n"
+            "\n"
+            "float4 main(PS_INPUT input) : SV_Target\n"
+            "{\n"
+            "  float4 out_col = input.col * texture0.Sample(sampler0, input.uv);\n"
+            "  return out_col;\n"
+            "}\n";
 
         ID3DBlob* pixelShaderBlob;
-        if (FAILED(D3DCompile(pixelShader, strlen(pixelShader), nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0, &pixelShaderBlob, nullptr)))
+        if (FAILED(D3DCompile(pixelShader, sizeof(pixelShader)-1, nullptr, nullptr, nullptr, "main", "ps_4_0", 0, 0, &pixelShaderBlob, nullptr)))
             return false; // NB: Pass ID3DBlob* pErrorBlob to D3DCompile() to get error showing in (const char*)pErrorBlob->GetBufferPointer(). Make sure to Release() the blob!
+        // [DIVERGENCE END]
         if (bd->pd3dDevice->CreatePixelShader(pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize(), nullptr, &bd->pPixelShader) != S_OK)
         {
             pixelShaderBlob->Release();

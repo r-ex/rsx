@@ -1,3 +1,7 @@
+// [DIVERGENCE - Custom vertex shader]
+// [DIVERGENCE - avoid using strlen on a static string]
+// [DIVERGENCE - Change to DXGI_FORMAT_R16G16B16A16_FLOAT to match main window]
+
 // dear imgui: Renderer Backend for DirectX11
 // This needs to be used along with a Platform Backend (e.g. Win32)
 

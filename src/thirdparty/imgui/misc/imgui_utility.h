@@ -93,6 +93,10 @@ public:
     ImFont* GetDefaultFont() const { return defaultFont; };
     ImFont* GetMonospaceFont() const { return monospaceFont; };
 
+    // custom ImGui widgets
+
+    static void ProgressBarCentered(float fraction, const ImVec2& size_arg, const char* overlay);
+
 private:
     std::mutex eventMutex;
     ProgressBarEvent_t pbEvents[PB_SIZE];

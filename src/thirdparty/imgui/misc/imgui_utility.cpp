@@ -351,27 +351,20 @@ void ImGuiHandler::HandleProgressBar()
         if (!event->slotIsUsed)
             continue;
 
-
-        ImVec2 winPos = ImGui::GetCursorPos();
-        const ImVec2 regAvail = ImGui::GetContentRegionAvail();
-        const ImVec2 winSize = ImGui::GetWindowSize();
-
-        constexpr ImVec2 eventWinSize = { 500, 84 };
-        winPos.x += ((ImGui::GetContentRegionAvail().x + eventWinSize.x) * 0.5f) + (winSize.x - regAvail.x) * (i * 0.5f);
-        winPos.y += ((ImGui::GetContentRegionAvail().y + eventWinSize.y) * 0.5f) + (winSize.y - regAvail.y) * (i * 0.5f);
-
         if (!foundTopLevelBar)
         {
-            ImGui::SetNextWindowSize(ImVec2{ 0, 0});
-            ImGui::SetNextWindowPos(winPos, ImGuiCond_Appearing);
-            if (!ImGui::Begin(event->eventName, nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoNavInputs | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoScrollWithMouse))
+            ImVec2 viewportCenter = ImGui::GetMainViewport()->GetWorkCenter();
+
+            ImGui::SetNextWindowSize(ImVec2(0, 0));
+            ImGui::SetNextWindowPos(viewportCenter, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+            if (!ImGui::Begin(event->eventName, nullptr, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoScrollWithMouse))
                 continue;
         }
         else
         {
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 2.f);
             ImGui::Separator();
-            ImGui::TextUnformatted(event->eventName);
+            ImGui::Text(event->eventName);
         }
 
         const uint32_t numEvents = event->eventNum;
@@ -379,13 +372,52 @@ void ImGuiHandler::HandleProgressBar()
 
         const uint32_t leftOverEvents = event->isInverted ? remainingEvents : numEvents - remainingEvents;
         const float progressFraction = std::clamp(static_cast<float>(leftOverEvents) / static_cast<float>(numEvents), 0.0f, 1.0f);
-        ImGui::ProgressBar(progressFraction, ImVec2(485, 48), std::format("{}/{}", leftOverEvents, numEvents).c_str());
+        ProgressBarCentered(progressFraction, ImVec2(485, 48), std::format("{}/{}", leftOverEvents, numEvents).c_str());
 
         foundTopLevelBar = true;
     }
 
     if(foundTopLevelBar)
         ImGui::End();
+}
+
+// size_arg (for each axis) < 0.0f: align to end, 0.0f: auto, > 0.0f: specified size
+void ImGuiHandler::ProgressBarCentered(float fraction, const ImVec2& size_arg, const char* overlay)
+{
+    using namespace ImGui;
+
+    ImGuiWindow* window = GetCurrentWindow();
+    if (window->SkipItems)
+        return;
+
+    ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+
+    ImVec2 pos = window->DC.CursorPos;
+    ImVec2 size = CalcItemSize(size_arg, CalcItemWidth(), g.FontSize + style.FramePadding.y * 2.0f);
+    ImRect bb(pos, pos + size);
+    ItemSize(size, style.FramePadding.y);
+    if (!ItemAdd(bb, 0))
+        return;
+
+    // Render
+    fraction = ImSaturate(fraction);
+    RenderFrame(bb.Min, bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
+    bb.Expand(ImVec2(-style.FrameBorderSize, -style.FrameBorderSize));
+    const ImVec2 fill_br = ImVec2(ImLerp(bb.Min.x, bb.Max.x, fraction), bb.Max.y);
+    RenderRectFilledRangeH(window->DrawList, bb, GetColorU32(ImGuiCol_PlotHistogram), 0.0f, fraction, style.FrameRounding);
+
+    // Default displaying the fraction as percentage string, but user can override it
+    char overlay_buf[32];
+    if (!overlay)
+    {
+        ImFormatString(overlay_buf, IM_ARRAYSIZE(overlay_buf), "%.0f%%", fraction * 100 + 0.01f);
+        overlay = overlay_buf;
+    }
+
+    ImVec2 overlay_size = CalcTextSize(overlay, NULL);
+    if (overlay_size.x > 0.0f)
+        RenderTextClipped(ImVec2(bb.Min.x, bb.Min.y), bb.Max, overlay, NULL, &overlay_size, ImVec2(0.5f, 0.5f), &bb);
 }
 
 ImGuiHandler::ImGuiHandler()

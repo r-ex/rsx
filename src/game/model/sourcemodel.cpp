@@ -538,6 +538,8 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
         if (!matlAsset)
             continue;
 
+        meshDrawData->indexFormat = DXGI_FORMAT_R16_UINT;
+
         const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlAsset->extraData());
 
         // If this body part is disabled, don't draw the mesh.
@@ -550,6 +552,7 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
         else
             drawData->meshBuffers[i].visible = false;
 
+#if defined(ADVANCED_MODEL_PREVIEW)
         if (matl->shaderSetAsset)
         {
             ShaderSetAsset* const shaderSet = reinterpret_cast<ShaderSetAsset*>(matl->shaderSetAsset->extraData());
@@ -565,6 +568,7 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
                 meshDrawData->inputLayout = vertexShader->vertexInputLayout;
             }
         }
+#endif
 
         if ((meshDrawData->textures.size() == 0 || lastSelectedSkinIndex != selectedSkinIndex) && matl)
         {
@@ -788,7 +792,7 @@ void PostLoadSourceSequenceAsset(CAssetContainer* const container, CAsset* const
     }
     case 53:
     {
-        ParseSeqDesc_R2_RLE(seqdesc, bones, reinterpret_cast<const r2::studiohdr_t* const>(srcMdlAsset->GetAssetData()));
+        ParseSeqDesc_R2(seqdesc, bones, reinterpret_cast<const r2::studiohdr_t* const>(srcMdlAsset->GetAssetData()));
 
         break;
     }

@@ -42,6 +42,11 @@ struct Vertex_t
 	// Apex Legends
 	static void ParseVertexFromVTX(Vertex_t* const vert, VertexWeight_t* const weights, Vector2D* const texcoords, ModelMeshData_t* mesh, const OptimizedModel::Vertex_t* const pVertex, const vvd::mstudiovertex_t* const pVerts, const Vector4D* const pTangs, const Color32* const pColors, const Vector2D* const pUVs,
 		const vvw::vertexBoneWeightsExtraFileHeader_t* const pVVW, int& weightIdx);
+
+	inline static void InvertTexcoord(Vector2D& texcoord)
+	{
+		texcoord.y = 1.0f - texcoord.y;
+	}
 };
 
 //
@@ -115,11 +120,13 @@ struct ModelLODData_t
 struct ModelBone_t
 {
 	ModelBone_t() = default;
+	ModelBone_t(const r1::mstudiobone_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
+	ModelBone_t(const r2::mstudiobone_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
 	ModelBone_t(const r5::mstudiobone_v8_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
 	ModelBone_t(const r5::mstudiobone_v12_1_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
 	ModelBone_t(const r5::mstudiobonehdr_v16_t* bonehdr, const r5::mstudiobonedata_v16_t* bonedata) : name(bonehdr->pszName()), parentIndex(bonedata->parent), flags(bonedata->flags), poseToBone(bonedata->poseToBone), pos(bonedata->pos), quat(bonedata->quat), rot(bonedata->rot), scale(bonedata->scale) {};
-	ModelBone_t(const r1::mstudiobone_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-	ModelBone_t(const r2::mstudiobone_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
+	ModelBone_t(const r5::mstudiobonehdr_v16_t* bonehdr, const r5::mstudiobonedata_v19_t* bonedata, const r5::mstudiolinearbone_v19_t* linearbone, const int bone) : name(bonehdr->pszName()), parentIndex(bonedata->parent), flags(bonedata->flags),
+		poseToBone(*linearbone->pPoseToBone(bone)), pos(*linearbone->pPos(bone)), quat(*linearbone->pQuat(bone)), rot(*linearbone->pRot(bone)), scale(*linearbone->pScale(bone)) {};
 
 	const char* name;
 	int parentIndex;
@@ -196,9 +203,10 @@ public:
 	ModelParsedData_t(r5::studiohdr_v8_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
 	ModelParsedData_t(r5::studiohdr_v12_1_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
 	ModelParsedData_t(r5::studiohdr_v12_2_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v12_3_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
+	ModelParsedData_t(r5::studiohdr_v12_4_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
 	ModelParsedData_t(r5::studiohdr_v14_t* const hdr) : sequences(nullptr), studiohdr(hdr) {};
 	ModelParsedData_t(r5::studiohdr_v16_t* const hdr, const int dataSizePhys, const int dataSizeModel) : sequences(nullptr), studiohdr(hdr, dataSizePhys, dataSizeModel) {};
+	ModelParsedData_t(r5::studiohdr_v17_t* const hdr, const int dataSizePhys, const int dataSizeModel) : sequences(nullptr), studiohdr(hdr, dataSizePhys, dataSizeModel) {};
 
 	~ModelParsedData_t()
 	{
@@ -263,12 +271,14 @@ public:
 void ParseModelBoneData_v8(ModelParsedData_t* const parsedData);
 void ParseModelBoneData_v12_1(ModelParsedData_t* const parsedData);
 void ParseModelBoneData_v16(ModelParsedData_t* const parsedData);
+void ParseModelBoneData_v19(ModelParsedData_t* const parsedData);
 
 void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const drawData, const uint64_t lod);
 
-void ParseSeqDesc_R2_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr);
-void ParseSeqDesc_R5_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const bool useStall);
+void ParseSeqDesc_R2(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr);
+void ParseSeqDesc_R5(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const bool useStall);
 
+// [rika]: this is for model internal sequence data (r5)
 void ParseModelSequenceData_NoStall(ModelParsedData_t* const parsedData, char* const baseptr);
 template<typename mstudioseqdesc_t> void ParseModelSequenceData_Stall(ModelParsedData_t* const parsedData, char* const baseptr)
 {
@@ -285,7 +295,7 @@ template<typename mstudioseqdesc_t> void ParseModelSequenceData_Stall(ModelParse
 	{
 		parsedData->sequences[i] = seqdesc_t(reinterpret_cast<mstudioseqdesc_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i, nullptr);
 
-		ParseSeqDesc_R5_RLE(&parsedData->sequences[i], &parsedData->bones, false);
+		ParseSeqDesc_R5(&parsedData->sequences[i], &parsedData->bones, true);
 	}
 }
 
@@ -365,25 +375,42 @@ private:
 	std::vector<Vector> scales;
 };
 
+static const int s_AnimDataBoneSizeLUT[8] =
+{
+	0,
+	sizeof(Vector),								// ANIMDATA_POS
+	sizeof(Quaternion),							// ANIMDATA_ROT
+	sizeof(Vector) + sizeof(Quaternion),		// ANIMDATA_POS | ANIMDATA_ROT
+	sizeof(Vector),								// ANIMDATA_SCL
+	sizeof(Vector) * 2,							// ANIMDATA_POS | ANIMDATA_SCL
+	sizeof(Vector) + sizeof(Quaternion),		// ANIMDATA_ROT | ANIMDATA_SCL
+	(sizeof(Vector) * 2) + sizeof(Quaternion),	// ANIMDATA_POS | ANIMDATA_ROT | ANIMDATA_SCL
+};
+
 class CAnimData
 {
 public:
-	CAnimData(const size_t boneCount, const size_t frameCount) : numBones(boneCount), numFrames(frameCount), memory(false), pBuffer(nullptr), pOffsets(nullptr), pFlags(nullptr) {};
+	CAnimData(const int boneCount, const int frameCount) : numBones(boneCount), numFrames(frameCount), pBuffer(nullptr), pOffsets(nullptr), pFlags(nullptr) {};
 	CAnimData(char* const buf);
 
 	inline void ReserveVector() { bones.resize(numBones, numFrames); };
 	CAnimDataBone& GetBone(const size_t idx) { return bones.at(idx); };
 
 	// mem
-	const uint8_t GetFlag(const size_t idx) const { return pFlags[idx]; };
-	const char* const GetData(const size_t idx) const { return GetFlag(idx) & CAnimDataBone::ANIMDATA_DATA ? reinterpret_cast<const char* const>(pBuffer + pOffsets[idx]) : nullptr; }
+	inline const uint8_t GetFlag(const size_t idx) const { return pFlags[idx]; };
+	inline const uint8_t GetFlag(const int idx) const { return pFlags[idx]; };
+	inline const char* const GetData(const size_t idx) const { return GetFlag(idx) & CAnimDataBone::ANIMDATA_DATA ? reinterpret_cast<const char* const>(pBuffer + pOffsets[idx]) : nullptr; }
+
+	const Vector* const GetBonePosForFrame(const int bone, const int frame) const;
+	const Quaternion* const GetBoneQuatForFrame(const int bone, const int frame) const;
+	const Vector* const GetBoneScaleForFrame(const int bone, const int frame) const;
 
 	// returns allocated buffer
 	const size_t ToMemory(char* const buf);
 
 private:
-	size_t numBones;
-	size_t numFrames;
+	int numBones;
+	int numFrames;
 
 	bool memory; // memory format
 

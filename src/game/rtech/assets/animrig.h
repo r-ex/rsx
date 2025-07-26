@@ -56,14 +56,15 @@ public:
 			break;
 		}
 		case eMDLVersion::VERSION_12_2:
+		case eMDLVersion::VERSION_12_3:
 		{
 			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_2_t*>(data));
 			break;
 		}
-		case eMDLVersion::VERSION_12_3:
 		case eMDLVersion::VERSION_12_4:
+		case eMDLVersion::VERSION_12_5:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_4_t*>(data));
 			break;
 		}
 		case eMDLVersion::VERSION_14:
@@ -75,16 +76,33 @@ public:
 	}
 	AnimRigAsset(AnimRigAssetHeader_v5_t* hdr, const eMDLVersion ver) : data(hdr->data), name(hdr->name), numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), studioVersion(ver)
 	{
-		const r5::studiohdr_v16_t* const tmp = reinterpret_cast<const r5::studiohdr_v16_t* const>(data);
-		const int studioDataSize = FIX_OFFSET(tmp->boneDataOffset) + (tmp->boneCount * sizeof(r5::mstudiobonedata_v16_t));
-
 		switch (ver)
 		{
 		case eMDLVersion::VERSION_16:
+		{
+			const r5::studiohdr_v16_t* const tmp = reinterpret_cast<const r5::studiohdr_v16_t* const>(data);
+			const int studioDataSize = FIX_OFFSET(tmp->boneDataOffset) + (tmp->boneCount * sizeof(r5::mstudiobonedata_v16_t));
+
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v16_t*>(data), 0, studioDataSize);
+			break;
+		}
 		case eMDLVersion::VERSION_17:
 		case eMDLVersion::VERSION_18:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v16_t*>(data), 0, studioDataSize);
+			const r5::studiohdr_v17_t* const tmp = reinterpret_cast<const r5::studiohdr_v17_t* const>(data);
+			const int studioDataSize = FIX_OFFSET(tmp->boneDataOffset) + (tmp->boneCount * sizeof(r5::mstudiobonedata_v16_t));
+
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v17_t*>(data), 0, studioDataSize);
+			break;
+		}
+		case eMDLVersion::VERSION_19:
+		{
+			const r5::studiohdr_v17_t* const tmp = reinterpret_cast<const r5::studiohdr_v17_t* const>(data);
+			constexpr int dataPerBone = sizeof(int) + sizeof(short) + (sizeof(Vector) * 3) + (sizeof(Quaternion) * 2) + sizeof(matrix3x4_t);
+
+			const int studioDataSize = IALIGN16(FIX_OFFSET(tmp->linearboneindex) + sizeof(r5::mstudiolinearbone_v19_t) + (dataPerBone * tmp->boneCount));
+
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v17_t*>(data), 0, studioDataSize);
 			break;
 		}
 		}

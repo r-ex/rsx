@@ -714,7 +714,9 @@ enum eStudioAnimFlags
 	ANIM_DELTA			= 0x4,
 	ANIM_ALLZEROS		= 0x20,		// this animation/sequence has no real animation data
 	ANIM_VALID			= 0x20000,	// if not set this anim has no data
+	ANIM_SCALE			= 0x20000,	// set in mstudioseqdesc_t if this animation uses scale data
 	ANIM_FRAMEMOVEMENT	= 0x40000,
+	ANIM_DATAPOINT		= 0x200000,	// uses 'datapoint' style compression instead of 'rle' style
 };
 
 // This is set any time the .qc files has $staticprop in it

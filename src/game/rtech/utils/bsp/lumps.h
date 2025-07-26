@@ -1,7 +1,5 @@
 #pragma once
 
-BEGIN_NAMESPACE(apex)
-
 enum lumptype_e : int
 {
     LUMP_ENTITIES = 0x0000, // 0
@@ -134,7 +132,7 @@ enum lumptype_e : int
     LUMP_SHADOW_MESH_MESHES = 0x007F,
 };
 
-static std::map<apex::lumptype_e, const char*> s_LumpNames = 
+static std::map<lumptype_e, const char*> s_LumpNames = 
 {
    { LUMP_ENTITIES, "LUMP_ENTITIES" },
    { LUMP_PLANES, "LUMP_PLANES" },
@@ -266,4 +264,3 @@ static std::map<apex::lumptype_e, const char*> s_LumpNames =
    { LUMP_SHADOW_MESH_MESHES, "LUMP_SHADOW_MESH_MESHES" },
 };
 
-END_NAMESPACE()

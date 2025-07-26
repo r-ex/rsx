@@ -6,6 +6,8 @@ using namespace DirectX;
 #define RAD2DEG(x) (static_cast<float>(x) * (180.f / XM_PI))
 
 #if MATH_SIMD
+
+// [rika]: I do not like these
 #define SubFloat(m, i) (m.m128_f32[i])
 #define SubInt(m, i) (m.m128_i32[i])
 
@@ -45,6 +47,14 @@ __forceinline __m128 AndNotSIMD(const __m128& a, const __m128& b)			// ~a & b
 	return retVal;
 }
 
+static constexpr __m128 simd_Four_Zeros = { 0.0f, 0.0f, 0.0f, 0.0f };
+static constexpr __m128 simd_Four_NegZeroes = { -0.0f, -0.0f, -0.0f, -0.0f };
+static constexpr __m128 simd_Four_PointFives = { 0.5f, 0.5f, 0.5f, 0.5f };
+static constexpr __m128 simd_Four_Ones = { 1.0f, 1.0f, 1.0f, 1.0f };
+static constexpr __m128 simd_Four_Threes = { 3.0f, 3.0f, 3.0f, 3.0f };
+
+static constexpr __m128 simd_NegativeMask = { .m128_u32 = { 0x80000000, 0x80000000, 0x80000000, 0x80000000 } };
+
 __forceinline __m128 MaskedAssign(const __m128& ReplacementMask, const __m128& NewValue, const __m128& OldValue)
 {
 	//return _mm_or_ps( _mm_add_ps(ReplacementMask, NewValue), _mm_andnot_ps(ReplacementMask, OldValue));
@@ -54,20 +64,71 @@ __forceinline __m128 MaskedAssign(const __m128& ReplacementMask, const __m128& N
 __forceinline __m128 ReplicateX4(float flValue)
 {
 	__m128 value = _mm_set_ss(flValue);
-	return _mm_shuffle_ps(value, value, 0);
+	return _mm_shuffle_ps(value, value, _MM_SHUFFLE(0, 0, 0, 0));
 }
 
-__forceinline __m128 MaddSIMD(const __m128& a, const __m128& b, const __m128& c)				// a*b + c
+__forceinline __m128 MulSIMD(const __m128& a, const __m128& b)
 {
-	return _mm_add_ps(_mm_mul_ps(a, b), c);
+	return _mm_mul_ps(a, b);
+}
+
+__forceinline __m128 AddSIMD(const __m128& a, const __m128& b)
+{
+	return _mm_add_ps(a, b);
+}
+
+__forceinline __m128 SubSIMD(const __m128& a, const __m128& b)
+{
+	return _mm_sub_ps(a, b);
+}
+
+// a*b + c
+__forceinline __m128 MaddSIMD(const __m128& a, const __m128& b, const __m128& c)
+{
+	return AddSIMD(MulSIMD(a, b), c);
+}
+
+// 1/sqrt(a), more or less
+__forceinline __m128 ReciprocalSqrtEstSIMD(const __m128& a)
+{
+	return _mm_rsqrt_ps(a);
+}
+
+// uses newton iteration for higher precision results than ReciprocalSqrtEstSIMD
+// 1/sqrt(a)
+__forceinline __m128 ReciprocalSqrtSIMD(const __m128& a)
+{
+	__m128 guess = ReciprocalSqrtEstSIMD(a);
+	// newton iteration for 1/sqrt(a) : y(n+1) = 1/2 (y(n)*(3-a*y(n)^2));
+	guess = MulSIMD(guess, SubSIMD(simd_Four_Threes, MulSIMD(a, MulSIMD(guess, guess))));
+	guess = MulSIMD(simd_Four_PointFives, guess);
+	return guess;
+}
+
+__forceinline const float DotSIMD(const __m128& a, const __m128& b)
+{
+	const __m128 product = _mm_mul_ps(a, b);
+	const __m128 shfl0 = _mm_shuffle_ps(product, product, _MM_SHUFFLE(2, 3, 0, 1));
+
+	const __m128 sum = _mm_add_ps(shfl0, product);
+	const __m128 shfl1 = _mm_shuffle_ps(sum, sum, _MM_SHUFFLE(0, 1, 2, 3));
+
+	const float flDot = shfl1.m128_f32[0] + sum.m128_f32[0];
+
+	return flDot;
 }
 
 __forceinline __m128 Dot4SIMD(const __m128& a, const __m128& b)
 {
-	__m128 m = _mm_mul_ps(a, b);
-	float flDot = SubFloat(m, 0) + SubFloat(m, 1) + SubFloat(m, 2) + SubFloat(m, 3);
+	/*__m128 m = _mm_mul_ps(a, b);
+	float flDot = SubFloat(m, 0) + SubFloat(m, 1) + SubFloat(m, 2) + SubFloat(m, 3);*/
+
+	// [rika]: accurate within 0.0001, from inital tests
+	const float flDot = DotSIMD(a, b);
+
 	return ReplicateX4(flDot);
 }
+
 #endif // MATH_SIMD
 
 

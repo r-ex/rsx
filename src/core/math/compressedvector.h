@@ -186,6 +186,9 @@ public:
 
 	const float operator[](int i) const { return (((float16*)this)[i]).GetFloat(); }
 
+	// [rika]: todo surely a better solution for this
+	inline Vector AsVector() const;
+
 	float16 x;
 	float16 y;
 	float16 z;
@@ -197,6 +200,21 @@ inline Vector48& Vector48::operator=(const Vector& vOther)
 	y.SetFloat(vOther.y);
 	z.SetFloat(vOther.z);
 	return *this;
+}
+
+inline Vector Vector48::AsVector() const
+{
+	Vector tmp;
+
+	tmp.x = x.GetFloat();
+	tmp.y = y.GetFloat();
+	tmp.z = z.GetFloat();
+
+#if MATH_ASSERTS
+	assert(tmp.IsValid());
+#endif
+
+	return tmp;
 }
 
 inline Vector48::operator Vector ()

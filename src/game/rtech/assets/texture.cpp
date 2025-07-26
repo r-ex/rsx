@@ -1014,8 +1014,10 @@ bool ExportTextureAsset(CAsset* const asset, const int setting)
     std::filesystem::path exportPath = std::filesystem::current_path().append(EXPORT_DIRECTORY_NAME); // 
     const std::filesystem::path texturePath(asset->GetAssetName());
 
+    const bool hasFullPath = txtrAsset->name != nullptr || g_cacheDBManager.LookupGuid(pakAsset->GetAssetGUID(), nullptr);
+
     // [rika]: there is no point to add the parent path if we don't have a proper name (it will just end up in 's_PathPrefixTXTR' anyway)
-    if (txtrAsset->name && g_ExportSettings.exportPathsFull)
+    if (hasFullPath && g_ExportSettings.exportPathsFull)
         exportPath.append(texturePath.parent_path().string());
     else
         exportPath.append(s_PathPrefixTXTR);

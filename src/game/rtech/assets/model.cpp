@@ -983,6 +983,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
     case eMDLVersion::VERSION_12_2:
     case eMDLVersion::VERSION_12_3:
     case eMDLVersion::VERSION_12_4:
+    case eMDLVersion::VERSION_12_5:
     {
         ModelAssetHeader_v12_1_t* hdr = reinterpret_cast<ModelAssetHeader_v12_1_t*>(pakAsset->header());
         mdlAsset = new ModelAsset(hdr, streamEntry, ver);
@@ -1043,6 +1044,18 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         ParseModelSequenceData_Stall<r5::mstudioseqdesc_v18_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
         break;
     }
+    case eMDLVersion::VERSION_19:
+    {
+        ModelAssetHeader_v16_t* hdr = reinterpret_cast<ModelAssetHeader_v16_t*>(pakAsset->header());
+        ModelAssetCPU_v16_t* cpu = reinterpret_cast<ModelAssetCPU_v16_t*>(pakAsset->cpu());
+        mdlAsset = new ModelAsset(hdr, cpu, streamEntry, ver);
+
+        ParseModelBoneData_v19(mdlAsset->GetParsedData());
+        ParseModelTextureData_v16(mdlAsset->GetParsedData());
+        ParseModelVertexData_v16(pakAsset, mdlAsset);
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v18_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
+        break;
+    }
     default:
     {
         assertm(false, "unaccounted asset version, will cause major issues!");
@@ -1071,6 +1084,11 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
     case eMDLVersion::VERSION_12_4:
     {
         asset->SetAssetVersion({ 12, 4 });
+        break;
+    }
+    case eMDLVersion::VERSION_12_5:
+    {
+        asset->SetAssetVersion({ 12, 5 });
         break;
     }
     case eMDLVersion::VERSION_13_1:
@@ -1215,6 +1233,7 @@ static bool ExportRawModelAsset(const ModelAsset* const modelAsset, std::filesys
     case eMDLVersion::VERSION_12_2:
     case eMDLVersion::VERSION_12_3:
     case eMDLVersion::VERSION_12_4:
+    case eMDLVersion::VERSION_12_5:
     case eMDLVersion::VERSION_13:
     case eMDLVersion::VERSION_13_1:
     case eMDLVersion::VERSION_14:
@@ -1232,6 +1251,7 @@ static bool ExportRawModelAsset(const ModelAsset* const modelAsset, std::filesys
     case eMDLVersion::VERSION_16:
     case eMDLVersion::VERSION_17:
     case eMDLVersion::VERSION_18:
+    case eMDLVersion::VERSION_19:
     {
         // special case because of compression
         exportPath.replace_extension(".vg");
@@ -1532,6 +1552,9 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
     if (!drawData)
         return nullptr;
 
+    drawData->vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_vs", s_PreviewVertexShader, eShaderType::Vertex);;
+    drawData->pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_ps", s_PreviewPixelShader, eShaderType::Pixel);
+
     ModelParsedData_t* const parsedData = &modelAsset->parsedData;
 
     static std::vector<size_t> bodygroupModelSelected;
@@ -1734,6 +1757,8 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
         if (!matlAsset)
             continue;
 
+        meshDrawData->indexFormat = DXGI_FORMAT_R16_UINT;
+
         const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlAsset->extraData());
 
         // If this body part is disabled, don't draw the mesh.
@@ -1746,6 +1771,7 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
         else
             drawData->meshBuffers[i].visible = false;
 
+#if defined(ADVANCED_MODEL_PREVIEW)
         if (matl->shaderSetAsset)
         {
             ShaderSetAsset* const shaderSet = reinterpret_cast<ShaderSetAsset*>(matl->shaderSetAsset->extraData());
@@ -1761,6 +1787,7 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
                 meshDrawData->inputLayout = vertexShader->vertexInputLayout;
             }
         }
+#endif
 
         if ((meshDrawData->textures.size() == 0 || lastSelectedSkinIndex != selectedSkinIndex) && matl)
         {

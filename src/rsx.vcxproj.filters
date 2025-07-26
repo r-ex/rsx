@@ -82,6 +82,12 @@
     <Filter Include="game\bluepoint">
       <UniqueIdentifier>{9d5d3372-940a-4085-8c52-1e8611c120dc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="game\bsp">
+      <UniqueIdentifier>{e6018f98-46d3-406f-a16b-8095d38f8f68}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="game\rtech\utils\bsp">
+      <UniqueIdentifier>{6cfd2ed6-9eb3-4b23-b70e-eb1804348882}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -372,8 +378,17 @@
     <ClInclude Include="game\bluepoint\bp_pakfile.h">
       <Filter>game\bluepoint</Filter>
     </ClInclude>
-    <ClInclude Include="core\utils\cli_parser.h">
-      <Filter>core\utils</Filter>
+    <ClInclude Include="game\bsp\bsp.h">
+      <Filter>game\bsp</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\bsp\bspflags.h">
+      <Filter>game\rtech\utils\bsp</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\utils\bsp\lumps.h">
+      <Filter>game\rtech\utils\bsp</Filter>
+    </ClInclude>
+    <ClInclude Include="game\rtech\assets\lcd_screen_effect.h">
+      <Filter>game\rtech\assets</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -634,6 +649,12 @@
     </ClCompile>
     <ClCompile Include="core\filehandling\bpk.cpp">
       <Filter>core\filehandling</Filter>
+    </ClCompile>
+    <ClCompile Include="game\bsp\bsp.cpp">
+      <Filter>game\bsp</Filter>
+    </ClCompile>
+    <ClCompile Include="game\rtech\assets\lcd_screen_effect.cpp">
+      <Filter>game\rtech\assets</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -50,6 +50,7 @@
     <ClInclude Include="game\audio\miles.h" />
     <ClInclude Include="game\audio\wavefile.h" />
     <ClInclude Include="game\bluepoint\bp_pakfile.h" />
+    <ClInclude Include="game\bsp\bsp.h" />
     <ClInclude Include="game\model\sourcemodel.h" />
     <ClInclude Include="game\rtech\assets\animrig.h" />
     <ClInclude Include="game\rtech\assets\animseq.h" />
@@ -57,6 +58,7 @@
     <ClInclude Include="game\rtech\assets\datatable.h" />
     <ClInclude Include="game\rtech\assets\effect.h" />
     <ClInclude Include="game\rtech\assets\impact.h" />
+    <ClInclude Include="game\rtech\assets\lcd_screen_effect.h" />
     <ClInclude Include="game\rtech\assets\localisation.h" />
     <ClInclude Include="game\rtech\assets\map.h" />
     <ClInclude Include="game\rtech\assets\material.h" />
@@ -82,6 +84,8 @@
     <ClInclude Include="game\rtech\assets\wrap.h" />
     <ClInclude Include="game\rtech\cpakfile.h" />
     <ClInclude Include="game\rtech\patchapi.h" />
+    <ClInclude Include="game\rtech\utils\bsp\bspflags.h" />
+    <ClInclude Include="game\rtech\utils\bsp\lumps.h" />
     <ClInclude Include="game\rtech\utils\bvh\bvh.h" />
     <ClInclude Include="game\rtech\utils\studio\optimize.h" />
     <ClInclude Include="game\rtech\utils\studio\studio.h" />
@@ -144,6 +148,7 @@
     <ClCompile Include="game\audio\miles_bcf.cpp" />
     <ClCompile Include="game\audio\miles_rada.cpp" />
     <ClCompile Include="game\bluepoint\bp_pakfile.cpp" />
+    <ClCompile Include="game\bsp\bsp.cpp" />
     <ClCompile Include="game\model\sourcemodel.cpp" />
     <ClCompile Include="game\rtech\assets\animrig.cpp" />
     <ClCompile Include="game\rtech\assets\animseq.cpp" />
@@ -151,6 +156,7 @@
     <ClCompile Include="game\rtech\assets\datatable.cpp" />
     <ClCompile Include="game\rtech\assets\effect.cpp" />
     <ClCompile Include="game\rtech\assets\impact.cpp" />
+    <ClCompile Include="game\rtech\assets\lcd_screen_effect.cpp" />
     <ClCompile Include="game\rtech\assets\localisation.cpp" />
     <ClCompile Include="game\rtech\assets\map.cpp" />
     <ClCompile Include="game\rtech\assets\material.cpp" />

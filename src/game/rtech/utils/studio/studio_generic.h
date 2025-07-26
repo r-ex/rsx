@@ -43,6 +43,9 @@ struct animmovement_t
 
 struct animsection_t
 {
+	animsection_t() = default;
+	animsection_t(const int index, const bool bExternal = false) : animindex(index), isExternal(bExternal) {};
+
 	int animindex;
 	bool isExternal;
 };
@@ -75,9 +78,11 @@ struct animdesc_t
 	inline r1::mstudiomovement_t* const pMovement(int i) const { return reinterpret_cast<r1::mstudiomovement_t*>((char*)this + movementindex) + i; };
 
 	int animindex;
+
 	// data array, starting with per bone flags
-	char* pAnimdataStall(int* const piFrame) const;
 	char* pAnimdataNoStall(int* const piFrame) const;
+	char* pAnimdataStall(int* const piFrame) const;
+	char* pAnimdataStall_DP(int* const piFrame, int* const sectionFrameCount) const;
 
 	int sectionindex; // can be safely removed
 	int sectionstallframes; // number of static frames inside the animation, the reset excluding the final frame are stored externally. when external data is not loaded(?)/found(?) it falls back on the last frame of this as a stall
@@ -85,7 +90,30 @@ struct animdesc_t
 	std::vector<animsection_t> sections;
 	inline const bool HasStall() const { return sectionstallframes > 0; }
 	inline const animsection_t* pSection(const int i) const { return &sections.at(i); }
-	inline const int SectionCount() const { return ((numframes - sectionstallframes - 1) / sectionframes) + 2 + (static_cast<int>(HasStall())); }
+
+	inline const int SectionCount_RLE() const
+	{
+		const int sectionbase = ((numframes - sectionstallframes - 1) / sectionframes); // basic section index
+		const int sectionmaxindex = sectionbase + static_cast<int>(HasStall()) + 1; // max index of a section, check for a stall section, add final trailing section that rle anims have
+		return sectionmaxindex + 1; // add one to make this max index a max count
+	}
+
+	inline const int SectionCount_DP() const
+	{
+		const int sectionbase = ((numframes - sectionstallframes) / sectionframes); // basic section index
+		const int sectionmaxindex = sectionbase + static_cast<int>(HasStall()); // max index of a section
+		return sectionmaxindex + 1; // add one to make this max index a max count
+	}
+
+	inline const int SectionCount() const
+	{
+		if (flags & eStudioAnimFlags::ANIM_DATAPOINT)
+		{
+			return SectionCount_DP();
+		}
+
+		return SectionCount_RLE();
+	}
 
 	char* sectionDataExtra;
 
@@ -182,9 +210,10 @@ struct studiohdr_generic_t
 	studiohdr_generic_t(const r5::studiohdr_v8_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v12_1_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v12_2_t* const pHdr);
-	studiohdr_generic_t(const r5::studiohdr_v12_3_t* const pHdr);
+	studiohdr_generic_t(const r5::studiohdr_v12_4_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v14_t* const pHdr);
 	studiohdr_generic_t(const r5::studiohdr_v16_t* const pHdr, int dataSizePhys, int dataSizeModel);
+	studiohdr_generic_t(const r5::studiohdr_v17_t* const pHdr, int dataSizePhys, int dataSizeModel);
 
 	const char* baseptr;
 
@@ -205,11 +234,13 @@ struct studiohdr_generic_t
 	int phySize; // still used in models using vg
 	size_t hwDataSize;
 
+	int linearBoneOffset;
 	int boneOffset;
 	int boneDataOffset; // guh
 	int boneCount;
 	inline const char* const pBones() const { return baseptr + boneOffset; };
 	inline const char* const pBoneData() const { return baseptr + boneDataOffset; };
+	inline const char* const pLinearBone() const { return baseptr + linearBoneOffset; };
 
 	int textureOffset;
 	int textureCount;

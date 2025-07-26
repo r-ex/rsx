@@ -4,6 +4,12 @@
 #define WRAP_FLAG_FILE_IS_PERMANENT		0x4   // Fourth bit seems to indicate that the asset is streamed.
 #define WRAP_FLAG_FILE_IS_STREAMED		0x10
 
+enum class eWrapAssetParsedDataType
+{
+	NONE = 0, // if there's no special parsed data
+	BSP,      // wrap asset is a base BSP file and contains a CBSPData pointer
+};
+
 struct WrapAssetHeader_v7_t
 {
 	char* path;
@@ -63,4 +69,8 @@ public:
 	//
 	bool isCompressed;
 	bool isStreamed;
+
+	eWrapAssetParsedDataType parsedDataType;
+
+	void* parsedData; // data class for something like 
 };

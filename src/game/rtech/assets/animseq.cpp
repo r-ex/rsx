@@ -98,7 +98,7 @@ void PostLoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	case eSeqVersion::VERSION_11:
 	case eSeqVersion::VERSION_12:
 	{
-		ParseSeqDesc_R5_RLE(&seqAsset->seqdesc, bones, seqAsset->UseStall());
+		ParseSeqDesc_R5(&seqAsset->seqdesc, bones, seqAsset->UseStall());
 
 		break;
 	}

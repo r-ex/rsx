@@ -42,13 +42,13 @@ public:
 	bool SaveToFile(const std::string& path);
 	bool LoadFromFile(const std::string& path);
 
-	bool LookupGuid(const uint64_t guid, CCacheEntry* const outEntry) const
+	bool LookupGuid(const uint64_t guid, CCacheEntry* const outEntry = nullptr) const
 	{
 		const bool foundGuid = m_cacheEntries.contains(guid);
 
 		// must copy! if an asset calls CCacheDBManager::Add from another thread
 		// while LookupGuid is being called, we end up with UB from a bad pointer
-		if (foundGuid)
+		if (foundGuid && outEntry)
 			*outEntry = m_cacheEntries.at(guid);
 
 		return foundGuid;

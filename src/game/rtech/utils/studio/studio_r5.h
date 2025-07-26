@@ -73,10 +73,13 @@ namespace r5
 	// flags for the per bone array, in 4 bit sections (two sets of flags per char), aligned to two chars
 	enum RleBoneFlags_t
 	{
-		STUDIO_ANIM_POS = 0x1, // bone has pos values
-		STUDIO_ANIM_ROT = 0x2, // bone has rot values
-		STUDIO_ANIM_SCALE = 0x4, // bone has scale values
-		STUDIO_ANIM_DATA = (STUDIO_ANIM_POS | STUDIO_ANIM_ROT | STUDIO_ANIM_SCALE), // bone has animation data
+		STUDIO_ANIM_POS		= 0x1, // bone has pos values
+		STUDIO_ANIM_ROT		= 0x2, // bone has rot values
+		STUDIO_ANIM_SCALE	= 0x4, // bone has scale values
+		STUDIO_ANIM_UNK8	= 0x8, // used in virtual models for new anim type
+
+		STUDIO_ANIM_DATA	= (STUDIO_ANIM_POS | STUDIO_ANIM_ROT | STUDIO_ANIM_SCALE), // bone has animation data
+		STUDIO_ANIM_MASK	= (STUDIO_ANIM_POS | STUDIO_ANIM_ROT | STUDIO_ANIM_SCALE | STUDIO_ANIM_UNK8),
 	};
 
 	#define ANIM_BONEFLAG_BITS				4 // a nibble even
@@ -129,7 +132,14 @@ namespace r5
 		inline uint16_t* pSection(const int frame, const bool retail) const { return reinterpret_cast<uint16_t*>((char*)this + (retail ? SectionOffset_V16(frame) : SectionOffset(frame))); }
 
 		inline mstudioanimvalue_t* pAnimvalue(const int i, const uint16_t* section) const { return (section[i] > 0) ? reinterpret_cast<mstudioanimvalue_t*>((char*)section + section[i]) : nullptr; }
+
+		inline const uint8_t* const pDatapointTrack() const
+		{
+			constexpr int baseOffset = sizeof(mstudioframemovement_t) + sizeof(uint16_t);
+			return reinterpret_cast<const uint8_t* const>(this) + baseOffset;
+		}
 	};
+	static_assert(sizeof(mstudioframemovement_t) == 0x14);
 
 	static const float s_StudioWeightList_1[256] = {};	// all zeroes
 	static const float s_StudioWeightList_3[256] = {	// all ones
@@ -159,5 +169,146 @@ namespace r5
 	void CalcBonePosition(int frame, float s, const mstudio_rle_anim_t* panim, Vector& pos);
 	void CalcBoneScale(int frame, float s, const mstudio_rle_anim_t* panim, Vector& scale, const uint8_t boneFlags);
 
+	// uses 'datapoints' and interpolates from them
+	void CalcBoneQuaternion_DP(int sectionlength, const uint8_t** panimtrack, float fFrame, Quaternion& q);
+	void CalcBonePosition_DP(int sectionlength, const uint8_t** panimtrack, float fFrame, Vector& pos);
+	void CalcBonePositionVirtual_DP(const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& pos);
+	void CalcBoneScale_DP(const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& scale);
+
+	template<class PackedType>
+	__forceinline void CalcBoneSeek_DP(const PackedType* const pPackedData, int& validIdx, uint32_t& remainingFrames, const uint32_t targetFrame)
+	{
+		// [rika]: seek to the correct quaterion index for this frame
+		/*if (pPackedData[validIdx].numInterpFrames < static_cast<uint32_t>(prevFrame))
+		{
+			// todo function
+			uint32_t numInterpFrames = pPackedData[validIdx].numInterpFrames;
+
+			// [rika]: does this quaternion cover our desired frame
+			do
+			{
+				validIdx++;
+				assertm(validIdx < valid, "invalid index");
+
+				remainingFrames += -1 - numInterpFrames;
+				numInterpFrames = pPackedData[validIdx].numInterpFrames;
+
+			} while (numInterpFrames < remainingFrames);
+		}*/
+
+		/*uint32_t numInterpFrames = pPackedData[validIdx].numInterpFrames;
+		for (uint32_t i = nextFrame + remainingFrames - prevFrame; numInterpFrames < i; numInterpFrames = pPackedData[validIdx].numInterpFrames)
+		{
+			++validIdx;
+			assertm(validIdx < valid, "invalid index");
+
+			i += -1 - numInterpFrames;
+		}*/
+
+		remainingFrames = targetFrame;
+
+		// [rika]: seek to the correct data index for this frame
+		if (pPackedData[validIdx].numInterpFrames < targetFrame)
+		{
+			uint32_t numInterpFrames = pPackedData[validIdx].numInterpFrames;
+
+			// [rika]: does this quaternion cover our desired frame
+			while (numInterpFrames < remainingFrames)
+			{
+				validIdx++;
+				//assertm(validIdx < valid, "invalid index");
+
+				remainingFrames += -1 - numInterpFrames;
+				numInterpFrames = pPackedData[validIdx].numInterpFrames;
+
+			}
+		}
+	}
+
+	template<class IndexType, class PackedType>
+	__forceinline void CalcBoneInterpFrames_DP(int& prevFrame, int& nextFrame, float& s, const float fFrame, const IndexType total, const int sectionlength, const IndexType* const pFrameIndices, const PackedType** const pPackedData)
+	{
+		if (total >= sectionlength)
+		{
+			const int maxFrameIndex = sectionlength - 1; // the max index of any frame in this section
+
+			// [rika]: if the frame is interpolated, the truncated value would be the previous frame
+			prevFrame = static_cast<int>(fminf(truncf(fFrame), (static_cast<float>(sectionlength) - 1.0f)));
+
+			// [rika]: extract the 's' or interp value from fFrameInterp value
+			s = fFrame - static_cast<float>(prevFrame);
+
+			nextFrame = prevFrame + 1; // the next frame would be the next indice
+
+			// [rika]: if the interp is too small, or the previous frame is the last frame in our section, the next frame should be equal to previous frame
+			if (s < 0.00000011920929 || prevFrame == maxFrameIndex)
+				nextFrame = prevFrame;
+
+			// [rika]: set the pointers for our data
+			*pPackedData = reinterpret_cast<const PackedType* const>(pFrameIndices);
+			return;
+		}
+		else
+		{
+			prevFrame = 0;
+			nextFrame = total - 1;
+
+			// [rika]: pretty sure this is thinning down frames
+			// [rika]: only do this if we have more than two frames
+			if (nextFrame > 1)
+			{
+				while (true)
+				{
+					if (1 >= nextFrame - prevFrame)
+						break;
+
+					// [rika]: this should be the frame between our two end points
+					const int interpFrame = (nextFrame + prevFrame) >> 1;
+					const float fIndice = static_cast<float>(pFrameIndices[interpFrame]);
+
+					if (fIndice <= fFrame)
+					{
+						prevFrame = interpFrame; // move the previous frame closer to the next frame
+
+						if (fFrame > fIndice)
+							continue;
+					}
+
+					nextFrame = interpFrame; // move the next frame closer to the previous frame
+				}
+			}
+
+			const float prevFrameIndice = static_cast<float>(pFrameIndices[prevFrame]);
+			const float nextFrameIndice = static_cast<float>(pFrameIndices[nextFrame]);
+
+			if (prevFrameIndice > fFrame)
+			{
+				nextFrame = prevFrame;
+				s = 0.0f;
+			}
+			else if (fFrame <= nextFrameIndice)
+			{
+				// [rika]: same frame, don't interp
+				if (prevFrame == nextFrame)
+					s = 0.0f;
+				else
+					s = (fFrame - prevFrameIndice) / static_cast<float>(pFrameIndices[nextFrame] - pFrameIndices[prevFrame]);
+
+				/*if (prevFrame != nextFrame)
+					s = (fFrame - prevFrameIndice) / static_cast<float>(pFrameIndices[nextFrame] - pFrameIndices[prevFrame]);*/
+			}
+			else
+			{
+				prevFrame = nextFrame;
+				s = 0.0f;
+			}
+
+			// [rika]: set the pointers for our data
+			*pPackedData = reinterpret_cast<const PackedType* const>(pFrameIndices + total);
+			return;
+		}
+	}
+
+	// movements
 	bool Studio_AnimPosition(const animdesc_t* const panim, float flCycle, Vector& vecPos, QAngle& vecAngle);
 }

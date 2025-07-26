@@ -3,6 +3,12 @@
 
 namespace r5
 {
+	//
+	//
+	// Model V16
+	//
+	//
+
 	struct studio_hw_groupdata_v16_t
 	{
 		int dataOffset;				// offset to this section in compressed vg
@@ -454,7 +460,13 @@ namespace r5
 		short unk_0xDE;
 	};
 
-	// mdl_ v17
+	
+	//
+	//
+	// Model V17
+	//
+	//
+
 	struct studiohdr_v17_t
 	{
 		int flags;
@@ -580,5 +592,190 @@ namespace r5
 		short unk_0xDE;
 
 		int unk_0xE0;
+	};
+
+	
+	//
+	// 
+	// Model V19
+	//
+	//
+
+
+	//
+	// Model Bone
+	//
+
+	struct mstudiobonedata_v19_t
+	{
+		short parent; // parent bone;
+
+		uint16_t unk_76; // gotta be used because there's to 8 bit vars that could've fit here, still may be packing. previously 'unk1'
+
+		int flags;
+
+		uint8_t collisionIndex; // index into sections of collision, phy, bvh, etc. needs confirming
+
+		uint8_t proctype;
+		uint16_t procindex; // procedural rule
+
+		int unk_C; // chance this is alignment for 16 bytes
+	};
+
+	struct mstudiolinearbone_v19_t
+	{
+		// they cut pos and rot scale, understandable since posscale was never used it tf|2 and they do anims different in apex
+		uint16_t numbones;
+
+		uint16_t flagsindex;
+		inline int* pFlags(int i) const { assert(i >= 0 && i < numbones); return reinterpret_cast<int*>((char*)this + FIX_OFFSET(flagsindex)) + i; }
+		inline int flags(int i) const { return *pFlags(i); }
+
+		uint16_t parentindex;
+		inline int* pParent(int i)
+			const {
+			assert(i >= 0 && i < numbones);
+			return reinterpret_cast<int*>((char*)this + FIX_OFFSET(parentindex)) + i;
+		}
+
+		uint16_t posindex;
+		inline const Vector* pPos(int i)
+			const {
+			assert(i >= 0 && i < numbones);
+			return reinterpret_cast<Vector*>((char*)this + FIX_OFFSET(posindex)) + i;
+		}
+
+		uint16_t quatindex;
+		inline const Quaternion* pQuat(int i)
+			const {
+			assert(i >= 0 && i < numbones);
+			return reinterpret_cast<Quaternion*>((char*)this + FIX_OFFSET(quatindex)) + i;
+		}
+
+		uint16_t rotindex;
+		inline const RadianEuler* pRot(int i)
+			const {
+			assert(i >= 0 && i < numbones);
+			return reinterpret_cast<RadianEuler*>((char*)this + FIX_OFFSET(rotindex)) + i;
+		}
+
+		uint16_t posetoboneindex;
+		inline const matrix3x4_t* pPoseToBone(int i)
+			const {
+			assert(i >= 0 && i < numbones);
+			return reinterpret_cast<matrix3x4_t*>((char*)this + FIX_OFFSET(posetoboneindex)) + i;
+		}
+
+		uint16_t qalignmentindex;
+		inline const Quaternion* pQAlignment(int i)
+			const {
+			assert(i >= 0 && i < numbones);
+			return reinterpret_cast<Quaternion*>((char*)this + FIX_OFFSET(qalignmentindex)) + i;
+		}
+
+		uint16_t scaleindex;
+		inline const Vector* pScale(int i)
+			const {
+			assert(i >= 0 && i < numbones);
+			return reinterpret_cast<Vector*>((char*)this + FIX_OFFSET(scaleindex)) + i;
+		}
+
+		uint16_t unk_18;
+
+	};
+
+	//
+	// Model Anim
+	//
+
+	// for datapoint animations
+	struct AxisFixup_t
+	{
+		int8_t adjustment[3]; // per indice
+
+		inline const Vector ToVector(const float scale) const
+		{
+			Vector vec;
+
+			vec.x = static_cast<float>(adjustment[0]) * scale;
+			vec.y = static_cast<float>(adjustment[1]) * scale;
+			vec.z = static_cast<float>(adjustment[2]) * scale;
+
+			return vec;
+		}
+	};
+	static_assert(sizeof(AxisFixup_t) == 0x3);
+
+	struct AnimQuat32
+	{
+		inline uint32_t AsUint32() const { return *reinterpret_cast<const uint32_t*>(this); }
+		inline uint32_t* AsUint32Ptr() { return reinterpret_cast<uint32_t*>(this); }
+		inline const uint32_t* AsUint32Ptr() const { return reinterpret_cast<const uint32_t*>(this); }
+
+		// copy constructors
+		AnimQuat32(AnimQuat32& in)
+		{
+			*this->AsUint32Ptr() = in.AsUint32();
+		}
+
+		AnimQuat32(const AnimQuat32& in)
+		{
+			*this->AsUint32Ptr() = in.AsUint32();
+		}
+
+		// equals
+		AnimQuat32& operator=(const AnimQuat32& in)
+		{
+			*this->AsUint32Ptr() = in.AsUint32();
+
+			return *this;
+		}
+
+		// saved components
+		uint32_t value0 : 7;
+		uint32_t value1 : 7;
+		uint32_t value2 : 7;
+
+		uint32_t scaleFactor : 3; // used to set two different scaling floats for unpacking components
+		uint32_t droppedAxis : 2; // axis/indice of the dropped component
+
+		uint32_t numInterpFrames : 6; // frame gap between this and the next valid data
+
+		static void Unpack(Quaternion& quat, const AnimQuat32 packedQuat, const AxisFixup_t* const axisFixup);
+	};
+	static_assert(sizeof(AnimQuat32) == 0x4);
+
+	struct AnimPos64
+	{
+		inline uint64_t AsUint64() const { return *reinterpret_cast<const uint64_t*>(this); }
+		inline uint64_t* AsUint64Ptr() { return reinterpret_cast<uint64_t*>(this); }
+		inline const uint64_t* AsUint64Ptr() const { return reinterpret_cast<const uint64_t*>(this); }
+
+		// copy constructors
+		AnimPos64(AnimPos64& in)
+		{
+			*this->AsUint64Ptr() = in.AsUint64();
+		}
+
+		AnimPos64(const AnimPos64& in)
+		{
+			*this->AsUint64Ptr() = in.AsUint64();
+		}
+
+		// equals
+		AnimPos64& operator=(const AnimPos64& in)
+		{
+			*this->AsUint64Ptr() = in.AsUint64();
+
+			return *this;
+		}
+
+		// saved components
+		int16_t values[3]; // x, y, z
+
+		uint16_t scaleFactor : 9; // used to scale the values
+		uint16_t numInterpFrames : 7; // frame gap between this and the next valid data
+
+		static void Unpack(Vector& pos, const AnimPos64 packedPos, const AxisFixup_t* const axisFixup);
 	};
 }

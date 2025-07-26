@@ -1,17 +1,19 @@
 #include <pch.h>
 #include <game/rtech/utils/studio/studio.h>
 #include <game/rtech/utils/studio/studio_r5.h>
+#include <game/rtech/utils/studio/studio_r5_v12.h>
+#include <game/rtech/utils/studio/studio_r5_v16.h>
 
 namespace r5
 {
 	static char s_FrameBitCountLUT[4]{ 0, 2, 4, 0 }; // 0x1412FC154i64 (12FC154h)
 	static float s_FrameValOffsetLUT[4]{ 0.0f, 3.0f, 15.0f, 0.0f }; // dword_1412FED60 (12FED60) (1 << s_FrameBitCountLUT[i] ==  s_FrameValOffsetLUT[i])
-	static char s_AnimSeekLUT[60]
+	static char s_AnimSeekLUT[60] // [rika]: may be larger in newer versions
 	{
 		1,  15, 16, 2,  7,  8,  2,  15, 0,  3,  15, 0,  4,  15, 0,  5,
 		15, 0,  6,  15, 0,  7,  15, 0,  2,  15, 2,  3,  15, 2,  4,  15,
 		2,  5,  15, 2,  6,  15, 2,  7,  15, 2,  2,  15, 4,  3,  15, 4,
-		4,  15, 4, 5, 15, 4, 6, 15, 4,  7,  15, 4
+		4,  15, 4, 5, 15, 4, 6, 15, 4,  7,  15, 4,
 	};
 
 	// this LUT will Just Work within reason, no real need to fashion values specially
@@ -173,10 +175,10 @@ namespace r5
 					// check this
 					angle[j] = baseRot[j];
 				}
-
-				assert(angle.IsValid());
-				AngleQuaternion(angle, q);
 			}
+
+			assert(angle.IsValid());
+			AngleQuaternion(angle, q);
 		}
 		else
 		{
@@ -308,5 +310,352 @@ namespace r5
 		scale += tmp; // what?? are the scale values stored differently in apex? delta vs absolute
 
 		assert(scale.IsValid());
+	}
+
+	//
+	// DATAPOINT ANIMATION (Model V19)
+	//
+
+	// uses base datapoints with offsets and interps to get the proper values
+	void CalcBoneQuaternion_DP(const int sectionlength, const uint8_t** panimtrack, const float fFrame, Quaternion& q)
+	{
+		const uint8_t* ptrack = *reinterpret_cast<const uint8_t** const>(panimtrack);
+
+		const uint8_t valid = ptrack[0];
+		const uint8_t total = ptrack[1];
+
+		const uint8_t* pFrameIndices = ptrack + 2;
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 0.0f; // always init as 0!
+
+		// [rika]: get data pointers
+		const AnimQuat32* pPackedData = nullptr;
+		const AxisFixup_t* pAxisFixup = nullptr;
+
+		CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pPackedData);
+
+		pAxisFixup = reinterpret_cast<const AxisFixup_t*>(pPackedData + valid);
+
+		// [rika]: see to our datapoint
+		int validIdx = 0;
+		uint32_t remainingFrames = 0;
+
+		const uint32_t prevTarget = prevFrame;
+		CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ prevTarget);
+
+		Quaternion q1;
+		AnimQuat32::Unpack(q1, pPackedData[validIdx], &pAxisFixup[prevFrame]);
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			q = q1;
+		}
+		else
+		{
+			// [rika]: see to our datapoint (the sequal)
+			const uint32_t nextTarget = (nextFrame - prevFrame) + remainingFrames; // to check if our current data will contain this interp data, seek until we have it
+			CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ nextTarget);
+
+			Quaternion q2;
+			AnimQuat32::Unpack(q2, pPackedData[validIdx], &pAxisFixup[nextFrame]);
+
+			// load the quats into simd registers
+			__m128 q1v = _mm_load_ps(q1.Base());
+			__m128 q2v = _mm_load_ps(q2.Base());
+
+			// align quaternion ?
+			float dp = DotSIMD(q1v, q2v);
+
+			if (dp < 0.0f)
+			{
+				q1v = _mm_xor_ps(q1v, simd_NegativeMask);
+				dp = -dp;
+			}
+
+			// QuaternionSlerp ?
+			// dp >= 0.99619472 ?
+			// dp == 1.0f ?
+			if (dp <= 0.99619472)
+			{
+				const float acos = acosf(dp);
+				
+				//__m128 v38 = (__m128)0x3F800000u;
+				__m128 simd_acos_slerp = { 1.0f, 1.0f, 1.0f, 1.0f };
+				simd_acos_slerp.m128_f32[0] = (1.0f - s) * acos;
+
+				const float acos_interp = acos * s;
+
+				__m128 simd_acos = simd_Four_Zeros;
+				simd_acos.m128_f32[0] = acos;
+
+				__m128 simd_acos_interp = simd_Four_Zeros;
+				simd_acos_interp.m128_f32[0] = acos_interp;
+
+				const __m128 v42 = _mm_movelh_ps(_mm_unpacklo_ps(simd_acos_slerp, simd_acos_interp), _mm_unpacklo_ps(simd_acos, simd_acos));
+
+
+				__m128 v43 = v42;
+				v43.m128_f32[0] = sinf(v42.m128_f32[0]); // 0
+				__m128 v44 = v43;
+				const float v45 = sinf(_mm_shuffle_ps(v42, v42, 0x55).m128_f32[0]); // 1
+				const float v46 = sinf(_mm_shuffle_ps(v42, v42, 0xAA).m128_f32[0]); // 2
+				v43.m128_f32[0] = sinf(_mm_shuffle_ps(v42, v42, 0xff).m128_f32[0]); // 3
+				
+				//const __m128 simd_sin = _mm_sin_ps(v42);
+
+				__m128 v47 = _mm_shuffle_ps(v44, v44, _MM_SHUFFLE(3, 2, 0, 1));
+				v47.m128_f32[0] = v45;
+				__m128 v48 = _mm_shuffle_ps(v47, v47, _MM_SHUFFLE(3, 0, 1, 2));
+				v48.m128_f32[0] = v46;
+
+				__m128 v49 = _mm_shuffle_ps(v48, v48, _MM_SHUFFLE(0, 2, 1, 3));
+				v49.m128_f32[0] = v43.m128_f32[0];
+				__m128 v50 = _mm_shuffle_ps(v49, v49, _MM_SHUFFLE(0, 3, 2, 1));
+
+				const __m128 v50_0 = _mm_shuffle_ps(v50, v50, _MM_SHUFFLE(0, 0, 0, 0)); // for q1
+				const __m128 v50_1 = _mm_shuffle_ps(v50, v50, _MM_SHUFFLE(1, 1, 1, 1)); // for q2
+				const __m128 v50_2 = _mm_shuffle_ps(v50, v50, _MM_SHUFFLE(2, 2, 2, 2));
+
+				__m128 v52 = _mm_rcp_ps(v50_2);
+				__m128 v53 = _mm_sub_ps(_mm_add_ps(v52, v52), _mm_mul_ps(_mm_mul_ps(v52, v52), v50_2));
+
+				// (v50_1 * v53) * q1 + (v50_2 * v53) * q2 
+				const __m128 simd_result = _mm_add_ps(_mm_mul_ps(_mm_mul_ps(v50_1, v53), q2v), _mm_mul_ps(_mm_mul_ps(v50_0, v53), q1v));
+
+
+				_mm_store_ps(q.Base(), simd_result);
+
+				assertm(q.IsValid(), "invalid quaternion");
+			}
+			else
+			{
+				// q1 * (1.0f - s) + q2 * s;
+				const __m128 simd_s = ReplicateX4(s);
+				const __m128 simd_qinterp = AddSIMD(MulSIMD(SubSIMD(simd_Four_Ones, simd_s), q1v), MulSIMD(simd_s, q2v));
+
+				// BoneQuaternionNormalizeSIMD ?
+
+				// same function as above ?
+				// don't recalc if true
+				// simd_qinterp dot product
+				const __m128 simd_qinterp_dp = Dot4SIMD(simd_qinterp_dp, simd_qinterp_dp);
+				const __m128 simd_clamp_dp = _mm_max_ps(simd_qinterp_dp, simd_NegativeMask);
+
+				// newtwon raphson rsqrt 
+				const __m128 simd_recp_sqrt = ReciprocalSqrtSIMD(simd_clamp_dp);
+				const __m128 simd_result = MulSIMD(simd_recp_sqrt, simd_qinterp);
+
+				_mm_store_ps(q.Base(), simd_result);
+
+				assertm(q.IsValid(), "invalid quaternion");
+			}
+		}
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pAxisFixup + total);
+	}
+
+	void CalcBonePosition_DP(const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& pos)
+	{
+		const uint8_t* ptrack = *reinterpret_cast<const uint8_t** const>(panimtrack);
+
+		const uint8_t valid = ptrack[0];
+		const uint8_t total = ptrack[1];
+
+		const uint8_t* pFrameIndices = ptrack + 2;
+		*panimtrack = reinterpret_cast<const uint8_t*>(pFrameIndices);
+
+		// [rika]: return zeros if no data
+		if (!total)
+		{
+			pos.Init(0.0f, 0.0f, 0.0f);
+			return;
+		}
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 0.0f; // always init as 0!
+
+		// [rika]: get data pointers
+		const AnimPos64* pPackedData = nullptr;
+		const AxisFixup_t* pAxisFixup = nullptr;
+
+		CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pPackedData);
+
+		pAxisFixup = reinterpret_cast<const AxisFixup_t*>(pPackedData + valid);
+
+		// [rika]: see to our datapoint
+		int validIdx = 0;
+		uint32_t remainingFrames = 0;
+
+		const uint32_t prevTarget = prevFrame;
+		CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ prevTarget);
+
+		Vector pos1;
+		AnimPos64::Unpack(pos1, pPackedData[validIdx], &pAxisFixup[prevFrame]);
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			pos = pos1;
+		}
+		else
+		{
+			// [rika]: see to our datapoint (the sequal)
+			const uint32_t nextTarget = (nextFrame - prevFrame) + remainingFrames; // to check if our current data will contain this interp data, seek until we have it
+			CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ nextTarget);
+
+			Vector pos2;
+			AnimPos64::Unpack(pos2, pPackedData[validIdx], &pAxisFixup[nextFrame]);
+
+			pos = pos1 * (1.0f - s) + pos2 * s;
+		}
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pAxisFixup + total);
+	}
+
+	void CalcBonePositionVirtual_DP(const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& pos)
+	{
+		const uint8_t* ptrack = *reinterpret_cast<const uint8_t** const>(panimtrack);
+
+		const uint8_t total = ptrack[0];
+
+		const float16 packedscale = *reinterpret_cast<const float16* const>(ptrack + 1);
+		const float posscale = packedscale.GetFloat() / 127.0f;
+
+		const uint8_t* pFrameIndices = ptrack + 3;
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 0.0f; // always init as 0!
+
+		// [rika]: get data pointers
+		const AxisFixup_t* pAxisFixup = nullptr;
+
+		CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pAxisFixup);
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			pos = pAxisFixup[prevFrame].ToVector(posscale);
+		}
+		else
+		{
+			const Vector pos1(pAxisFixup[prevFrame].ToVector(posscale));
+			const Vector pos2(pAxisFixup[nextFrame].ToVector(posscale));
+
+			pos = pos1 * (1.0f - s) + pos2 * s;
+		}
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pAxisFixup + total);
+	}
+
+	void CalcBoneScale_DP(const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& scale)
+	{
+		const uint8_t* ptrack = *reinterpret_cast<const uint8_t** const>(panimtrack);
+
+		const uint8_t total = ptrack[0];
+
+		const uint8_t* pFrameIndices = ptrack + 1;
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 0.0f; // always init as 0!
+
+		// [rika]: get data pointers
+		const Vector48* pPackedData = nullptr;
+
+		CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pPackedData);
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			scale = pPackedData[prevFrame].AsVector();
+		}
+		else
+		{
+			Vector scale1(pPackedData[prevFrame].AsVector());
+			Vector scale2(pPackedData[nextFrame].AsVector());
+
+			scale = scale1 * (1.0f - s) + scale2 * s;
+		}
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pPackedData + total);
+	}
+
+	void AnimQuat32::Unpack(Quaternion& quat, const AnimQuat32 packedQuat, const AxisFixup_t* const axisFixup)
+	{
+		const int scaleFac = packedQuat.scaleFactor;
+
+		const float scaleComponent = scaleFac ? 0.011048543f : 0.0055242716f;
+		const float scaleFixup = static_cast<float>(1 << scaleFac) * 0.000021924432f;
+
+		const float axis0 = ((static_cast<float>(packedQuat.value0) + 0.5f) * scaleComponent) + (static_cast<float>(axisFixup->adjustment[0]) * scaleFixup);
+		const float axis1 = ((static_cast<float>(packedQuat.value1) + 0.5f) * scaleComponent) + (static_cast<float>(axisFixup->adjustment[1]) * scaleFixup);
+		const float axis2 = ((static_cast<float>(packedQuat.value2) + 0.5f) * scaleComponent) + (static_cast<float>(axisFixup->adjustment[2]) * scaleFixup);
+
+		float droppedComponent = 0.0f;
+
+		const float dotProduct = (axis0 * axis0) + (axis1 * axis1) + (axis2 * axis2);
+
+		if (dotProduct < 1.0f)
+		{
+			const float dprem = 1.0f - dotProduct;
+			if ((1.0f - dotProduct) < 0.0)
+				droppedComponent = sqrtf(dprem);
+			else
+				droppedComponent = FastSqrtFast(dprem); // fsqrt
+		}
+
+		switch (packedQuat.droppedAxis)
+		{
+		case 0:
+		{
+			quat.x = droppedComponent;
+			quat.y = axis0;
+			quat.z = axis1;
+			quat.w = axis2;
+
+			break;
+		}
+		case 1:
+		{
+			quat.x = axis0;
+			quat.y = droppedComponent;
+			quat.z = axis1;
+			quat.w = axis2;
+
+			break;
+		}
+		case 2:
+		{
+			quat.x = axis0;
+			quat.y = axis1;
+			quat.z = droppedComponent;
+			quat.w = axis2;
+
+			break;
+		}
+		case 3:
+		{
+			quat.x = axis0;
+			quat.y = axis1;
+			quat.z = axis2;
+			quat.w = droppedComponent;
+
+			break;
+		}
+		}
+	}
+
+	void AnimPos64::Unpack(Vector& pos, const AnimPos64 packedPos, const AxisFixup_t* const axisFixup)
+	{
+		const float scaleFac = static_cast<float>(packedPos.scaleFactor + 1);
+
+		pos.x = ((static_cast<float>(axisFixup->adjustment[0]) / 100.0f) + static_cast<float>(packedPos.values[0])) * scaleFac;
+		pos.y = ((static_cast<float>(axisFixup->adjustment[1]) / 100.0f) + static_cast<float>(packedPos.values[1])) * scaleFac;
+		pos.z = ((static_cast<float>(axisFixup->adjustment[2]) / 100.0f) + static_cast<float>(packedPos.values[2])) * scaleFac;
 	}
 }

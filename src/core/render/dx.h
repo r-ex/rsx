@@ -79,7 +79,13 @@ struct DXMeshDrawData_t
 
     uint32_t vertexStride;
 
+    DXGI_FORMAT indexFormat;
+
+    Vector modelMins;
+    Vector modelMaxs;
+
     bool visible;
+    bool doFrustumCulling;
 };
 
 struct VS_TransformConstants
@@ -198,6 +204,12 @@ struct CBufModelInstance
 };
 static_assert(sizeof(CBufModelInstance) == 208);
 
+struct DXShaderResourceDesc_t
+{
+    UINT bindPoint;
+    ID3D11ShaderResourceView* resourceView;
+};
+
 class CDXDrawData
 {
 public:
@@ -222,6 +234,12 @@ public:
     ID3D11ShaderResourceView* boneMatrixSRV;
 
     ID3D11InputLayout* inputLayout;
+
+    CShader* pixelShader;
+    CShader* vertexShader;
+
+    std::vector<DXShaderResourceDesc_t> pixelShaderResources;
+    std::vector<DXShaderResourceDesc_t> vertexShaderResources;
 
     char* modelName;
 
@@ -299,9 +317,10 @@ public:
 
     inline CDXCamera* GetCamera() const { return m_pCamera; };
 
-    inline CDXScene& GetScene() { return m_Scene; }
+    inline CDXScene& GetScene() { return m_Scene; };
 
     inline CUIState& GetUIState() { return m_UIState; };
+
 private:
     bool CreateDepthBuffer(ID3D11Texture2D* frameBuffer);
 	bool CreateMainView(const uint16_t w, const uint16_t h);
@@ -330,3 +349,4 @@ private:
 
     CUIState m_UIState;
 };
+

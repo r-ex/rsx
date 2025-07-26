@@ -830,19 +830,22 @@ void HandleRenderFrame()
 
     if (previewDrawData)
     {
-        const CDXCamera* camera = g_dxHandler->GetCamera();
+        CDXCamera* const camera = g_dxHandler->GetCamera();
 
-        const CShader* const vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_vs", s_PreviewVertexShader, eShaderType::Vertex);
-        const CShader* const pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_ps", s_PreviewPixelShader, eShaderType::Pixel);
-
-        if (vertexShader && pixelShader)
+        if (previewDrawData->vertexShader && previewDrawData->pixelShader)
         {
+            CShader* vertexShader = previewDrawData->vertexShader;
+            CShader* pixelShader = previewDrawData->pixelShader;
+
             ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
             ctx->IASetInputLayout(vertexShader->GetInputLayout());
 
-            ctx->VSSetShader(vertexShader->Get<ID3D11VertexShader>(), nullptr, 0u);
-            ctx->PSSetShader(pixelShader->Get<ID3D11PixelShader>(), nullptr, 0u);
+            if (vertexShader)
+                ctx->VSSetShader(vertexShader->Get<ID3D11VertexShader>(), nullptr, 0u);
+
+            if (pixelShader)
+                ctx->PSSetShader(pixelShader->Get<ID3D11PixelShader>(), nullptr, 0u);
 
             assertm(previewDrawData->transformsBuffer, "uh oh something very bad happened!!!!!!");
             ID3D11Buffer* const transformsBuffer = previewDrawData->transformsBuffer;
@@ -859,10 +862,10 @@ void HandleRenderFrame()
                 if (!meshDrawData.visible)
                     continue;
 
-                ID3D11Buffer* sharedConstBuffers[] = {
-                    camera->bufCommonPerCamera,
-                    previewDrawData->transformsBuffer,
-                };
+                if (meshDrawData.doFrustumCulling)
+                {
+                    // todo
+                }
 
 #if defined(ADVANCED_MODEL_PREVIEW)
                 const bool useAdvancedModelPreview = meshDrawData.vertexShader && meshDrawData.pixelShader;
@@ -870,33 +873,45 @@ void HandleRenderFrame()
                 constexpr bool useAdvancedModelPreview = false;
 #endif
 
+                ID3D11Buffer* sharedConstBuffers[] = {
+                    camera->bufCommonPerCamera,
+                    previewDrawData->transformsBuffer,
+                };
+
+                if (meshDrawData.vertexShader)
+                {
+                    ctx->IASetInputLayout(meshDrawData.inputLayout);
+                    ctx->VSSetShader(meshDrawData.vertexShader, nullptr, 0u);
+                }
+                else
+                    ctx->VSSetShader(vertexShader->Get<ID3D11VertexShader>(), nullptr, 0u);
+
                 // if we have a custom vertex shader and/or pixel shader for this mesh from the draw data, use it
                 // otherwise we can fall back on the base shaders
                 if (useAdvancedModelPreview)
                 {
-                    ctx->VSSetShader(meshDrawData.vertexShader, nullptr, 0u);
-                    ctx->IASetInputLayout(meshDrawData.inputLayout);
-
                     ctx->VSSetConstantBuffers(2u, ARRSIZE(sharedConstBuffers), sharedConstBuffers);
 
                     ctx->VSSetShaderResources(60u, 1u, &previewDrawData->boneMatrixSRV);
                     ctx->VSSetShaderResources(62u, 1u, &previewDrawData->boneMatrixSRV);
+                }
 
-                    ctx->IASetVertexBuffers(0u, 1u, &meshDrawData.vertexBuffer, &meshDrawData.vertexStride, &offset);
-                }
-                else
+                for (auto& rsrc : previewDrawData->vertexShaderResources)
                 {
-                    constexpr UINT stride = sizeof(Vertex_t);
-                    //ctx->VSSetConstantBuffers(2u, 1u, &camera->bufCommonPerCamera);
-                    ctx->IASetVertexBuffers(0u, 1u, &meshDrawData.vertexBuffer, &stride, &offset);
+                    ctx->VSSetShaderResources(rsrc.bindPoint, 1u, &rsrc.resourceView);
                 }
+
+                ctx->IASetVertexBuffers(0u, 1u, &meshDrawData.vertexBuffer, &meshDrawData.vertexStride, &offset);
+
+                if (meshDrawData.pixelShader)
+                    ctx->PSSetShader(meshDrawData.pixelShader, nullptr, 0u);
+                else
+                    ctx->PSSetShader(pixelShader->Get<ID3D11PixelShader>(), nullptr, 0u);
 
                 ID3D11SamplerState* const samplerState = g_dxHandler->GetSamplerState();
 
                 if (useAdvancedModelPreview)
                 {
-                    ctx->PSSetShader(meshDrawData.pixelShader, nullptr, 0u);
-
                     ID3D11SamplerState* samplers[] = {
                         g_dxHandler->GetSamplerComparisonState(),
                         samplerState,
@@ -913,9 +928,7 @@ void HandleRenderFrame()
 #endif
                 }
                 else
-                {
                     ctx->PSSetSamplers(0, 1, &samplerState);
-                }
 
                 for (auto& tex : meshDrawData.textures)
                 {
@@ -926,7 +939,12 @@ void HandleRenderFrame()
                     ctx->PSSetShaderResources(tex.resourceBindPoint, 1u, &textureSRV);
                 }
 
-                ctx->IASetIndexBuffer(meshDrawData.indexBuffer, DXGI_FORMAT_R16_UINT, 0u);
+                for (auto& rsrc : previewDrawData->pixelShaderResources)
+                {
+                    ctx->PSSetShaderResources(rsrc.bindPoint, 1u, &rsrc.resourceView);
+                }
+
+                ctx->IASetIndexBuffer(meshDrawData.indexBuffer, meshDrawData.indexFormat, 0u);
                 ctx->DrawIndexed(static_cast<UINT>(meshDrawData.numIndices), 0u, 0u);
             }
         }

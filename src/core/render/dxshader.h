@@ -67,11 +67,17 @@ protected:
     void* m_dxShader;
     ID3D11InputLayout* m_inputLayout;
 
+    ID3DBlob* m_bytecodeBlob;
+
     eShaderType m_type;
 
 public:
     inline const std::string& GetName() const { return m_name; };
     inline ID3D11InputLayout* GetInputLayout() const { return m_inputLayout; };
+    
+    void SetInputLayout(ID3D11InputLayout* layout) { assert(m_type == eShaderType::Vertex);  m_inputLayout = layout; };
+
+    ID3DBlob* GetBytecodeBlob() const { return m_bytecodeBlob; };
 
     template<typename T>
     inline T* Get() const
@@ -106,8 +112,8 @@ public:
 class CDXShaderManager
 {
 public:
-    CShader* LoadShader(const std::string& path, eShaderType type);
-    CShader* LoadShaderFromString(const std::string& path, const std::string& sourceString, eShaderType type);
+    CShader* LoadShader(const std::string& path, eShaderType type, bool useDefaultInputLayout = true);
+    CShader* LoadShaderFromString(const std::string& path, const std::string& sourceString, eShaderType type, bool useDefaultInputLayout = true);
 
 private:
     CShader* GetShaderByPath(const std::string& path);

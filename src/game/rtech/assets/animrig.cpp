@@ -34,6 +34,12 @@ void LoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
         arigAsset = new AnimRigAsset(hdr, GetModelPakVersion(reinterpret_cast<const int* const>(hdr->data)));
         break;
     }
+    case 7:
+    {
+        AnimRigAssetHeader_v5_t* const hdr = reinterpret_cast<AnimRigAssetHeader_v5_t*>(pakAsset->header());
+        arigAsset = new AnimRigAsset(hdr, eMDLVersion::VERSION_19);
+        break;
+    }
     default:
         return;
     }
@@ -55,6 +61,7 @@ void LoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
     case eMDLVersion::VERSION_12_2:
     case eMDLVersion::VERSION_12_3:
     case eMDLVersion::VERSION_12_4:
+    case eMDLVersion::VERSION_12_5:
     case eMDLVersion::VERSION_13:
     case eMDLVersion::VERSION_13_1:
     case eMDLVersion::VERSION_14:
@@ -77,6 +84,13 @@ void LoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
     case eMDLVersion::VERSION_18:
     {
         ParseModelBoneData_v16(arigAsset->GetParsedData());
+        ParseModelSequenceData_Stall<r5::mstudioseqdesc_v18_t>(arigAsset->GetParsedData(), reinterpret_cast<char* const>(arigAsset->data));
+
+        break;
+    }
+    case eMDLVersion::VERSION_19:
+    {
+        ParseModelBoneData_v19(arigAsset->GetParsedData());
         ParseModelSequenceData_Stall<r5::mstudioseqdesc_v18_t>(arigAsset->GetParsedData(), reinterpret_cast<char* const>(arigAsset->data));
 
         break;

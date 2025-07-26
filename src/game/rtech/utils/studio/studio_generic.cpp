@@ -60,15 +60,15 @@ sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), se
 
 	if (sectionframes)
 	{
-		sections.resize(SectionCount());
+		sections.reserve(SectionCount());
 
 		for (int i = 0; i < SectionCount(); i++)
 		{
-			sections.at(i) = { .animindex = animdesc->pSection(i)->animindex, .isExternal = false };
+			sections.emplace_back(animdesc->pSection(i)->animindex);
 		}
 	}
 
-	if (framemovementindex && flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
+	if (framemovementindex && (flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT))
 	{
 		movement = new animmovement_t(animdesc->pFrameMovement());
 	}
@@ -79,15 +79,15 @@ sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), se
 {
 	if (sectionframes)
 	{
-		sections.resize(SectionCount());
+		sections.reserve(SectionCount());
 
 		for (int i = 0; i < SectionCount(); i++)
 		{
-			sections.at(i) = { .animindex = animdesc->pSection(i)->animindex, .isExternal = false };
+			sections.emplace_back(animdesc->pSection(i)->animindex);
 		}
 	}
 
-	if (framemovementindex && flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
+	if (framemovementindex && (flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT))
 	{
 		movement = new animmovement_t(animdesc->pFrameMovement(), numframes, false);
 	}
@@ -98,15 +98,15 @@ sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), se
 {
 	if (sectionframes)
 	{
-		sections.resize(SectionCount());
+		sections.reserve(SectionCount());
 
 		for (int i = 0; i < SectionCount(); i++)
 		{
-			sections.at(i) = { .animindex = animdesc->pSection(i)->animindex, .isExternal = animdesc->pSection(i)->isExternal };
+			sections.emplace_back(animdesc->pSection(i)->animindex, animdesc->pSection(i)->isExternal);
 		}
 	}
 
-	if (framemovementindex && flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
+	if (framemovementindex && (flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT))
 	{
 		movement = new animmovement_t(animdesc->pFrameMovement(), numframes, false);
 	}
@@ -115,23 +115,51 @@ sectionindex(animdesc->sectionindex), sectionframes(animdesc->sectionframes), se
 animdesc_t::animdesc_t(r5::mstudioanimdesc_v16_t* animdesc, char* ext) : baseptr(reinterpret_cast<void*>(animdesc)), name(animdesc->pszName()), fps(animdesc->fps), flags(animdesc->flags), numframes(animdesc->numframes), animindex(animdesc->animindex),
 sectionindex(static_cast<int>(FIX_OFFSET(animdesc->sectionindex))), sectionframes(static_cast<int>(animdesc->sectionframes)), sectionstallframes(static_cast<int>(animdesc->sectionstallframes)), sectionDataExtra(ext), nummovements(0), movementindex(0), framemovementindex(FIX_OFFSET(animdesc->framemovementindex)), movement(nullptr), parsedBufferIndex(0ull)
 {
+	assertm(!(animdesc->animindex & 0x80000000), "non section anim with external data");
+
 	if (sectionframes)
 	{
-		sections.resize(SectionCount());
+		sections.reserve(SectionCount());
 
 		for (int i = 0; i < SectionCount(); i++)
 		{
-			sections.at(i) = { .animindex = animdesc->pSection(i)->Index(), .isExternal = animdesc->pSection(i)->isExternal() };
+			sections.emplace_back(animdesc->pSection(i)->Index(), animdesc->pSection(i)->isExternal());
 		}
 	}
 
-	if (framemovementindex && flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
+	if (framemovementindex && (flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT))
 	{
 		movement = new animmovement_t(animdesc->pFrameMovement(), numframes, true);
 	}
 };
 
-char* animdesc_t::pAnimdataStall(int* piFrame) const
+char* animdesc_t::pAnimdataNoStall(int* const piFrame) const
+{
+	int index = animindex;
+	int section = 0;
+
+	if (sectionframes != 0)
+	{
+		if (numframes > sectionframes && *piFrame == numframes - 1)
+		{
+			// last frame on long anims is stored separately
+			*piFrame = 0;
+			section = (numframes - 1) / sectionframes + 1;
+		}
+		else
+		{
+			section = *piFrame / sectionframes;
+			*piFrame -= section * sectionframes;
+		}
+
+		index = pSection(section)->animindex;
+		assertm(pSection(section)->isExternal == false, "anim can't have stall frames");
+	}
+
+	return ((char*)baseptr + index);
+}
+
+char* animdesc_t::pAnimdataStall(int* const piFrame) const
 {
 	int index = animindex;
 	int section = 0;
@@ -168,29 +196,52 @@ char* animdesc_t::pAnimdataStall(int* piFrame) const
 	return ((char*)baseptr + index);
 }
 
-char* animdesc_t::pAnimdataNoStall(int* piFrame) const
+// [rika]: broken in retail apex, does not load the last section in rle animation. this probably doesn't cause issues as sections always contain the first frame of the next sections
+// [rika]: tldr do not use for rle animations, only datapoint
+// todo: universal function that is not broken on rle
+char* animdesc_t::pAnimdataStall_DP(int* const piFrame, int* const pSectionLength) const
 {
 	int index = animindex;
 	int section = 0;
+	int sectionlength = numframes;
 
-	if (sectionframes != 0)
+	if (sectionframes)
 	{
-		if (numframes > sectionframes && *piFrame == numframes - 1)
+		if (*piFrame >= sectionstallframes)
 		{
-			// last frame on long anims is stored separately
-			*piFrame = 0;
-			section = (numframes - 1) / sectionframes + 1;
+			const int sectionbase = (*piFrame - sectionstallframes) / sectionframes;
+			section = sectionbase + 1;
+
+			const int frameoffset = sectionstallframes + (sectionbase * sectionframes);
+			*piFrame -= frameoffset;
+
+			const int remainingframes = numframes - frameoffset;
+
+			sectionlength = sectionframes;
+			if (remainingframes <= sectionframes)
+				sectionlength = remainingframes;
 		}
 		else
 		{
-			section = *piFrame / sectionframes;
-			*piFrame -= section * sectionframes;
+			section = 0;
+			sectionlength = sectionstallframes;
 		}
 
 		index = pSection(section)->animindex;
-		assertm(pSection(section)->isExternal == false, "anim can't have stall frames");
+
+		*pSectionLength = sectionlength;
+		if (pSection(section)->isExternal) // checks if it is external
+		{
+			if (sectionDataExtra)
+				return (sectionDataExtra + index);
+
+			// we will stall if this is not loaded, for whatever reason
+			index = pSection(0)->animindex;
+			*piFrame = sectionstallframes - 1; // gets set to last frame of 'static'/'stall' section if the external data offset has not been cached(?)
+		}
 	}
 
+	*pSectionLength = sectionlength;
 	return ((char*)baseptr + index);
 }
 
@@ -304,7 +355,7 @@ lodIndex(static_cast<uint8_t>(group->lodIndex)), lodCount(static_cast<uint8_t>(g
 #define FIX_FILE_OFFSET(offset) (offset < 0 ? 0 : offset)
 studiohdr_generic_t::studiohdr_generic_t(const r1::studiohdr_t* const pHdr, StudioLooseData_t* const pData) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(pData->VertOffset(StudioLooseData_t::SLD_VTX)), vvdOffset(pData->VertOffset(StudioLooseData_t::SLD_VVD)), vvcOffset(pData->VertOffset(StudioLooseData_t::SLD_VVC)), vvwOffset(0), phyOffset(pData->PhysOffset()),
 vtxSize(pData->VertSize(StudioLooseData_t::SLD_VTX)), vvdSize(pData->VertSize(StudioLooseData_t::SLD_VVD)), vvcSize(pData->VertSize(StudioLooseData_t::SLD_VVC)), vvwSize(0), phySize(pData->PhysSize()), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+linearBoneOffset(pHdr->studiohdr2index + pHdr->pStudioHdr2()->linearboneindex), boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
 groupCount(0), groups(), bvhOffset(-1), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 
@@ -312,7 +363,7 @@ groupCount(0), groups(), bvhOffset(-1), baseptr(reinterpret_cast<const char*>(pH
 
 studiohdr_generic_t::studiohdr_generic_t(const r2::studiohdr_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(0), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(0), phySize(pHdr->phySize), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
 groupCount(0), groups(), bvhOffset(-1), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 
@@ -320,7 +371,7 @@ groupCount(0), groups(), bvhOffset(-1), baseptr(reinterpret_cast<const char*>(pH
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v8_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(0)/*set in vertex parsing*/, textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
 groupCount(1), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 
@@ -328,7 +379,7 @@ groupCount(1), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<co
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_1_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_1_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_1_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
 groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
@@ -344,7 +395,7 @@ groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), basept
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_2_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_2_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_2_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
 groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
@@ -358,9 +409,9 @@ groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), basept
 	}
 };
 
-studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_3_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_4_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_3_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_4_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
 groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
@@ -376,7 +427,7 @@ groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), basept
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v14_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
 vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v14_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
+linearBoneOffset(pHdr->linearboneindex), boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v14_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
 groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
@@ -392,7 +443,25 @@ groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), basept
 
 studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v16_t* const pHdr, int dataSizePhys, int dataSizeModel) : length(dataSizeModel), flags(pHdr->flags), contents(0 /*TODO, where is this?*/), vtxOffset(-1), vvdOffset(-1), vvcOffset(-1), vvwOffset(-1), phyOffset(-1),
 vtxSize(-1), vvdSize(-1), vvcSize(-1), vvwSize(-1), phySize(dataSizePhys), hwDataSize(0), textureOffset(FIX_OFFSET(pHdr->textureindex)), textureCount(static_cast<int>(pHdr->numtextures)), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(FIX_OFFSET(pHdr->skinindex)),
-boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), boneCount(static_cast<int>(pHdr->boneCount)), boneStateOffset(offsetof(r5::studiohdr_v16_t, boneStateOffset) + FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), localSequenceOffset(FIX_OFFSET(pHdr->localseqindex)), localSequenceCount(pHdr->numlocalseq),
+linearBoneOffset(FIX_OFFSET(pHdr->linearboneindex)), boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), boneCount(static_cast<int>(pHdr->boneCount)), boneStateOffset(offsetof(r5::studiohdr_v16_t, boneStateOffset) + FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), localSequenceOffset(FIX_OFFSET(pHdr->localseqindex)), localSequenceCount(pHdr->numlocalseq),
+groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(FIX_OFFSET(pHdr->bvhOffset)), baseptr(reinterpret_cast<const char*>(pHdr))
+{
+	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
+
+	for (int i = 0; i < groupCount; i++)
+	{
+		if (i == 8)
+			break;
+
+		groups[i] = studio_hw_groupdata_t(pHdr->pLODGroup(static_cast<uint16_t>(i)));
+		hwDataSize += groups[i].dataSizeDecompressed;
+	}
+
+};
+
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v17_t* const pHdr, int dataSizePhys, int dataSizeModel) : length(dataSizeModel), flags(pHdr->flags), contents(0 /*TODO, where is this?*/), vtxOffset(-1), vvdOffset(-1), vvcOffset(-1), vvwOffset(-1), phyOffset(-1),
+vtxSize(-1), vvdSize(-1), vvcSize(-1), vvwSize(-1), phySize(dataSizePhys), hwDataSize(0), textureOffset(FIX_OFFSET(pHdr->textureindex)), textureCount(static_cast<int>(pHdr->numtextures)), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(FIX_OFFSET(pHdr->skinindex)),
+linearBoneOffset(FIX_OFFSET(pHdr->linearboneindex)), boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), boneCount(static_cast<int>(pHdr->boneCount)), boneStateOffset(offsetof(r5::studiohdr_v16_t, boneStateOffset) + FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), localSequenceOffset(FIX_OFFSET(pHdr->localseqindex)), localSequenceCount(pHdr->numlocalseq),
 groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(FIX_OFFSET(pHdr->bvhOffset)), baseptr(reinterpret_cast<const char*>(pHdr))
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
@@ -559,6 +628,120 @@ namespace r5
 		}
 	}
 
+	// [rika]: decode datapoint compressed position track for framemovement
+	static void Studio_FrameMovement_DP_Pos(const float fFrame, const int sectionlength, const uint8_t** const panimtrack, Vector& pos)
+	{
+		const uint16_t* ptrack = *reinterpret_cast<const uint16_t** const>(panimtrack);
+
+		const uint16_t valid = ptrack[0];
+		const uint16_t total = ptrack[1];
+
+		const uint16_t* pFrameIndices = ptrack + 2;
+		*panimtrack = reinterpret_cast<const uint8_t*>(pFrameIndices);
+
+		// [rika]: return zeros if no data
+		if (!total)
+		{
+			pos.Init(0.0f, 0.0f, 0.0f);
+			return;
+		}
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 0.0f; // always init as 0!
+
+		// [rika]: get data pointers
+		const AnimPos64* pPackedData = nullptr;
+		const AxisFixup_t* pAxisFixup = nullptr;
+
+		CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pPackedData);
+
+		pAxisFixup = reinterpret_cast<const AxisFixup_t*>(pPackedData + valid);
+
+		// [rika]: see to our datapoint
+		int validIdx = 0;
+		uint32_t remainingFrames = 0;
+
+		const uint32_t prevTarget = prevFrame;
+		CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ prevTarget);
+
+		Vector pos1;
+		AnimPos64::Unpack(pos1, pPackedData[validIdx], &pAxisFixup[prevFrame]);
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			pos = pos1;
+		}
+		else
+		{
+			// [rika]: see to our datapoint (the sequal)
+			const uint32_t nextTarget = (nextFrame - prevFrame) + remainingFrames; // to check if our current data will contain this interp data, seek until we have it
+			CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, nextTarget);
+
+			Vector pos2;
+			AnimPos64::Unpack(pos2, pPackedData[validIdx], &pAxisFixup[nextFrame]);
+
+			pos = pos1 * (1.0f - s) + pos2 * s;
+		}
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pAxisFixup + total);
+	}
+
+	// [rika]: decode datapoint compressed yaw track for framemovement
+	static void Studio_FrameMovement_DP_Rot(const float fFrame, const int sectionlength, const uint8_t** const panimtrack, float& yaw)
+	{
+		const uint16_t* ptrack = *reinterpret_cast<const uint16_t** const>(panimtrack);
+
+		const uint16_t total = ptrack[0];
+
+		const uint16_t* pFrameIndices = ptrack + 1;
+		*panimtrack = reinterpret_cast<const uint8_t*>(pFrameIndices);
+
+		// [rika]: return zeros if no data
+		if (!total)
+		{
+			yaw = 0.0f;
+			return;
+		}
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 0.0f; // always init as 0!
+
+		// [rika]: get data pointers
+		const float16* pPackedData = nullptr;
+
+		CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pPackedData);
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			yaw = pPackedData[prevFrame].GetFloat();
+		}
+		else
+		{
+			const float v1Yaw = pPackedData[prevFrame].GetFloat();
+			const float v2Yaw = pPackedData[nextFrame].GetFloat();
+
+			// [rika]: differs slightly from AngleDiff()
+			float yawDelta = v2Yaw;
+			if ((v2Yaw - v1Yaw) <= 180.0f)
+			{
+				if ((v1Yaw - v2Yaw) > 180.0f)
+					yawDelta = v2Yaw + 360.0f;
+			}
+			else
+			{
+				yawDelta = v2Yaw + -360.0f;
+			}
+
+			yaw = v1Yaw * (1.0f - s) + yawDelta * s;
+		}
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pPackedData + total);
+	}
+
 	bool Studio_AnimPosition(const animdesc_t* const panim, float flCycle, Vector& vecPos, QAngle& vecAngle)
 	{
 		vecPos.Init();
@@ -582,7 +765,23 @@ namespace r5
 			int iFrame = static_cast<int>(flFrame);
 			float s = (flFrame - iFrame);
 
-			if (s == 0)
+			if (panim->flags & eStudioAnimFlags::ANIM_DATAPOINT)
+			{
+				const mstudioframemovement_t* const pFrameMovement = reinterpret_cast<const mstudioframemovement_t* const>((char*)panim->baseptr + panim->framemovementindex);
+
+				// [rika]: remove after testing
+#ifdef _DEBUG
+				assertm(pFrameMovement->SectionCount(panim->numframes) == 1, "more than one section ?");
+#endif // _DEBUG
+
+				const uint8_t* panimtrack = pFrameMovement->pDatapointTrack();
+
+				Studio_FrameMovement_DP_Pos(flFrame, panim->numframes, &panimtrack, vecPos);
+				Studio_FrameMovement_DP_Rot(flFrame, panim->numframes, &panimtrack, vecAngle.y);
+
+				return true;
+			}
+			else if (s == 0.0f)
 			{
 				Studio_FrameMovement(panim->movement, iFrame, vecPos, vecAngle.y);
 				return true;

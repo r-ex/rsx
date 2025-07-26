@@ -603,7 +603,7 @@ namespace r5
 		int vvwSize;
 	};
 
-	struct studiohdr_v12_3_t
+	struct studiohdr_v12_4_t
 	{
 		int id; // Model format ID, such as "IDST" (0x49 0x44 0x53 0x54)
 		int version; // Format version number, such as 54 (0x36,0x00,0x00,0x00)
@@ -791,7 +791,7 @@ namespace r5
 		int unk_20C[2]; // added in rmdl v12.3
 	};
 
-	struct studiohdr_v12_4_t
+	struct studiohdr_v12_5_t
 	{
 		int id; // Model format ID, such as "IDST" (0x49 0x44 0x53 0x54)
 		int version; // Format version number, such as 54 (0x36,0x00,0x00,0x00)

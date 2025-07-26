@@ -14,7 +14,7 @@ inline bool CreateD3DBuffer(
     D3D11_BUFFER_DESC desc = {};
 
     desc.Usage = usage;
-    desc.ByteWidth = IALIGN(byteWidth, 16);
+    desc.ByteWidth = bindFlags & D3D11_BIND_CONSTANT_BUFFER ? IALIGN(byteWidth, 16) : byteWidth;
     desc.BindFlags = bindFlags;
     desc.CPUAccessFlags = cpuAccessFlags;
     desc.MiscFlags = miscFlags;

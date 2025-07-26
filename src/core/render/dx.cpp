@@ -379,6 +379,7 @@ bool CDXParentHandler::SetupDeviceD3D()
     deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
+    // [rika]: this is likely causing our issue with a white screen on igpus, todo look into an adapter here
     if (D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, deviceFlags, featureLevelArr, ARRSIZE(featureLevelArr),
         D3D11_SDK_VERSION, &swapChainDesc, &m_pSwapChain, &m_pDevice, &featureLevel, &m_pDeviceContext) != S_OK)
     {

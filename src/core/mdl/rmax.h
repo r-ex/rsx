@@ -7,7 +7,7 @@ namespace rmax
 	static constexpr uint8_t s_FrameSizeLUT[8] = { 0, 12, 16, 28, 12, 24, 28, 40 };
 
 	// if one of these is not set, default to bone value
-	enum AnimTrackFlags_t
+	enum AnimTrackFlags_t : uint16_t
 	{
 		ANIM_TRACK_POS = 1 << 0,
 		ANIM_TRACK_ROT = 1 << 1,

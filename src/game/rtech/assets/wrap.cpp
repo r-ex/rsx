@@ -2,6 +2,8 @@
 #include <game/rtech/assets/wrap.h>
 #include <game/rtech/cpakfile.h>
 #include <game/rtech/utils/utils.h>
+#include <game/bsp/bsp.h>
+#include <thirdparty/imgui/imgui.h>
 
 void LoadWrapAsset(CAssetContainer* const pak, CAsset* const asset)
 {
@@ -29,6 +31,7 @@ void LoadWrapAsset(CAssetContainer* const pak, CAsset* const asset)
     pakAsset->setExtraData(wrapAsset);
 }
 
+
 static bool GetStreamedDataForWrapAsset(CPakAsset* const asset, const uint32_t size, const int32_t skipSize, std::unique_ptr<char[]>& wrapData)
 {
     AssetPtr_t streamEntry = asset->getStarPakStreamEntry(false);
@@ -49,35 +52,12 @@ static bool GetStreamedDataForWrapAsset(CPakAsset* const asset, const uint32_t s
     return false;
 }
 
-bool ExportWrapAsset(CAsset* const asset, const int setting)
+std::unique_ptr<char[]> GetWrapAssetData(CAsset* const asset, uint64_t* outSize)
 {
-    UNUSED(setting);
     CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
 
     const WrapAsset* const wrapAsset = reinterpret_cast<WrapAsset*>(pakAsset->extraData());
     assertm(wrapAsset, "Extra data should be valid at this point.");
-
-    // Create exported path + asset path.
-    std::filesystem::path exportPath = std::filesystem::current_path().append(std::format("{}\\{}", EXPORT_DIRECTORY_NAME, fourCCToString(asset->GetAssetType())));
-    if (!CreateDirectories(exportPath))
-    {
-        assertm(false, "Failed to create asset type directory.");
-        return false;
-    }
-    exportPath.append(asset->GetAssetName());
-    if (!CreateDirectories(exportPath.parent_path()))
-    {
-        assertm(false, "Failed to create export directory.");
-        return false;
-    }
-
-    StreamIO wrapOut;
-
-    if (!wrapOut.open(exportPath.string(), eStreamIOMode::Write))
-    {
-        assertm(false, "Failed to open file for write.");
-        return false;
-    }
 
     const uint32_t wrapSize = wrapAsset->isCompressed ? wrapAsset->cmpSize : wrapAsset->dcmpSize;
     std::unique_ptr<char[]> wrapData = std::make_unique<char[]>(wrapSize);
@@ -87,7 +67,7 @@ bool ExportWrapAsset(CAsset* const asset, const int setting)
         if (!GetStreamedDataForWrapAsset(pakAsset, wrapSize, wrapAsset->skipSize, wrapData))
         {
             assertm(false, "Failed to get streamed data for wrap asset.");
-            return false;
+            return nullptr;
         }
     }
     else
@@ -112,10 +92,127 @@ bool ExportWrapAsset(CAsset* const asset, const int setting)
         wrapData = RTech::DecompressStreamedBuffer(std::move(wrapData), wrapOutSize, eCompressionType::OODLE);
     }
 
-    wrapOut.write(wrapData.get(), wrapOutSize);
-    wrapOut.close();
+    if (outSize)
+        *outSize = wrapOutSize;
+
+    return wrapData;
+}
+
+
+void PostLoadWrapAsset(CAssetContainer* const pak, CAsset* const asset)
+{
+    UNUSED(pak);
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    WrapAsset* const wrapAsset = reinterpret_cast<WrapAsset*>(pakAsset->extraData());
+    assertm(wrapAsset, "Extra data should be valid at this point.");
+
+    wrapAsset->parsedDataType = eWrapAssetParsedDataType::NONE;
+
+    // todo: bsp feature
+    //std::filesystem::path assetPath = std::filesystem::path(asset->GetAssetName());
+    //std::string extension = assetPath.extension().string();
+
+    //if (extension == ".bsp")
+    //{
+    //    wrapAsset->parsedDataType = eWrapAssetParsedDataType::BSP;
+
+    //    std::unique_ptr<char[]> wrapData = GetWrapAssetData(asset, nullptr);
+
+    //    CBSPData* bspData = new CBSPData(assetPath.stem().string());
+    //    bspData->PopulateFromPakAsset(pakAsset, wrapData.get());
+
+    //    wrapAsset->parsedData = bspData;
+    //}
+}
+
+bool ExportWrapAsset(CAsset* const asset, const int setting)
+{
+    UNUSED(setting);
+    CPakAsset* pakAsset = static_cast<CPakAsset*>(asset);
+
+    const WrapAsset* const wrapAsset = reinterpret_cast<WrapAsset*>(pakAsset->extraData());
+    assertm(wrapAsset, "Extra data should be valid at this point.");
+
+    // Create exported path + asset path.
+    std::filesystem::path exportPath = std::filesystem::current_path().append(std::format("{}\\{}", EXPORT_DIRECTORY_NAME, fourCCToString(asset->GetAssetType())));
+    if (!CreateDirectories(exportPath))
+    {
+        assertm(false, "Failed to create asset type directory.");
+        return false;
+    }
+    exportPath.append(asset->GetAssetName());
+
+    if (!CreateDirectories(exportPath.parent_path()))
+    {
+        assertm(false, "Failed to create export directory.");
+        return false;
+    }
+
+    switch (wrapAsset->parsedDataType)
+    {
+    case eWrapAssetParsedDataType::NONE:
+    default:
+    {
+        StreamIO wrapOut;
+
+        if (!wrapOut.open(exportPath.string(), eStreamIOMode::Write))
+        {
+            assertm(false, "Failed to open file for write.");
+            return false;
+        }
+
+        uint64_t wrapOutSize = 0;
+        std::unique_ptr<char[]> wrapData = GetWrapAssetData(asset, &wrapOutSize);
+
+        if (!wrapData)
+            return false;
+
+        wrapOut.write(wrapData.get(), wrapOutSize);
+        wrapOut.close();
+        break;
+    }
+    // needs some stuff to be finished first
+    /*case eWrapAssetParsedDataType::BSP:
+    {
+        StreamIO wrapOut;
+
+        if (!wrapOut.open(exportPath.string(), eStreamIOMode::Write))
+        {
+            assertm(false, "Failed to open file for write.");
+            return false;
+        }
+
+        CBSPData* bspData = reinterpret_cast<CBSPData*>(wrapAsset->parsedData);
+
+        bspData->Export(wrapOut.W());
+
+        wrapOut.close();
+
+        break;
+    }*/
+    }
 
     return true;
+}
+
+void* PreviewWrapAsset(CAsset* const asset, const bool firstFrameForAsset)
+{
+    UNUSED(firstFrameForAsset);
+    CPakAsset* const pakAsset = static_cast<CPakAsset*>(asset);
+    assertm(pakAsset, "Asset should be valid.");
+
+    WrapAsset* const wrapAsset = reinterpret_cast<WrapAsset*>(pakAsset->extraData());
+    assertm(wrapAsset, "Extra data should be valid at this point.");
+
+    if (!wrapAsset || wrapAsset->parsedDataType == eWrapAssetParsedDataType::NONE)
+        return nullptr;
+
+    if (wrapAsset->parsedDataType == eWrapAssetParsedDataType::BSP)
+        return reinterpret_cast<CBSPData*>(wrapAsset->parsedData)->ConstructPreviewData();
+
+    return nullptr;
+
 }
 
 void InitWrapAssetType()
@@ -125,8 +222,8 @@ void InitWrapAssetType()
         .type = 'parw',
         .headerAlignment = 8,
         .loadFunc = LoadWrapAsset,
-        .postLoadFunc = nullptr,
-        .previewFunc = nullptr,
+        .postLoadFunc = PostLoadWrapAsset,
+        .previewFunc = PreviewWrapAsset,
         .e = { ExportWrapAsset, 0, nullptr, 0ull },
     };
 

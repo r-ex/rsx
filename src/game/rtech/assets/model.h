@@ -171,8 +171,9 @@ enum class eMDLVersion : int
 	VERSION_12,
 	VERSION_12_1,
 	VERSION_12_2,
-	VERSION_12_3,
+	VERSION_12_3, // changes mstudioevent_t (animseq 10)
 	VERSION_12_4,
+	VERSION_12_5,
 	VERSION_13,
 	VERSION_13_1,
 	VERSION_14,
@@ -181,6 +182,7 @@ enum class eMDLVersion : int
 	VERSION_16,
 	VERSION_17,
 	VERSION_18,
+	VERSION_19,
 
 	// bleh
 	VERSION_52,
@@ -200,6 +202,7 @@ static const std::map<int, eMDLVersion> s_mdlVersionMap
 	{ 16, eMDLVersion::VERSION_16 },
 	{ 17, eMDLVersion::VERSION_17 },
 	{ 18, eMDLVersion::VERSION_18 },
+	{ 19, eMDLVersion::VERSION_19 },
 };
 
 inline const eMDLVersion GetModelVersionFromAsset(CPakAsset* const asset)
@@ -228,17 +231,17 @@ inline const eMDLVersion GetModelVersionFromAsset(CPakAsset* const asset)
 		if ((pMDL[102] == sizeof(r5::studiohdr_v12_2_t) || pMDL[41] == sizeof(r5::studiohdr_v12_2_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
 			return eMDLVersion::VERSION_12_2;
 
-		if ((pMDL[102] == sizeof(r5::studiohdr_v12_3_t) || pMDL[41] == sizeof(r5::studiohdr_v12_3_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
-			return eMDLVersion::VERSION_12_3;
-
 		if ((pMDL[102] == sizeof(r5::studiohdr_v12_4_t) || pMDL[41] == sizeof(r5::studiohdr_v12_4_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
 			return eMDLVersion::VERSION_12_4;
+
+		if ((pMDL[102] == sizeof(r5::studiohdr_v12_5_t) || pMDL[41] == sizeof(r5::studiohdr_v12_5_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
+			return eMDLVersion::VERSION_12_5;
 
 		return eMDLVersion::VERSION_UNK;
 	}
 	case eMDLVersion::VERSION_13:
 	{
-		const r5::studiohdr_v12_4_t* const pHdr = reinterpret_cast<const r5::studiohdr_v12_4_t* const>(pMDL);
+		const r5::studiohdr_v12_5_t* const pHdr = reinterpret_cast<const r5::studiohdr_v12_5_t* const>(pMDL);
 
 		if (pHdr->numbodyparts == 0)
 			return out;
@@ -287,11 +290,11 @@ inline const eMDLVersion GetModelPakVersion(const int* const pHdr)
 	if (pHdr[102] == sizeof(r5::studiohdr_v12_2_t) || pHdr[41] == sizeof(r5::studiohdr_v12_2_t))
 		return eMDLVersion::VERSION_12_2;
 
-	if (pHdr[102] == sizeof(r5::studiohdr_v12_3_t) || pHdr[41] == sizeof(r5::studiohdr_v12_3_t))
-		return eMDLVersion::VERSION_12_3;
-
 	if (pHdr[102] == sizeof(r5::studiohdr_v12_4_t) || pHdr[41] == sizeof(r5::studiohdr_v12_4_t))
 		return eMDLVersion::VERSION_12_4;
+
+	if (pHdr[102] == sizeof(r5::studiohdr_v12_5_t) || pHdr[41] == sizeof(r5::studiohdr_v12_5_t))
+		return eMDLVersion::VERSION_12_5;
 	
 	if (pHdr[104] == sizeof(r5::studiohdr_v14_t) || pHdr[41] == sizeof(r5::studiohdr_v14_t))
 		return eMDLVersion::VERSION_14;
@@ -332,14 +335,15 @@ public:
 			break;
 		}
 		case eMDLVersion::VERSION_12_2:
+		case eMDLVersion::VERSION_12_3:
 		{
 			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_2_t*>(data));
 			break;
 		}
-		case eMDLVersion::VERSION_12_3:
 		case eMDLVersion::VERSION_12_4:
+		case eMDLVersion::VERSION_12_5:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_4_t*>(data));
 			break;
 		}
 		}
@@ -354,7 +358,7 @@ public:
 		case eMDLVersion::VERSION_13:
 		case eMDLVersion::VERSION_13_1:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_3_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_4_t*>(data));
 			break;
 		}
 		case eMDLVersion::VERSION_14:
@@ -369,7 +373,24 @@ public:
 
 	ModelAsset(ModelAssetHeader_v16_t* hdr, ModelAssetCPU_v16_t* cpu, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertDataPermanent(hdr->permVertData), vertDataStreamed(streamedData), physics(cpu->physics),
 		componentDataSize(-1), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
-		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), parsedData(reinterpret_cast<r5::studiohdr_v16_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel) {};
+		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver)
+	{
+		switch (ver)
+		{
+		case eMDLVersion::VERSION_16:
+		{
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v16_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel);
+			break;
+		}
+		case eMDLVersion::VERSION_17:
+		case eMDLVersion::VERSION_18:
+		case eMDLVersion::VERSION_19:
+		{
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v17_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel);
+			break;
+		}
+		}
+	};
 
 	~ModelAsset()
 	{

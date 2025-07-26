@@ -367,6 +367,20 @@ void ParseModelBoneData_v16(ModelParsedData_t* const parsedData)
 		parsedData->bones.at(i) = ModelBone_t(&bonehdrs[i], &bonedata[i]);
 }
 
+void ParseModelBoneData_v19(ModelParsedData_t* const parsedData)
+{
+	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+
+	const r5::mstudiobonehdr_v16_t* const bonehdrs = reinterpret_cast<const r5::mstudiobonehdr_v16_t* const>(pStudioHdr->pBones());
+	const r5::mstudiobonedata_v19_t* const bonedata = reinterpret_cast<const r5::mstudiobonedata_v19_t* const>(pStudioHdr->pBoneData());
+	const r5::mstudiolinearbone_v19_t* const linearbone = reinterpret_cast<const r5::mstudiolinearbone_v19_t* const>(pStudioHdr->pLinearBone());
+
+	parsedData->bones.resize(pStudioHdr->boneCount);
+
+	for (int i = 0; i < pStudioHdr->boneCount; i++)
+		parsedData->bones.at(i) = ModelBone_t(&bonehdrs[i], &bonedata[i], linearbone, i);
+}
+
 void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const drawData, const uint64_t lod)
 {
 	// [rika]: eventually parse through models
@@ -376,6 +390,7 @@ void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const 
 		DXMeshDrawData_t* const meshDrawData = &drawData->meshBuffers[i];
 
 		meshDrawData->visible = true;
+		meshDrawData->doFrustumCulling = false;
 
 		if (mesh.materialAsset)
 			meshDrawData->uberStaticBuf = mesh.GetMaterialAsset()->uberStaticBuffer;
@@ -440,6 +455,7 @@ void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const 
 	return;
 }
 
+// [rika]: this is for model internal sequence data (r5)
 void ParseModelSequenceData_NoStall(ModelParsedData_t* const parsedData, char* const baseptr)
 {
 	assertm(parsedData->bones.size() > 0, "should have bones");
@@ -455,25 +471,223 @@ void ParseModelSequenceData_NoStall(ModelParsedData_t* const parsedData, char* c
 	{
 		parsedData->sequences[i] = seqdesc_t(reinterpret_cast<r5::mstudioseqdesc_v8_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i);
 
-		ParseSeqDesc_R5_RLE(&parsedData->sequences[i], &parsedData->bones, false);
+		ParseSeqDesc_R5(&parsedData->sequences[i], &parsedData->bones, false);
 	}
 }
 
-void ParseSeqDesc_R2_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr)
+void ParseAnimDesc_Origin(animdesc_t* const animdesc, CAnimData& animData, bool(*Studio_AnimPosition)(const animdesc_t* const, float, Vector&, QAngle&))
 {
-	const size_t boneCount = bones->size();
+	// [rika]: adjust the origin bone
+	// [rika]: do after we get anim data, so our rotation does not get overwritten
+	CAnimDataBone& originBone = animData.GetBone(0);
+	originBone.SetFlags(CAnimDataBone::ANIMDATA_POS | CAnimDataBone::ANIMDATA_ROT); // make sure it has position and rotation
 
+	for (int frame = 0; frame < animdesc->numframes; frame++)
+	{
+		Vector pos(originBone.GetPosPtr()[frame]);
+		Quaternion q(originBone.GetRotPtr()[frame]);
+		const Vector& scale = originBone.GetSclPtr()[frame];
+
+		QAngle vecAngleBase(q);
+
+		const float cycle = animdesc->GetCycle(frame);
+
+		if ((nullptr != animdesc->movement && animdesc->flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT) || (animdesc->nummovements && animdesc->movementindex))
+		{
+			Vector vecPos;
+			QAngle vecAngle;
+
+			Studio_AnimPosition(animdesc, cycle, vecPos, vecAngle);
+
+			pos += vecPos; // add our base movement position to our base position 
+			vecAngleBase.y += (vecAngle.y);
+		}
+
+		vecAngleBase.y += -90; // rotate -90 degree on the yaw axis
+
+		// adjust position as we are rotating on the Z axis
+		const float x = pos.x;
+		const float y = pos.y;
+
+		pos.x = y;
+		pos.y = -x;
+
+		AngleQuaternion(vecAngleBase, q);
+
+		originBone.SetFrame(frame, pos, q, scale);
+	}
+}
+
+void ParseAnimDesc_R2(seqdesc_t* const seqdesc, animdesc_t* const animdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr)
+{
+	const int boneCount = static_cast<int>(bones->size());
+
+	Vector positions[256]{};
+	Quaternion quats[256]{};
+	Vector scales[256]{};
+
+	if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA)
+	{
+		for (int i = 0; i < boneCount; i++)
+		{
+			positions[i].Init(0.0f, 0.0f, 0.0f);
+			quats[i].Init(0.0f, 0.0f, 0.0f, 1.0f);
+			scales[i].Init(1.0f, 1.0f, 1.0f);
+		}
+	}
+	else
+	{
+		for (int i = 0; i < boneCount; i++)
+		{
+			const ModelBone_t* const bone = &bones->at(i);
+
+			positions[i] = bone->pos;
+			quats[i] = bone->quat;
+			scales[i] = bone->scale;
+		}
+	}
+
+	// no point to allocate memory on empty animations!
+	CAnimData animData(boneCount, animdesc->numframes);
+	animData.ReserveVector();
+
+	// [rika]: parse through the bone tracks here
+	for (int frame = 0; frame < animdesc->numframes; frame++)
+	{
+		const float cycle = animdesc->GetCycle(frame);
+
+		float fFrame = cycle * static_cast<float>(animdesc->numframes - 1);
+
+		const int iFrame = static_cast<int>(fFrame);
+		const float s = (fFrame - static_cast<float>(iFrame));
+
+		int iLocalFrame = iFrame;
+
+		//const r2::mstudio_rle_anim_t* panim = reinterpret_cast<const r2::mstudio_rle_anim_t*>(animdesc->pAnimdataNoStall(&iLocalFrame));
+
+		for (int bone = 0; bone < boneCount; bone++)
+		{
+			Vector pos;
+			Quaternion q;
+			Vector scale;
+
+			const r2::mstudio_rle_anim_t* panim = reinterpret_cast<const r2::mstudio_rle_anim_t*>(animdesc->pAnimdataNoStall(&iLocalFrame));
+			
+			// [rika]: titanfall 2 cycles through all the bone headers to get right one for a given bone
+			// [rika]: handle like the game since sometimes there can be blocks of bone headers with '0xff' bone id (if my memory serves me)
+			// [rika]: slightly slower this way which is likely why it's changed in apex
+			while (panim->bone < bone)
+			{
+				panim = panim->pNext();
+
+				if (!panim)
+					break;
+			}
+
+			// r2 animations will always have position
+			uint8_t boneFlags = CAnimDataBone::ANIMDATA_POS;
+
+			if (panim && panim->bone == bone)
+			{
+				boneFlags |= (panim->flags & r2::RleFlags_t::STUDIO_ANIM_NOROT ? 0 : CAnimDataBone::ANIMDATA_ROT) | (seqdesc->flags & eStudioAnimFlags::ANIM_SCALE ? CAnimDataBone::ANIMDATA_SCL : 0);
+
+				// need to add a bool here, we do not want the interpolated values (inbetween frames)
+				r2::CalcBonePosition(iLocalFrame, s, pStudioHdr->pBone(panim->bone), pStudioHdr->pLinearBones(), panim, pos);
+				r2::CalcBoneQuaternion(iLocalFrame, s, pStudioHdr->pBone(panim->bone), pStudioHdr->pLinearBones(), panim, q);
+				r2::CalcBoneScale(iLocalFrame, s, pStudioHdr->pBone(panim->bone)->scale, pStudioHdr->pBone(panim->bone)->scalescale, panim, scale);
+			}
+			else
+			{
+				boneFlags = 0x0;
+
+				pos = positions[bone];
+				q = quats[bone];
+				scale = scales[bone];
+			}
+
+			CAnimDataBone& animDataBone = animData.GetBone(bone);
+			animDataBone.SetFlags(boneFlags);
+			animDataBone.SetFrame(frame, pos, q, scale);
+		}
+	}
+
+	ParseAnimDesc_Origin(animdesc, animData, &r1::Studio_AnimPosition);
+
+	// parse into memory and compress
+	CManagedBuffer* buffer = g_BufferManager.ClaimBuffer();
+
+	const size_t sizeInMem = animData.ToMemory(buffer->Buffer());
+	animdesc->parsedBufferIndex = seqdesc->parsedData.addBack(buffer->Buffer(), sizeInMem);
+
+	g_BufferManager.RelieveBuffer(buffer);
+}
+
+void ParseSeqDesc_R2(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr)
+{
 	for (int i = 0; i < seqdesc->AnimCount(); i++)
 	{
 		animdesc_t* const animdesc = &seqdesc->anims.at(i);
 
-		// no point to allocate memory on empty animations!
-		CAnimData animData(boneCount, animdesc->numframes);
-		animData.ReserveVector();
+		ParseAnimDesc_R2(seqdesc, animdesc, bones, pStudioHdr);
+	}
+}
 
-		for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
+void ParseAnimDesc_R5(seqdesc_t* const seqdesc, animdesc_t* const animdesc, const std::vector<ModelBone_t>* const bones, char* (animdesc_t::* pAnimdata)(int* const) const)
+{
+	const int boneCount = static_cast<int>(bones->size());
+
+	Vector positions[256]{};
+	Quaternion quats[256]{};
+	Vector scales[256]{};
+	RadianEuler rotations[256]{};
+
+	if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA)
+	{
+		for (int i = 0; i < boneCount; i++)
 		{
-			const float cycle = animdesc->GetCycle(frameIdx);
+			positions[i].Init(0.0f, 0.0f, 0.0f);
+			quats[i].Init(0.0f, 0.0f, 0.0f, 1.0f);
+			scales[i].Init(1.0f, 1.0f, 1.0f);
+			rotations[i].Init(0.0f, 0.0f, 0.0f);
+		}
+	}
+	else
+	{
+		if (animdesc->flags & eStudioAnimFlags::ANIM_DATAPOINT)
+		{
+			for (int i = 0; i < boneCount; i++)
+			{
+				const ModelBone_t* const bone = &bones->at(i);
+
+				positions[i].Init(0.0f, 0.0f, 0.0f);
+				quats[i].Init(0.0f, 0.0f, 0.0f, 1.0f);
+				scales[i].Init(1.0f, 1.0f, 1.0f);
+				rotations[i] = bone->rot;
+			}
+		}
+		else
+		{
+			for (int i = 0; i < boneCount; i++)
+			{
+				const ModelBone_t* const bone = &bones->at(i);
+
+				positions[i] = bone->pos;
+				quats[i] = bone->quat;
+				scales[i] = bone->scale;
+				rotations[i] = bone->rot;
+			}
+		}
+	}
+
+	CAnimData animData(boneCount, animdesc->numframes);
+	animData.ReserveVector();
+
+	// [rika]: parse through the bone tracks here
+	if (animdesc->flags & eStudioAnimFlags::ANIM_VALID && animdesc->flags & eStudioAnimFlags::ANIM_DATAPOINT)
+	{
+		for (int frame = 0; frame < animdesc->numframes; frame++)
+		{
+			const float cycle = animdesc->GetCycle(frame);
 
 			float fFrame = cycle * static_cast<float>(animdesc->numframes - 1);
 
@@ -482,123 +696,60 @@ void ParseSeqDesc_R2_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t
 
 			int iLocalFrame = iFrame;
 
-			const r2::mstudio_rle_anim_t* panim = reinterpret_cast<const r2::mstudio_rle_anim_t*>(animdesc->pAnimdataNoStall(&iLocalFrame));
+			int sectionlength = 0;
+			const uint8_t* boneFlagArray = reinterpret_cast<uint8_t*>(animdesc->pAnimdataStall_DP(&iLocalFrame, &sectionlength));
+			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount)]);
 
-			for (int boneIdx = 0; boneIdx < boneCount; boneIdx++)
+			for (int bone = 0; bone < boneCount; bone++)
 			{
-				const ModelBone_t* const bone = &bones->at(boneIdx);
+				Vector pos(positions[bone]);
+				Quaternion q(quats[bone]);
+				Vector scale(scales[bone]);
+				RadianEuler baseRot(rotations[bone]);
 
-				Vector pos;
-				Quaternion q;
-				Vector scale;
 
-				// r2 animations will always have position
-				uint8_t boneFlags = CAnimDataBone::ANIMDATA_POS
-					| (panim->flags & r2::RleFlags_t::STUDIO_ANIM_NOROT ? 0 : CAnimDataBone::ANIMDATA_ROT)
-					| (seqdesc->flags & 0x20000 ? CAnimDataBone::ANIMDATA_SCL : 0);
+				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone); // truncate byte offset then shift if needed
+				const uint8_t* panimtrack = reinterpret_cast<const uint8_t*>(panim + 1);
+				const float fLocalFrame = static_cast<float>(iLocalFrame) + s;
 
-				if (panim && panim->bone == boneIdx)
+				if (boneFlags & (r5::RleBoneFlags_t::STUDIO_ANIM_DATA)) // check if this bone has data
 				{
-					// need to add a bool here, we do not want the interpolated values (inbetween frames)
-					r2::CalcBonePosition(iLocalFrame, s, pStudioHdr->pBone(panim->bone), pStudioHdr->pLinearBones(), panim, pos);
-					r2::CalcBoneQuaternion(iLocalFrame, s, pStudioHdr->pBone(panim->bone), pStudioHdr->pLinearBones(), panim, q);
-					r2::CalcBoneScale(iLocalFrame, s, pStudioHdr->pBone(panim->bone)->scale, pStudioHdr->pBone(panim->bone)->scalescale, panim, scale);
+					if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_ROT)
+						r5::CalcBoneQuaternion_DP(sectionlength, &panimtrack, fLocalFrame, q);
+
+					if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_POS)
+					{
+						if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_UNK8)
+							r5::CalcBonePositionVirtual_DP(sectionlength, &panimtrack, fLocalFrame, pos);
+						else
+							r5::CalcBonePosition_DP(sectionlength, &panimtrack, fLocalFrame, pos);
+					}
+
+					if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_SCALE)
+						r5::CalcBoneScale_DP(sectionlength, &panimtrack, fLocalFrame, pos);
 
 					panim = panim->pNext();
 				}
-				else
+
+				if (!(animdesc->flags & eStudioAnimFlags::ANIM_DELTA))
 				{
-					if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA)
-					{
-						pos.Init(0.0f, 0.0f, 0.0f);
-						q.Init(0.0f, 0.0f, 0.0f, 1.0f);
-						scale.Init(1.0f, 1.0f, 1.0f);
-					}
-					else
-					{
-						pos = bone->pos;
-						q = bone->quat;
-						scale = bone->scale;
-					}
+
 				}
 
-				// adjust the origin bone
-				// do after we get anim data, so our rotation does not get overwritten
-				if (boneIdx == 0)
-				{
-					QAngle vecAngleBase(q);
+				assertm(pos.IsValid(), "invalid position");
+				assertm(q.IsValid(), "invalid quaternion");
 
-					if (nullptr != animdesc->movement && animdesc->flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
-					{
-						Vector vecPos;
-						QAngle vecAngle;
-
-						r1::Studio_AnimPosition(animdesc, cycle, vecPos, vecAngle);
-
-						pos += vecPos; // add our base movement position to our base position 
-						vecAngleBase.y += (vecAngle.y);
-					}
-
-					vecAngleBase.y += -90; // rotate -90 degree on the yaw axis
-
-					// adjust position as we are rotating on the Z axis
-					const float x = pos.x;
-					const float y = pos.y;
-
-					pos.x = y;
-					pos.y = -x;
-
-					AngleQuaternion(vecAngleBase, q);
-
-					// has pos/rot data regardless since we just adjusted pos/rot
-					boneFlags |= (CAnimDataBone::ANIMDATA_POS | CAnimDataBone::ANIMDATA_ROT);
-				}
-
-				CAnimDataBone& animDataBone = animData.GetBone(boneIdx);
+				CAnimDataBone& animDataBone = animData.GetBone(bone);
 				animDataBone.SetFlags(boneFlags);
-				animDataBone.SetFrame(frameIdx, pos, q, scale);
+				animDataBone.SetFrame(frame, pos, q, scale);
 			}
 		}
-
-		// parse into memory and compress
-		CManagedBuffer* buffer = g_BufferManager.ClaimBuffer();
-
-		const size_t sizeInMem = animData.ToMemory(buffer->Buffer());
-		animdesc->parsedBufferIndex = seqdesc->parsedData.addBack(buffer->Buffer(), sizeInMem);
-
-		g_BufferManager.RelieveBuffer(buffer);
 	}
-}
-
-void ParseSeqDesc_R5_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const bool useStall)
-{
-	// check flags
-	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_POS) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_POS), "flag mismatch");
-	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_ROT) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_ROT), "flag mismatch");
-	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_SCL) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_SCALE), "flag mismatch");
-
-	char* (animdesc_t::*pAnimdata)(int* const) const = useStall ? &animdesc_t::pAnimdataStall : &animdesc_t::pAnimdataNoStall;
-
-	const size_t boneCount = bones->size();
-
-	for (int i = 0; i < seqdesc->AnimCount(); i++)
+	else if (animdesc->flags & eStudioAnimFlags::ANIM_VALID)
 	{
-		animdesc_t* const animdesc = &seqdesc->anims.at(i);
-
-		if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID))
+		for (int frame = 0; frame < animdesc->numframes; frame++)
 		{
-			animdesc->parsedBufferIndex = invalidNoodleIdx;
-
-			continue;
-		}
-
-		// no point to allocate memory on empty animations!
-		CAnimData animData(boneCount, animdesc->numframes);
-		animData.ReserveVector();
-
-		for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
-		{
-			const float cycle = animdesc->GetCycle(frameIdx);
+			const float cycle = animdesc->GetCycle(frame);
 
 			float fFrame = cycle * static_cast<float>(animdesc->numframes - 1);
 
@@ -610,31 +761,14 @@ void ParseSeqDesc_R5_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t
 			const uint8_t* boneFlagArray = reinterpret_cast<uint8_t*>((animdesc->*pAnimdata)(&iLocalFrame));
 			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount)]);
 
-			for (int boneIdx = 0; boneIdx < boneCount; boneIdx++)
+			for (int bone = 0; bone < boneCount; bone++)
 			{
-				const ModelBone_t* const bone = &bones->at(boneIdx);
+				Vector pos(positions[bone]);
+				Quaternion q(quats[bone]);
+				Vector scale(scales[bone]);
+				RadianEuler baseRot(rotations[bone]);
 
-				Vector pos;
-				Quaternion q;
-				Vector scale;
-				RadianEuler baseRot;
-
-				if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA)
-				{
-					pos.Init(0.0f, 0.0f, 0.0f);
-					q.Init(0.0f, 0.0f, 0.0f, 1.0f);
-					scale.Init(1.0f, 1.0f, 1.0f);
-					baseRot.Init(0.0f, 0.0f, 0.0f);
-				}
-				else
-				{
-					pos = bone->pos;
-					q = bone->quat;
-					scale = bone->scale;
-					baseRot = bone->rot;
-				}
-
-				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, boneIdx); // truncate byte offset then shift if needed
+				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone); // truncate byte offset then shift if needed
 
 				if (boneFlags & (r5::RleBoneFlags_t::STUDIO_ANIM_DATA)) // check if this bone has data
 				{
@@ -645,61 +779,66 @@ void ParseSeqDesc_R5_RLE(seqdesc_t* const seqdesc, const std::vector<ModelBone_t
 					if (boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_SCALE)
 						CalcBoneScale(iLocalFrame, s, panim, scale, boneFlags);
 
-
 					panim = panim->pNext();
 				}
 
-				// adjust the origin bone
-				// do after we get anim data, so our rotation does not get overwritten
-				if (boneIdx == 0)
-				{
-					QAngle vecAngleBase(q);
-
-					if (nullptr != animdesc->movement && animdesc->flags & eStudioAnimFlags::ANIM_FRAMEMOVEMENT)
-					{
-						Vector vecPos;
-						QAngle vecAngle;
-
-						r5::Studio_AnimPosition(animdesc, cycle, vecPos, vecAngle);
-
-						pos += vecPos; // add our base movement position to our base position 
-						vecAngleBase.y += (vecAngle.y);
-					}
-
-					vecAngleBase.y += -90; // rotate -90 degree on the yaw axis
-
-					// adjust position as we are rotating on the Z axis
-					const float x = pos.x;
-					const float y = pos.y;
-
-					pos.x = y;
-					pos.y = -x;
-
-					AngleQuaternion(vecAngleBase, q);
-
-					// has pos/rot data regardless since we just adjusted pos/rot
-					boneFlags |= (CAnimDataBone::ANIMDATA_POS | CAnimDataBone::ANIMDATA_ROT);
-				}
-
-				CAnimDataBone& animDataBone = animData.GetBone(boneIdx);
+				CAnimDataBone& animDataBone = animData.GetBone(bone);
 				animDataBone.SetFlags(boneFlags);
-				animDataBone.SetFrame(frameIdx, pos, q, scale);
+				animDataBone.SetFrame(frame, pos, q, scale);
 			}
 		}
+	}
+	// [rika]: or don't, if we don't have any
+	else
+	{
+		// [rika]: does this sequence use scale?
+		const uint8_t boneFlags = 0x0/*(seqdesc->flags & eStudioAnimFlags::ANIM_SCALE) ? CAnimDataBone::ANIMDATA_DATA : (CAnimDataBone::ANIMDATA_POS | CAnimDataBone::ANIMDATA_ROT)*/;
 
-		// parse into memory and compress
-		CManagedBuffer* buffer = g_BufferManager.ClaimBuffer();
+		for (int bone = 0; bone < boneCount; bone++)
+		{
+			CAnimDataBone& animDataBone = animData.GetBone(bone);
+			
+			for (int frame = 0; frame < animdesc->numframes; frame++)
+			{
+				animDataBone.SetFlags(boneFlags);
+				animDataBone.SetFrame(frame, positions[bone], quats[bone], scales[bone]);
+			}
+		}
+	}
 
-		const size_t sizeInMem = animData.ToMemory(buffer->Buffer());
-		animdesc->parsedBufferIndex = seqdesc->parsedData.addBack(buffer->Buffer(), sizeInMem);
+	ParseAnimDesc_Origin(animdesc, animData, &r5::Studio_AnimPosition);
 
-		g_BufferManager.RelieveBuffer(buffer);
+	// parse into memory and compress
+	CManagedBuffer* buffer = g_BufferManager.ClaimBuffer();
+
+	const size_t sizeInMem = animData.ToMemory(buffer->Buffer());
+	animdesc->parsedBufferIndex = seqdesc->parsedData.addBack(buffer->Buffer(), sizeInMem);
+
+	g_BufferManager.RelieveBuffer(buffer);		
+}
+
+void ParseSeqDesc_R5(seqdesc_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const bool useStall)
+{
+	// check flags
+	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_POS) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_POS), "flag mismatch");
+	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_ROT) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_ROT), "flag mismatch");
+	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_SCL) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_SCALE), "flag mismatch");
+
+	char* (animdesc_t::*pAnimdata)(int* const) const = useStall ? &animdesc_t::pAnimdataStall : &animdesc_t::pAnimdataNoStall;
+
+	for (int i = 0; i < seqdesc->AnimCount(); i++)
+	{
+		animdesc_t* const animdesc = &seqdesc->anims.at(i);
+
+		ParseAnimDesc_R5(seqdesc, animdesc, bones, pAnimdata);
 	}
 }
 
 //
 // COMPDATA
 //
+
+// CMeshData
 void CMeshData::AddIndices(const uint16_t* const indices, const size_t indiceCount)
 {
 	assertm(writer, "attempting to write data, but writer is not initialized.");
@@ -756,14 +895,15 @@ void CMeshData::AddTexcoords(const Vector2D* const texcoords, const size_t texco
 	writer += IALIGN16(bufferSize);
 }
 
+// CAnimData
 CAnimData::CAnimData(char* const buf) : pBuffer(buf), memory(true)
 {
 	assertm(nullptr != pBuffer, "invalid pointer provided");
 
 	const char* curpos = pBuffer;
 
-	memcpy(&numBones, curpos, sizeof(size_t) * 2);
-	curpos += sizeof(size_t) * 2;
+	memcpy(&numBones, curpos, sizeof(int) * 2);
+	curpos += sizeof(int) * 2;
 
 	pOffsets = reinterpret_cast<const size_t* const>(curpos);
 	curpos += IALIGN16(sizeof(size_t) * numBones);
@@ -772,12 +912,44 @@ CAnimData::CAnimData(char* const buf) : pBuffer(buf), memory(true)
 	curpos += IALIGN16(sizeof(uint8_t) * numBones);
 };
 
+// access memory data
+const Vector* const CAnimData::GetBonePosForFrame(const int bone, const int frame) const
+{
+	const uint8_t boneFlags = GetFlag(bone);
+	assertm(boneFlags & CAnimDataBone::ANIMDATA_POS, "bone did not have position");
+
+	const Vector* const tmp = reinterpret_cast<const Vector* const>(pBuffer + pOffsets[bone]);
+
+	return tmp + frame;
+}
+
+const Quaternion* const CAnimData::GetBoneQuatForFrame(const int bone, const int frame) const
+{
+	const uint8_t boneFlags = GetFlag(bone);
+	assertm(boneFlags & CAnimDataBone::ANIMDATA_ROT, "bone did not have rotation");
+
+	const Quaternion* const tmp = reinterpret_cast<const Quaternion* const>(pBuffer + pOffsets[bone] + (s_AnimDataBoneSizeLUT[boneFlags & CAnimDataBone::ANIMDATA_POS] * numFrames));
+
+	return tmp + frame;
+}
+
+const Vector* const CAnimData::GetBoneScaleForFrame(const int bone, const int frame) const
+{
+	const uint8_t boneFlags = GetFlag(bone);
+	assertm(boneFlags & CAnimDataBone::ANIMDATA_SCL, "bone did not have scale");
+
+	const Vector* const tmp = reinterpret_cast<const Vector* const>(pBuffer + pOffsets[bone] + (s_AnimDataBoneSizeLUT[boneFlags & (CAnimDataBone::ANIMDATA_POS | CAnimDataBone::ANIMDATA_ROT)] * numFrames));
+
+	return tmp + frame;
+}
+
 const size_t CAnimData::ToMemory(char* const buf)
 {
 	char* curpos = buf;
 
-	memcpy(curpos, &numBones, sizeof(size_t) * 2);
-	curpos += sizeof(size_t) * 2;
+	// dumb
+	memcpy(curpos, &numBones, sizeof(int) * 2);
+	curpos += sizeof(int) * 2;
 
 	size_t* offsets = reinterpret_cast<size_t*>(curpos);
 	curpos += IALIGN16(sizeof(size_t) * numBones);
@@ -1339,7 +1511,9 @@ inline void ParseVertexIntoSMD(const Vertex_t* const srcVert, const VertexWeight
 		StaticPropFlipFlop(vert->normal);
 	}
 
+	// [rika]: todo support more texcoords ?
 	vert->texcoords[0] = srcVert->texcoord;
+	Vertex_t::InvertTexcoord(vert->texcoords[0]); // [rika]: the texcoord has to be inverted for proper recompile
 
 	vert->numBones = srcVert->weightCount > smd::maxBoneWeights ? smd::maxBoneWeights : srcVert->weightCount;
 
@@ -1464,6 +1638,7 @@ bool ExportSeqDescRMAX(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 		if (animdesc->flags & eStudioAnimFlags::ANIM_DELTA) // delta flag
 			animFlags |= rmax::AnimFlags_t::ANIM_DELTA;
 
+		// [rika]: not touching this for now since we really don't care about empty bones on types not for re import
 		if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID) || animdesc->parsedBufferIndex == invalidNoodleIdx)
 			animFlags |= rmax::AnimFlags_t::ANIM_EMPTY;
 
@@ -1480,11 +1655,9 @@ bool ExportSeqDescRMAX(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 		const std::unique_ptr<char[]> noodle = seqdesc->parsedData.getIdx(animdesc->parsedBufferIndex);
 		CAnimData animData(noodle.get());
 
-		for (size_t i = 0; i < boneCount; i++)
+		for (int i = 0; i < boneCount; i++)
 		{
 			const uint8_t flags = animData.GetFlag(i);
-
-			const char* dataPtr = animData.GetData(i);
 
 			anim->SetTrack(flags, static_cast<uint16_t>(i));
 			rmax::RMAXAnimTrack* const track = anim->GetTrack(i);
@@ -1494,25 +1667,13 @@ bool ExportSeqDescRMAX(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 			const Vector* scale = nullptr;
 
 			if (flags & CAnimDataBone::ANIMDATA_POS)
-			{
-				pos = reinterpret_cast<const Vector*>(dataPtr);
-
-				dataPtr += (sizeof(Vector) * animdesc->numframes);
-			}
+				pos = animData.GetBonePosForFrame(i, 0);
 
 			if (flags & CAnimDataBone::ANIMDATA_ROT)
-			{
-				q = reinterpret_cast<const Quaternion*>(dataPtr);
-
-				dataPtr += (sizeof(Quaternion) * animdesc->numframes);
-			}
+				q = animData.GetBoneQuatForFrame(i, 0);
 
 			if (flags & CAnimDataBone::ANIMDATA_SCL)
-			{
-				scale = reinterpret_cast<const Vector*>(dataPtr);
-
-				dataPtr += (sizeof(Vector) * animdesc->numframes);
-			}
+				scale = animData.GetBoneScaleForFrame(i, 0);
 
 			for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
 			{
@@ -1571,6 +1732,7 @@ bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 			}
 		}
 
+		// [rika]: not touching this for now since we really don't care about empty bones on types not for re import
 		if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID) || animdesc->parsedBufferIndex == invalidNoodleIdx)
 		{
 			cast.ToFile();
@@ -1591,23 +1753,20 @@ bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 		Quaternion deltaQuat(0.0f, 0.0f, 0.0f, 1.0f);
 		Vector deltaScale(1.0f, 1.0f, 1.0f);
 
-		for (size_t i = 0; i < boneCount; i++)
+		for (int i = 0; i < boneCount; i++)
 		{
 			const ModelBone_t* const boneData = &bones->at(i);
 
 			// parsed data
 			const uint8_t flags = animData.GetFlag(i);
-			const char* dataPtr = animData.GetData(i);
 
 			// weight for delta anims
-			const float animWeight = seqdesc->Weight(static_cast<int>(i));
+			const float animWeight = seqdesc->Weight(i);
 
 			if (flags & CAnimDataBone::ANIMDATA_POS)
 			{
 				cast::CastNodeCurve curveNode(animNode);
-				curveNode.MakeCurveVector(boneData->name, reinterpret_cast<const Vector*>(dataPtr), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), cast::CastPropsCurveValue::POS_X, curveMode, animWeight);
-
-				dataPtr += (sizeof(Vector) * animdesc->numframes);
+				curveNode.MakeCurveVector(boneData->name, animData.GetBonePosForFrame(i, 0), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), cast::CastPropsCurveValue::POS_X, curveMode, animWeight);
 			}
 			else
 			{
@@ -1620,9 +1779,7 @@ bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 			if (flags & CAnimDataBone::ANIMDATA_ROT)
 			{
 				cast::CastNodeCurve curveNode(animNode);
-				curveNode.MakeCurveQuaternion(boneData->name, reinterpret_cast<const Quaternion*>(dataPtr), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), curveMode, animWeight);
-
-				dataPtr += (sizeof(Quaternion) * animdesc->numframes);
+				curveNode.MakeCurveQuaternion(boneData->name, animData.GetBoneQuatForFrame(i, 0), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), curveMode, animWeight);
 			}
 			else
 			{
@@ -1638,7 +1795,7 @@ bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 				if (flags & CAnimDataBone::ANIMDATA_SCL)
 				{
 					cast::CastNodeCurve curveNode(animNode);
-					curveNode.MakeCurveVector(boneData->name, reinterpret_cast<const Vector*>(dataPtr), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), cast::CastPropsCurveValue::SCL_X, curveMode, animWeight);
+					curveNode.MakeCurveVector(boneData->name, animData.GetBoneScaleForFrame(i, 0), static_cast<size_t>(animdesc->numframes), frameBuffer, static_cast<size_t>(animdesc->numframes), cast::CastPropsCurveValue::SCL_X, curveMode, animWeight);
 				}
 				else
 				{
@@ -1675,18 +1832,21 @@ bool ExportSeqDescSMD(const seqdesc_t* const seqdesc, std::filesystem::path& exp
 		smd->InitNode(bone.name, static_cast<int>(i), bone.parentIndex);
 	}
 
-	Vector deltaPos(0.0f, 0.0f, 0.0f);
-	Quaternion deltaQuat(0.0f, 0.0f, 0.0f, 1.0f);
+	const Vector deltaPos(0.0f, 0.0f, 0.0f);
+	const Quaternion deltaQuat(0.0f, 0.0f, 0.0f, 1.0f);
 
 	for (int animIdx = 0; animIdx < seqdesc->AnimCount(); animIdx++)
 	{
 		const animdesc_t* const animdesc = &seqdesc->anims.at(animIdx);
-		const std::string animname(std::format("{}_{}.smd", fileNameBase, std::to_string(animIdx)));
+
+		assertm(animdesc->name, "name was nullptr");
+		std::string animname(animdesc->name);
+		animname.append(".smd");
 
 		smd->ResetFrameData(static_cast<size_t>(animdesc->numframes));
 		smd->SetName(animname);
 
-		if (!(animdesc->flags & eStudioAnimFlags::ANIM_VALID) || animdesc->parsedBufferIndex == invalidNoodleIdx)
+		if (animdesc->parsedBufferIndex == invalidNoodleIdx)
 		{
 			smd->Write();
 
@@ -1696,45 +1856,34 @@ bool ExportSeqDescSMD(const seqdesc_t* const seqdesc, std::filesystem::path& exp
 		const std::unique_ptr<char[]> noodle = seqdesc->parsedData.getIdx(animdesc->parsedBufferIndex);
 		CAnimData animData(noodle.get());
 
-		for (int frameIdx = 0; frameIdx < animdesc->numframes; frameIdx++)
+		for (int frame = 0; frame < animdesc->numframes; frame++)
 		{
-			for (size_t i = 0; i < boneCount; i++)
+			for (int bone = 0; bone < boneCount; bone++)
 			{
-				const ModelBone_t* const boneData = &bones->at(i);
+				const ModelBone_t* const boneData = &bones->at(bone);
 
 				// parsed data
-				const uint8_t flags = animData.GetFlag(i);
-				const char* dataPtr = animData.GetData(i);
+				const uint8_t flags = animData.GetFlag(bone);
 
 				const Vector* pos = nullptr;
 				const Quaternion* q = nullptr;
 
 				if (flags & CAnimDataBone::ANIMDATA_POS)
-				{
-					pos = reinterpret_cast<const Vector* const>(dataPtr) + frameIdx;
-
-					dataPtr += (sizeof(Vector) * animdesc->numframes);
-				}
+					pos = animData.GetBonePosForFrame(bone, frame);
 				else
-				{
 					pos = animdesc->flags & eStudioAnimFlags::ANIM_DELTA ? &deltaPos : &boneData->pos;
-				}
 
 				if (flags & CAnimDataBone::ANIMDATA_ROT)
-				{
-					q = reinterpret_cast<const Quaternion* const>(dataPtr) + frameIdx;
-				}
+					q = animData.GetBoneQuatForFrame(bone, frame);
 				else
-				{
 					q = animdesc->flags & eStudioAnimFlags::ANIM_DELTA ? &deltaQuat : &boneData->quat;
-				}
 
 				assertm(pos, "should not be nullptr");
 				assertm(q, "should not be nullptr");
 
 				const RadianEuler rot(*q);
 
-				smd->InitFrameBone(frameIdx, static_cast<int>(i), *pos, rot);
+				smd->InitFrameBone(frame, bone, *pos, rot);
 			}
 		}
 

@@ -58,7 +58,7 @@ static void HandleAssetRegistration(const CCommandLine* const cli)
     // ui
     extern void InitUIAssetType();
     // hsys
-    // rlcd
+    extern void InitLcdScreenEffectAssetType();
     extern void InitRTKAssetType();
     
     // pak
@@ -121,7 +121,7 @@ static void HandleAssetRegistration(const CCommandLine* const cli)
     // ui
     InitUIAssetType();
     // hsys
-    // rlcd
+    InitLcdScreenEffectAssetType();
     InitRTKAssetType();
 
     // pak

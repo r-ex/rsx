@@ -208,16 +208,70 @@ private:
 			return;
 		}
 
+		const char* ends[24]{};
+		assertm(seqdesc.AnimCount() < 24, "too many anims");
+
 		// start at the last, and work back if required.
-		for (int i = seqdesc.AnimCount() - 1; i >= 0; i--)
+		for (int i = 0; i < seqdesc.AnimCount(); i++)
 		{
-			const animdesc_t* const anim = &seqdesc.anims.at(i);			
+			const animdesc_t* const anim = &seqdesc.anims.at(i);
 
 			const r5::mstudioanimdesc_v16_t* const animdesc = reinterpret_cast<const r5::mstudioanimdesc_v16_t* const>(anim->baseptr);
 			int lastFrame = anim->numframes - 1;
 
-			// if the last data is framemovement data
-			if (anim->flags & ANIM_FRAMEMOVEMENT && anim->framemovementindex > 0)
+			const bool useDatapointAnim = (anim->flags & ANIM_DATAPOINT) ? true : false;
+			const bool useFrameMovement = (anim->flags & ANIM_FRAMEMOVEMENT) && (anim->framemovementindex > 0);
+
+			// [rika]: if the last data is framemovement data
+			// [rika]: framemovement is datapoint
+			if (useFrameMovement && useDatapointAnim)
+			{
+				const r5::mstudioframemovement_t* const pFrameMovement = animdesc->pFrameMovement();
+
+#ifdef _DEBUG
+				assertm(pFrameMovement->SectionCount(anim->numframes) == 1, "more than one section ?");
+#endif // _DEBUG
+
+				// [rika]: don't care didn't ask
+				union {
+					const uint16_t* u16;
+					const uint8_t* u8;
+				} panimtrack;
+
+				panimtrack.u8 = pFrameMovement->pDatapointTrack();
+
+				// [rika]: calc size of datapoint data
+				const uint16_t posValid = panimtrack.u16[0];
+				const uint16_t posTotal = panimtrack.u16[1];
+
+				panimtrack.u16 += 2;
+
+				if (posTotal)
+				{
+					if (posValid < anim->numframes)
+						panimtrack.u16 += posTotal;
+
+					panimtrack.u8 += sizeof(r5::AnimPos64) * posValid;
+					panimtrack.u8 += sizeof(r5::AxisFixup_t) * posTotal;
+				}
+
+				const uint16_t rotTotal = panimtrack.u16[0];
+
+				panimtrack.u16 += 1;
+
+				if (rotTotal)
+				{
+					if (rotTotal < anim->numframes)
+						panimtrack.u16 += rotTotal;
+
+					panimtrack.u8 += sizeof(float16) * rotTotal;
+				}
+
+				ends[i] = reinterpret_cast<const char* const>(panimtrack.u8);
+				continue;
+			}
+			// [rika]: framemovement is rle
+			else if (useFrameMovement)
 			{
 				const r5::mstudioframemovement_t* const pFrameMovement = animdesc->pFrameMovement();
 				const uint16_t* const pSection = pFrameMovement->pSection(lastFrame, true);
@@ -243,21 +297,27 @@ private:
 					panimvalue += r5::GetAnimValueOffset(panimvalue);
 
 					// the animseq's data ends at an animvalue track's end, seek to find the end, and use it as our endpoint.
-					dataSize = IALIGN4(reinterpret_cast<const char*>(panimvalue) - reinterpret_cast<const char*>(seqdesc.baseptr));
+					ends[i] = reinterpret_cast<const char*>(panimvalue);
 
-					return;
+					break;
 				}
 
-				// the animseq's data ends at the last section in a framemovement, take the pointer for it, and add the section's size to get our endpoint.
-				dataSize = IALIGN4(reinterpret_cast<const char*>(pSection + 4) - reinterpret_cast<const char*>(seqdesc.baseptr));
+				// [rika]: continue to the next animation
+				if (ends[i])
+					continue;
 
-				return;
+				// the animseq's data ends at the last section in a framemovement, take the pointer for it, and add the section's size to get our endpoint.
+				ends[i] = reinterpret_cast<const char*>(pSection + 4);
+
+				// [rika]: continue to the next animation
+				continue;
 			}
 
 			// if the last data is animation data
-			if (anim->flags & ANIM_VALID || !(anim->flags & ANIM_ALLZEROS))
+			if (anim->flags & ANIM_VALID && !(anim->flags & ANIM_ALLZEROS))
 			{
-				const uint8_t* boneFlagArray = reinterpret_cast<uint8_t*>(anim->pAnimdataStall(&lastFrame));
+				int sectionlength;
+				const uint8_t* boneFlagArray = useDatapointAnim ? reinterpret_cast<uint8_t*>(anim->pAnimdataStall_DP(&lastFrame, &sectionlength)) : reinterpret_cast<uint8_t*>(anim->pAnimdataStall(&lastFrame));
 
 				const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount)]);
 
@@ -272,14 +332,20 @@ private:
 				}
 
 				// the animseq's data ends at the last rle bone, parse through all bones until the pointer is no longer advanced, and use the final pointer for our endpoint.
-				dataSize = IALIGN4(reinterpret_cast<const char*>(panim) - reinterpret_cast<const char*>(seqdesc.baseptr));
+				ends[i] = reinterpret_cast<const char*>(panim);
 
-				return;
+				continue;
+			}
+			else if (anim->animindex)
+			{
+				ends[i] = reinterpret_cast<const char*>(anim->baseptr) + anim->animindex;
+
+				continue;
 			}
 
 			// ikrules are static and do not have compresedikerrors (new as of v12)
 			if (animdesc->ikruleindex == 3 || animdesc->ikruleindex == 5)
-				return;
+				continue;
 
 			// not likely to get hit, but we should cover our bases.
 			// if the last data is compressedikerror data
@@ -291,7 +357,6 @@ private:
 
 					if (pIkRule->compressedikerror.sectionframes == 0)
 						continue;
-
 
 					const uint16_t* const pSection = pIkRule->pSection(lastFrame);
 
@@ -323,15 +388,26 @@ private:
 					}
 
 					// the animseq's data ends at the last section in a framemovement, take the pointer for it, and add the section's size to get our endpoint.
-					dataSize = IALIGN4(reinterpret_cast<const char*>(pSection + 4) - reinterpret_cast<const char*>(seqdesc.baseptr));
+					ends[i] = reinterpret_cast<const char*>(pSection + 4);
 
-					return;
+					continue;
 				}
 			}
 		}
 
-		const char* end = seqdesc.szlabel;
-		end += strnlen_s(end, MAX_PATH) + 1; // plus null terminator
+		if (!seqdesc.AnimCount())
+		{
+			const char* end = seqdesc.szlabel;
+			end += strnlen_s(end, MAX_PATH) + 1; // plus null terminator
+
+			ends[0] = end;
+		}
+
+		const char* end = nullptr;
+		for (int i = 0; i < seqdesc.AnimCount(); i++)
+		{
+			end = end < ends[i] ? ends[i] : end;
+		}
 
 		dataSize = IALIGN4(end - (char*)seqdesc.baseptr);
 

@@ -115,6 +115,18 @@ namespace r5
 		int unk[2];
 	};
 
+	struct mstudioattachment_v8_t
+	{
+		int sznameindex;
+		inline const char* const pszName() const { return reinterpret_cast<const char* const>(this) + sznameindex; }
+
+		int flags;
+
+		int localbone; // parent bone
+
+		matrix3x4_t localmatrix; // attachment point
+	};
+
 	// aseq v7
 	struct mstudioanimsections_v8_t
 	{

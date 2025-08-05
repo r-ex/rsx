@@ -8,10 +8,6 @@
 #include <game/rtech/utils/bvh/bvh.h>
 #include <game/rtech/utils/bsp/bspflags.h>
 
-#include <core/mdl/stringtable.h>
-#include <core/mdl/rmax.h>
-#include <core/mdl/cast.h>
-
 #include <core/render/dx.h>
 #include <thirdparty/imgui/imgui.h>
 #include <thirdparty/imgui/misc/imgui_utility.h>
@@ -909,7 +905,7 @@ static void ParseModelTextureData_v8(ModelParsedData_t* const parsedData)
             matlData.asset = g_assetData.FindAssetByGUID<CPakAsset>(texture->guid);
 
         matlData.guid = texture->guid;
-        matlData.name = texture->pszName();
+        matlData.SetName(texture->pszName());
     }
 
     parsedData->skins.reserve(pStudioHdr->numSkinFamilies);
@@ -924,6 +920,8 @@ static void ParseModelTextureData_v16(ModelParsedData_t* const parsedData)
     const uint64_t* const pTextures = reinterpret_cast<const uint64_t* const>(pStudioHdr->pTextures());
     parsedData->materials.resize(pStudioHdr->textureCount);
 
+    char namebuf[16]{};
+
     for (int i = 0; i < pStudioHdr->textureCount; ++i)
     {
         ModelMaterialData_t& matlData = parsedData->materials.at(i);
@@ -934,7 +932,8 @@ static void ParseModelTextureData_v16(ModelParsedData_t* const parsedData)
         // not possible to have vmt materials
         matlData.asset = g_assetData.FindAssetByGUID<CPakAsset>(texture);
 
-        matlData.name = matlData.asset ? matlData.asset->GetAssetName() : std::format("0x{:x}", texture); // no name
+        snprintf(namebuf, 16, "0x%llX", texture);
+        matlData.StoreName(namebuf);
     }
 
     parsedData->skins.reserve(pStudioHdr->numSkinFamilies);
@@ -960,6 +959,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         mdlAsset = new ModelAsset(hdr, streamEntry, ver);
 
         ParseModelBoneData_v8(mdlAsset->GetParsedData());
+        ParseModelAttachmentData_v8(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v8(pakAsset, mdlAsset);
         ParseModelSequenceData_NoStall(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
@@ -974,6 +974,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         mdlAsset = new ModelAsset(hdr, streamEntry, ver);
 
         ParseModelBoneData_v8(mdlAsset->GetParsedData());
+        ParseModelAttachmentData_v8(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v9(pakAsset, mdlAsset);
         ParseModelSequenceData_NoStall(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
@@ -989,6 +990,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         mdlAsset = new ModelAsset(hdr, streamEntry, ver);
 
         ParseModelBoneData_v12_1(mdlAsset->GetParsedData());
+        ParseModelAttachmentData_v8(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v12_1(pakAsset, mdlAsset);
         ParseModelSequenceData_Stall<r5::mstudioseqdesc_v8_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
@@ -1001,6 +1003,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         mdlAsset = new ModelAsset(hdr, streamEntry, ver);
 
         ParseModelBoneData_v12_1(mdlAsset->GetParsedData());
+        ParseModelAttachmentData_v8(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v12_1(pakAsset, mdlAsset);
         ParseModelSequenceData_Stall<r5::mstudioseqdesc_v8_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
@@ -1014,6 +1017,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         mdlAsset = new ModelAsset(hdr, streamEntry, ver);
 
         ParseModelBoneData_v12_1(mdlAsset->GetParsedData());
+        ParseModelAttachmentData_v8(mdlAsset->GetParsedData());
         ParseModelTextureData_v8(mdlAsset->GetParsedData());
         ParseModelVertexData_v14(pakAsset, mdlAsset);
         ParseModelSequenceData_Stall<r5::mstudioseqdesc_v8_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
@@ -1027,6 +1031,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         mdlAsset = new ModelAsset(hdr, cpu, streamEntry, ver);
 
         ParseModelBoneData_v16(mdlAsset->GetParsedData());
+        ParseModelAttachmentData_v16(mdlAsset->GetParsedData());
         ParseModelTextureData_v16(mdlAsset->GetParsedData());
         ParseModelVertexData_v16(pakAsset, mdlAsset);
         ParseModelSequenceData_Stall<r5::mstudioseqdesc_v16_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
@@ -1039,6 +1044,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         mdlAsset = new ModelAsset(hdr, cpu, streamEntry, ver);
 
         ParseModelBoneData_v16(mdlAsset->GetParsedData());
+        ParseModelAttachmentData_v16(mdlAsset->GetParsedData());
         ParseModelTextureData_v16(mdlAsset->GetParsedData());
         ParseModelVertexData_v16(pakAsset, mdlAsset);
         ParseModelSequenceData_Stall<r5::mstudioseqdesc_v18_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
@@ -1051,6 +1057,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         mdlAsset = new ModelAsset(hdr, cpu, streamEntry, ver);
 
         ParseModelBoneData_v19(mdlAsset->GetParsedData());
+        ParseModelAttachmentData_v16(mdlAsset->GetParsedData());
         ParseModelTextureData_v16(mdlAsset->GetParsedData());
         ParseModelVertexData_v16(pakAsset, mdlAsset);
         ParseModelSequenceData_Stall<r5::mstudioseqdesc_v18_t>(mdlAsset->GetParsedData(), reinterpret_cast<char* const>(mdlAsset->data));
@@ -1751,15 +1758,7 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
         const ModelMeshData_t& mesh = lodData.meshes.at(i);
         DXMeshDrawData_t* const meshDrawData = &drawData->meshBuffers[i];
 
-        // the rest of this loop requires the material to be valid
-        // so if it isn't just continue to the next iteration
-        CPakAsset* const matlAsset = parsedData->materials.at(skinData.indices[mesh.materialId]).asset;
-        if (!matlAsset)
-            continue;
-
         meshDrawData->indexFormat = DXGI_FORMAT_R16_UINT;
-
-        const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlAsset->extraData());
 
         // If this body part is disabled, don't draw the mesh.
         drawData->meshBuffers[i].visible = parsedData->bodyParts[mesh.bodyPartIndex].IsPreviewEnabled();
@@ -1770,6 +1769,14 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
             drawData->meshBuffers[i].visible = true;
         else
             drawData->meshBuffers[i].visible = false;
+
+        // the rest of this loop requires the material to be valid
+        // so if it isn't just continue to the next iteration
+        CPakAsset* const matlAsset = parsedData->materials.at(skinData.indices[mesh.materialId]).asset;
+        if (!matlAsset)
+            continue;
+
+        const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlAsset->extraData());
 
 #if defined(ADVANCED_MODEL_PREVIEW)
         if (matl->shaderSetAsset)

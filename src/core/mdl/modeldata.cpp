@@ -381,6 +381,32 @@ void ParseModelBoneData_v19(ModelParsedData_t* const parsedData)
 		parsedData->bones.at(i) = ModelBone_t(&bonehdrs[i], &bonedata[i], linearbone, i);
 }
 
+void ParseModelAttachmentData_v8(ModelParsedData_t* const parsedData)
+{
+	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+	const r5::mstudioattachment_v8_t* const pAttachments = reinterpret_cast<const r5::mstudioattachment_v8_t* const>(pStudioHdr->baseptr + pStudioHdr->localAttachmentOffset);
+
+	parsedData->attachments.reserve(pStudioHdr->localAttachmentCount);
+
+	for (int i = 0; i < pStudioHdr->localAttachmentCount; i++)
+	{
+		parsedData->attachments.emplace_back(pAttachments + i);
+	}
+}
+
+void ParseModelAttachmentData_v16(ModelParsedData_t* const parsedData)
+{
+	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+	const r5::mstudioattachment_v16_t* const pAttachments = reinterpret_cast<const r5::mstudioattachment_v16_t* const>(pStudioHdr->baseptr + pStudioHdr->localAttachmentOffset);
+
+	parsedData->attachments.reserve(pStudioHdr->localAttachmentCount);
+
+	for (int i = 0; i < pStudioHdr->localAttachmentCount; i++)
+	{
+		parsedData->attachments.emplace_back(pAttachments + i);
+	}
+}
+
 void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const drawData, const uint64_t lod)
 {
 	// [rika]: eventually parse through models
@@ -1035,7 +1061,10 @@ void HandleModelMaterials(const ModelParsedData_t* const parsedData, std::unorde
 
 		const int baseId = mesh.materialId;
 		const int skinId = static_cast<int>(skinData->indices[baseId]);
-		MaterialAsset* asset = parsedData->materials.at(skinId).GetMaterialAsset();
+
+		const ModelMaterialData_t* const materialData = parsedData->pMaterial(skinId);
+		MaterialAsset* asset = materialData->GetMaterialAsset();
+
 		ModelMaterialExport_t material(asset, skinId);
 
 		if (!asset)
@@ -1095,7 +1124,7 @@ bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem:
 	// do bones
 	rmaxFile.ReserveBones(parsedData->bones.size());
 	for (auto& bone : parsedData->bones)
-		rmaxFile.AddBone(bone.name, bone.parentIndex, bone.pos, bone.quat, bone.scale);
+		rmaxFile.AddBone(bone.name, bone.parent, bone.pos, bone.quat, bone.scale);
 
 	// [rika]: model is skin and bones, no meat
 	if (parsedData->lods.size() == 0)
@@ -1130,7 +1159,7 @@ bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem:
 			// [rika]: if it's unloaded, or unused we will just write a stub material
 			if (!materialData.asset)
 			{
-				rmaxFile.AddMaterial(materialData.name.c_str());
+				rmaxFile.AddMaterial(materialData.name);
 				continue;
 			}
 
@@ -1246,7 +1275,7 @@ bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem:
 			const ModelBone_t& boneData = parsedData->bones.at(i);
 
 			cast::CastNodeBone boneNode(&skelNode);
-			boneNode.MakeBone(boneData.name, boneData.parentIndex, &boneData.pos, &boneData.quat, false);
+			boneNode.MakeBone(boneData.name, boneData.parent, &boneData.pos, &boneData.quat, false);
 		}
 	}
 	const cast::CastNode& skelNodeConst = skelNode;
@@ -1311,7 +1340,7 @@ bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem:
 
 			if (!material.asset)
 			{
-				matlNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMaterial::Name), keepAfterLastSlashOrBackslash(materialData->name.c_str()), 1u); // unsure why it does this but we're rolling with it!
+				matlNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMaterial::Name), keepAfterLastSlashOrBackslash(materialData->name), 1u); // unsure why it does this but we're rolling with it!
 				modelNode->AddChild(matlNode);
 				continue;
 			}
@@ -1539,7 +1568,7 @@ bool ExportModelSMD(const ModelParsedData_t* const parsedData, std::filesystem::
 		const ModelBone_t& bone = parsedData->bones.at(i);
 		const int ibone = static_cast<int>(i);
 
-		smd->InitNode(bone.name, ibone, bone.parentIndex);
+		smd->InitNode(bone.name, ibone, bone.parent);
 		smd->InitFrameBone(0, ibone, bone.pos, bone.rot);
 	}
 
@@ -1585,12 +1614,24 @@ bool ExportModelSMD(const ModelParsedData_t* const parsedData, std::filesystem::
 				// [rika]: add more triangles
 				smd->AddTriangles(static_cast<size_t>(meshData.indexCount / 3));
 
-				const char* materialName = materials.find(meshData.materialId)->second.asset->name;
-				materialName = g_ExportSettings.exportPathsFull ? materialName : keepAfterLastSlashOrBackslash(materialName);
+				const char* material = nullptr;
+				const ModelMaterialData_t* const materialData = parsedData->pMaterial(meshData.materialId);
+
+				// [rika]: making the choice to use the stored rmdl name here when possible, as that is what it was likely compiled with
+				material = materialData->name;
+				assertm(material, "material name should always be valid regardless");
+
+				// [rika]: try to use a material asset name if our (r)mdl doesn't have names stored
+				if (materialData->asset && materialData->stored)
+				{
+					material = materialData->GetMaterialAsset()->name;
+				}
+
+				material = g_ExportSettings.exportPathsFull ? material : keepAfterLastSlashOrBackslash(material);
 
 				for (uint32_t indiceIdx = 0; indiceIdx < meshData.indexCount; indiceIdx += 3)
 				{
-					smd->InitTriangle(materialName);
+					smd->InitTriangle(material);
 					smd::Triangle* const tri = smd->TopTri();
 
 					ParseVertexIntoSMD(&vertices[indices[indiceIdx]], weights, &tri->vertices[0], isStaticProp);
@@ -1629,7 +1670,7 @@ bool ExportSeqDescRMAX(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 		// do bones
 		rmaxFile.ReserveBones(boneCount);
 		for (auto& bone : *bones)
-			rmaxFile.AddBone(bone.name, bone.parentIndex, bone.pos, bone.quat, bone.scale);
+			rmaxFile.AddBone(bone.name, bone.parent, bone.pos, bone.quat, bone.scale);
 
 		const animdesc_t* const animdesc = &seqdesc->anims.at(animIdx); // check flag 0x20000
 
@@ -1728,7 +1769,7 @@ bool ExportSeqDescCast(const seqdesc_t* const seqdesc, std::filesystem::path& ex
 				const ModelBone_t* const boneData = &bones->at(i);
 
 				cast::CastNodeBone boneNode(skelNode);
-				boneNode.MakeBone(boneData->name, boneData->parentIndex, &boneData->pos, &boneData->quat, false);
+				boneNode.MakeBone(boneData->name, boneData->parent, &boneData->pos, &boneData->quat, false);
 			}
 		}
 
@@ -1829,7 +1870,7 @@ bool ExportSeqDescSMD(const seqdesc_t* const seqdesc, std::filesystem::path& exp
 	{
 		const ModelBone_t& bone = bones->at(i);
 
-		smd->InitNode(bone.name, static_cast<int>(i), bone.parentIndex);
+		smd->InitNode(bone.name, static_cast<int>(i), bone.parent);
 	}
 
 	const Vector deltaPos(0.0f, 0.0f, 0.0f);

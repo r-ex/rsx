@@ -53,6 +53,9 @@
 #define	CONTENTS_BLOCK_PING		0x20000000
 #define CONTENTS_HITBOX			0x40000000	// use accurate hitboxes on trace
 
+// LEGACY (unsupported in reSource)
+#define CONTENTS_LADDER			0x20000000 // removed in r1 and r2, replaced in r5
+
 inline std::string ContentsToString(uint32_t contents)
 {
 	std::string str;

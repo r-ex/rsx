@@ -557,6 +557,66 @@ struct MaterialAssetHeader_v23_1_t
 };
 static_assert(sizeof(MaterialAssetHeader_v23_1_t) == 192);
 
+struct MaterialAssetHeader_v23_2_t
+{
+	uint64_t unk_0; // same as previous version (as of v23), does not seem to be vtftableReserved (contains data)
+
+	uint64_t snapshotMaterial; // 'msnp' asset
+
+	uint64_t guid; // guid of this material asset
+
+	char* name; // pointer to partial asset path
+	char* surfaceProp; // pointer to surfaceprop (as defined in surfaceproperties.rson)
+	char* surfaceProp2; // pointer to surfaceprop2 
+
+	uint64_t depthShadowMaterial;
+	uint64_t depthPrepassMaterial;
+	uint64_t depthVSMMaterial;
+	uint64_t depthShadowTightMaterial;
+	uint64_t colpassMaterial;
+
+	uint64_t shaderSet; // guid of the shaderset asset that this material uses
+
+	void* textureHandles; // ptr to array of texture guids
+	void* streamingTextureHandles; // ptr to array of streamable texture guids (empty at build time)
+
+	short numStreamingTextureHandles; // number of textures with streamed mip levels.
+	short width;
+	short height;
+	short depth;
+
+	// array of indices into sampler states array. must be set properly to have accurate texture tiling
+	// used in CShaderGlue::SetupShader (1403B3C60)
+	char samplers[4];// = 0x1D0300;
+
+	uint32_t unk_7C;
+
+	uint32_t unk_80;// = 0x1F5A92BD; // REQUIRED but why?
+
+
+	uint32_t glueFlags;
+	uint32_t glueFlags2;
+
+	char unk_8C[16];
+
+	uint16_t numAnimationFrames; // used in CMaterialGlue::GetNumAnimationFrames (0x1403B4250), which is called from GetSpriteInfo @ 0x1402561FC
+	MaterialShaderType_t materialType;
+	uint8_t uberBufferFlags; // used for unksections loading in UpdateMaterialAsset
+
+	int unk_A0; // unk_CC?
+
+	float unk_A4; // unk_E8?
+
+	uint64_t textureAnimation;
+
+	char unk_B0[8]; // unk_F0 ?
+
+	MaterialAssetCPU_t* cpuDataPtr;
+
+	uint8_t unk_C8[8]; // new as off season 26
+};
+static_assert(sizeof(MaterialAssetHeader_v23_2_t) == 200);
+
 struct TextureAssetEntry_t
 {
 	TextureAssetEntry_t(CPakAsset* assetIn, const uint32_t indexIn) : asset(assetIn), index(indexIn) {};
@@ -657,6 +717,18 @@ public:
 	};
 
 	MaterialAsset(MaterialAssetHeader_v23_1_t* const hdr, MaterialAssetCPU_t* const cpu) : snapshotMaterial(hdr->snapshotMaterial), guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
+		depthShadowMaterial(hdr->depthShadowMaterial), depthPrepassMaterial(hdr->depthPrepassMaterial), depthVSMMaterial(hdr->depthVSMMaterial), depthShadowTightMaterial(hdr->depthShadowTightMaterial), colpassMaterial(hdr->colpassMaterial), shaderSet(hdr->shaderSet),
+		numAnimationFrames(hdr->numAnimationFrames), textureAnimation(hdr->textureAnimation), textureHandles(hdr->textureHandles), streamingTextureHandles(hdr->streamingTextureHandles),
+		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr), snapshotAsset(nullptr),
+		cpuData(cpu->data), cpuDataSize(cpu->dataSize),
+		dxStates()
+	{
+		memcpy_s(samplers, sizeof(samplers), hdr->samplers, sizeof(hdr->samplers));
+
+		numRenderTargets = D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT;
+	};
+
+	MaterialAsset(MaterialAssetHeader_v23_2_t* const hdr, MaterialAssetCPU_t* const cpu) : snapshotMaterial(hdr->snapshotMaterial), guid(hdr->guid), name(hdr->name), surfaceProp(hdr->surfaceProp), surfaceProp2(hdr->surfaceProp2),
 		depthShadowMaterial(hdr->depthShadowMaterial), depthPrepassMaterial(hdr->depthPrepassMaterial), depthVSMMaterial(hdr->depthVSMMaterial), depthShadowTightMaterial(hdr->depthShadowTightMaterial), colpassMaterial(hdr->colpassMaterial), shaderSet(hdr->shaderSet),
 		numAnimationFrames(hdr->numAnimationFrames), textureAnimation(hdr->textureAnimation), textureHandles(hdr->textureHandles), streamingTextureHandles(hdr->streamingTextureHandles),
 		width(hdr->width), height(hdr->height), depth(hdr->depth), unk(hdr->unk_80), glueFlags(hdr->glueFlags), glueFlags2(hdr->glueFlags2), materialType(hdr->materialType), uberBufferFlags(hdr->uberBufferFlags), shaderSetAsset(nullptr), snapshotAsset(nullptr),

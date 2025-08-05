@@ -353,34 +353,98 @@ lodIndex(static_cast<uint8_t>(group->lodIndex)), lodCount(static_cast<uint8_t>(g
 // studiohdr
 // clamp silly studiomdl offsets (negative is base ptr)
 #define FIX_FILE_OFFSET(offset) (offset < 0 ? 0 : offset)
-studiohdr_generic_t::studiohdr_generic_t(const r1::studiohdr_t* const pHdr, StudioLooseData_t* const pData) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(pData->VertOffset(StudioLooseData_t::SLD_VTX)), vvdOffset(pData->VertOffset(StudioLooseData_t::SLD_VVD)), vvcOffset(pData->VertOffset(StudioLooseData_t::SLD_VVC)), vvwOffset(0), phyOffset(pData->PhysOffset()),
-vtxSize(pData->VertSize(StudioLooseData_t::SLD_VTX)), vvdSize(pData->VertSize(StudioLooseData_t::SLD_VVD)), vvcSize(pData->VertSize(StudioLooseData_t::SLD_VVC)), vvwSize(0), phySize(pData->PhysSize()), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-linearBoneOffset(pHdr->studiohdr2index + pHdr->pStudioHdr2()->linearboneindex), boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
-groupCount(0), groups(), bvhOffset(-1), baseptr(reinterpret_cast<const char*>(pHdr))
+studiohdr_generic_t::studiohdr_generic_t(const r1::studiohdr_t* const pHdr, StudioLooseData_t* const pData) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->pStudioHdr2()->sznameindex), length(pHdr->length), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(pHdr->eyeposition), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
+
+	// bone
+	boneCount(pHdr->numbones), boneOffset(pHdr->boneindex), boneDataOffset(-1), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(pHdr->hitboxsetindex), localAnimationCount(pHdr->numlocalanim), localAnimationOffset(pHdr->localanimindex), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(pHdr->localseqindex),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(pHdr->localattachmentindex),  linearBoneOffset(pHdr->pStudioHdr2()->linearboneindex), srcBoneTransformCount(pHdr->pStudioHdr2()->numsrcbonetransform), srcBoneTransformOffset(pHdr->pStudioHdr2()->srcbonetransformindex), boneStateCount(0), boneStateOffset(0), bvhOffset(-1),
+
+	// material
+	textureCount(pHdr->numtextures), textureOffset(pHdr->textureindex), cdTexturesCount(pHdr->numcdtextures), cdTexturesOffset(pHdr->cdtextureindex), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+	
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(pHdr->keyvaluesize), constdirectionallightdot(pHdr->constdirectionallightdot), fadeDistance(pHdr->fadeDistance), gatherSize(0.0f), illumpositionattachmentindex(pHdr->pStudioHdr2()->illumpositionattachmentindex),
+	
+	// file
+	vtxOffset(pData->VertOffset(StudioLooseData_t::SLD_VTX)), vvdOffset(pData->VertOffset(StudioLooseData_t::SLD_VVD)), vvcOffset(pData->VertOffset(StudioLooseData_t::SLD_VVC)), vvwOffset(-1), phyOffset(pData->PhysOffset()),
+	vtxSize(pData->VertSize(StudioLooseData_t::SLD_VTX)), vvdSize(pData->VertSize(StudioLooseData_t::SLD_VVD)), vvcSize(pData->VertSize(StudioLooseData_t::SLD_VVC)), vvwSize(-1), phySize(pData->PhysSize()), hwDataSize(0),
+	groupCount(0), groups(),
+
+	pad()
+{
+	// update offsets local to studiohdr2_t
+	const int baseOffset = static_cast<int>(reinterpret_cast<const char* const>(pHdr->pStudioHdr2()) - baseptr);
+
+	szNameOffset -= baseOffset;
+	linearBoneOffset -= baseOffset;
+};
+
+studiohdr_generic_t::studiohdr_generic_t(const r2::studiohdr_t* const pHdr) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->sznameindex), length(pHdr->length), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(pHdr->eyeposition), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
+
+	// bone
+	boneCount(pHdr->numbones), boneOffset(pHdr->boneindex), boneDataOffset(-1), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(pHdr->hitboxsetindex), localAnimationCount(pHdr->numlocalanim), localAnimationOffset(pHdr->localanimindex), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(pHdr->localseqindex),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(pHdr->localattachmentindex),  linearBoneOffset(pHdr->linearboneindex), srcBoneTransformCount(pHdr->numsrcbonetransform), srcBoneTransformOffset(pHdr->srcbonetransformindex), boneStateCount(0), boneStateOffset(0), bvhOffset(-1),
+
+	// material
+	textureCount(pHdr->numtextures), textureOffset(pHdr->textureindex), cdTexturesCount(pHdr->numcdtextures), cdTexturesOffset(pHdr->cdtextureindex), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+	
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(pHdr->keyvaluesize), constdirectionallightdot(pHdr->constdirectionallightdot), fadeDistance(pHdr->fadeDistance), gatherSize(0.0f), illumpositionattachmentindex(pHdr->illumpositionattachmentindex),
+	
+	// file
+	vtxOffset(pHdr->vtxOffset), vvdOffset(pHdr->vvdOffset), vvcOffset(pHdr->vvcOffset), vvwOffset(-1), phyOffset(pHdr->phyOffset),
+	vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(-1), phySize(pHdr->phySize), hwDataSize(0),
+	groupCount(0), groups(),
+
+	pad()
 {
 
 };
 
-studiohdr_generic_t::studiohdr_generic_t(const r2::studiohdr_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(0), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
-vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(0), phySize(pHdr->phySize), hwDataSize(0), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
-groupCount(0), groups(), bvhOffset(-1), baseptr(reinterpret_cast<const char*>(pHdr))
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v8_t* const pHdr) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->sznameindex), length(pHdr->length), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(pHdr->eyeposition), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
+
+	// bone
+	boneCount(pHdr->numbones), boneOffset(pHdr->boneindex), boneDataOffset(-1), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(pHdr->hitboxsetindex), localAnimationCount(pHdr->numlocalanim), localAnimationOffset(pHdr->localanimindex), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(pHdr->localseqindex),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(pHdr->localattachmentindex),  linearBoneOffset(pHdr->linearboneindex), srcBoneTransformCount(pHdr->numsrcbonetransform), srcBoneTransformOffset(pHdr->srcbonetransformindex), boneStateCount(0), boneStateOffset(0), bvhOffset(pHdr->bvhOffset),
+
+	// material
+	textureCount(pHdr->numtextures), textureOffset(pHdr->textureindex), cdTexturesCount(pHdr->numcdtextures), cdTexturesOffset(pHdr->cdtextureindex), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+	
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(pHdr->keyvaluesize), constdirectionallightdot(pHdr->constdirectionallightdot), fadeDistance(pHdr->fadeDistance), gatherSize(pHdr->gatherSize), illumpositionattachmentindex(pHdr->illumpositionattachmentindex),
+	
+	// file
+	vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
+	vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(0)/*set in vertex parsing*/,
+	groupCount(1), groups(),
+
+	pad()
 {
 
 };
 
-studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v8_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
-vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(0)/*set in vertex parsing*/, textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(0), boneStateCount(0), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
-groupCount(1), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
-{
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_1_t* const pHdr) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->sznameindex), length(pHdr->length), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(pHdr->eyeposition), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
 
-};
+	// bone
+	boneCount(pHdr->numbones), boneOffset(pHdr->boneindex), boneDataOffset(-1), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(pHdr->hitboxsetindex), localAnimationCount(pHdr->numlocalanim), localAnimationOffset(pHdr->localanimindex), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(pHdr->localseqindex),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(pHdr->localattachmentindex), linearBoneOffset(pHdr->linearboneindex), srcBoneTransformCount(pHdr->numsrcbonetransform), srcBoneTransformOffset(pHdr->srcbonetransformindex), boneStateOffset(offsetof(r5::studiohdr_v12_1_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), bvhOffset(pHdr->bvhOffset),
 
-studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_1_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
-vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_1_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
-groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+	// material
+	textureCount(pHdr->numtextures), textureOffset(pHdr->textureindex), cdTexturesCount(pHdr->numcdtextures), cdTexturesOffset(pHdr->cdtextureindex), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(pHdr->keyvaluesize), constdirectionallightdot(-1), fadeDistance(pHdr->fadeDistance), gatherSize(pHdr->gatherSize), illumpositionattachmentindex(pHdr->illumpositionattachmentindex),
+
+	// file
+	vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
+	vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize),
+	groupCount(pHdr->groupHeaderCount), groups(),
+
+	pad()
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 
@@ -393,10 +457,25 @@ groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), basept
 	}
 };
 
-studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_2_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
-vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_2_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
-groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_2_t* const pHdr) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->sznameindex), length(pHdr->length), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(pHdr->eyeposition), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
+
+	// bone
+	boneCount(pHdr->numbones), boneOffset(pHdr->boneindex), boneDataOffset(-1), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(pHdr->hitboxsetindex), localAnimationCount(pHdr->numlocalanim), localAnimationOffset(pHdr->localanimindex), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(pHdr->localseqindex),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(pHdr->localattachmentindex), linearBoneOffset(pHdr->linearboneindex), srcBoneTransformCount(pHdr->numsrcbonetransform), srcBoneTransformOffset(pHdr->srcbonetransformindex), boneStateOffset(offsetof(r5::studiohdr_v12_2_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), bvhOffset(pHdr->bvhOffset),
+
+	// material
+	textureCount(pHdr->numtextures), textureOffset(pHdr->textureindex), cdTexturesCount(pHdr->numcdtextures), cdTexturesOffset(pHdr->cdtextureindex), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(pHdr->keyvaluesize), constdirectionallightdot(-1), fadeDistance(pHdr->fadeDistance), gatherSize(pHdr->gatherSize), illumpositionattachmentindex(pHdr->illumpositionattachmentindex),
+
+	// file
+	vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
+	vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize),
+	groupCount(pHdr->groupHeaderCount), groups(),
+
+	pad()
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 
@@ -409,10 +488,26 @@ groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), basept
 	}
 };
 
-studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_4_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
-vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-linearBoneOffset(pHdr->linearboneindex),  boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v12_4_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
-groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+// [rika]: v12.4 and v12.5
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v12_4_t* const pHdr) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->sznameindex), length(pHdr->length), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(pHdr->eyeposition), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
+
+	// bone
+	boneCount(pHdr->numbones), boneOffset(pHdr->boneindex), boneDataOffset(-1), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(pHdr->hitboxsetindex), localAnimationCount(pHdr->numlocalanim), localAnimationOffset(pHdr->localanimindex), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(pHdr->localseqindex),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(pHdr->localattachmentindex), linearBoneOffset(pHdr->linearboneindex), srcBoneTransformCount(pHdr->numsrcbonetransform), srcBoneTransformOffset(pHdr->srcbonetransformindex), boneStateOffset(offsetof(r5::studiohdr_v12_4_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), bvhOffset(pHdr->bvhOffset),
+
+	// material
+	textureCount(pHdr->numtextures), textureOffset(pHdr->textureindex), cdTexturesCount(pHdr->numcdtextures), cdTexturesOffset(pHdr->cdtextureindex), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(pHdr->keyvaluesize), constdirectionallightdot(-1), fadeDistance(pHdr->fadeDistance), gatherSize(pHdr->gatherSize), illumpositionattachmentindex(pHdr->illumpositionattachmentindex),
+
+	// file
+	vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
+	vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize),
+	groupCount(pHdr->groupHeaderCount), groups(),
+
+	pad()
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 
@@ -425,10 +520,25 @@ groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), basept
 	}
 };
 
-studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v14_t* const pHdr) : length(pHdr->length), flags(pHdr->flags), contents(pHdr->contents), vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
-vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize), textureOffset(pHdr->textureindex), textureCount(pHdr->numtextures), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
-linearBoneOffset(pHdr->linearboneindex), boneOffset(pHdr->boneindex), boneDataOffset(-1), boneCount(pHdr->numbones), boneStateOffset(offsetof(r5::studiohdr_v14_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), localSequenceOffset(pHdr->localseqindex), localSequenceCount(pHdr->numlocalseq),
-groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), baseptr(reinterpret_cast<const char*>(pHdr))
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v14_t* const pHdr) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->sznameindex), length(pHdr->length), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(pHdr->eyeposition), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
+
+	// bone
+	boneCount(pHdr->numbones), boneOffset(pHdr->boneindex), boneDataOffset(-1), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(pHdr->hitboxsetindex), localAnimationCount(pHdr->numlocalanim), localAnimationOffset(pHdr->localanimindex), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(pHdr->localseqindex),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(pHdr->localattachmentindex), linearBoneOffset(pHdr->linearboneindex), srcBoneTransformCount(pHdr->numsrcbonetransform), srcBoneTransformOffset(pHdr->srcbonetransformindex), boneStateOffset(offsetof(r5::studiohdr_v14_t, boneStateOffset) + pHdr->boneStateOffset), boneStateCount(pHdr->boneStateCount), bvhOffset(pHdr->bvhOffset),
+
+	// material
+	textureCount(pHdr->numtextures), textureOffset(pHdr->textureindex), cdTexturesCount(pHdr->numcdtextures), cdTexturesOffset(pHdr->cdtextureindex), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(pHdr->skinindex),
+
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(pHdr->keyvaluesize), constdirectionallightdot(-1), fadeDistance(pHdr->fadeDistance), gatherSize(pHdr->gatherSize), illumpositionattachmentindex(pHdr->illumpositionattachmentindex),
+
+	// file
+	vtxOffset(FIX_FILE_OFFSET(pHdr->vtxOffset)), vvdOffset(FIX_FILE_OFFSET(pHdr->vvdOffset)), vvcOffset(FIX_FILE_OFFSET(pHdr->vvcOffset)), vvwOffset(FIX_FILE_OFFSET(pHdr->vvwOffset)), phyOffset(FIX_FILE_OFFSET(pHdr->phyOffset)),
+	vtxSize(pHdr->vtxSize), vvdSize(pHdr->vvdSize), vvcSize(pHdr->vvcSize), vvwSize(pHdr->vvwSize), phySize(pHdr->phySize), hwDataSize(pHdr->hwDataSize),
+	groupCount(pHdr->groupHeaderCount), groups(),
+
+	pad()
 {
 	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
 
@@ -439,44 +549,73 @@ groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(pHdr->bvhOffset), basept
 
 		groups[i] = studio_hw_groupdata_t(pHdr->pLODGroup(i));
 	}
-};
-
-studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v16_t* const pHdr, int dataSizePhys, int dataSizeModel) : length(dataSizeModel), flags(pHdr->flags), contents(0 /*TODO, where is this?*/), vtxOffset(-1), vvdOffset(-1), vvcOffset(-1), vvwOffset(-1), phyOffset(-1),
-vtxSize(-1), vvdSize(-1), vvcSize(-1), vvwSize(-1), phySize(dataSizePhys), hwDataSize(0), textureOffset(FIX_OFFSET(pHdr->textureindex)), textureCount(static_cast<int>(pHdr->numtextures)), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(FIX_OFFSET(pHdr->skinindex)),
-linearBoneOffset(FIX_OFFSET(pHdr->linearboneindex)), boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), boneCount(static_cast<int>(pHdr->boneCount)), boneStateOffset(offsetof(r5::studiohdr_v16_t, boneStateOffset) + FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), localSequenceOffset(FIX_OFFSET(pHdr->localseqindex)), localSequenceCount(pHdr->numlocalseq),
-groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(FIX_OFFSET(pHdr->bvhOffset)), baseptr(reinterpret_cast<const char*>(pHdr))
-{
-	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
-
-	for (int i = 0; i < groupCount; i++)
-	{
-		if (i == 8)
-			break;
-
-		groups[i] = studio_hw_groupdata_t(pHdr->pLODGroup(static_cast<uint16_t>(i)));
-		hwDataSize += groups[i].dataSizeDecompressed;
-	}
-
-};
-
-studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v17_t* const pHdr, int dataSizePhys, int dataSizeModel) : length(dataSizeModel), flags(pHdr->flags), contents(0 /*TODO, where is this?*/), vtxOffset(-1), vvdOffset(-1), vvcOffset(-1), vvwOffset(-1), phyOffset(-1),
-vtxSize(-1), vvdSize(-1), vvcSize(-1), vvwSize(-1), phySize(dataSizePhys), hwDataSize(0), textureOffset(FIX_OFFSET(pHdr->textureindex)), textureCount(static_cast<int>(pHdr->numtextures)), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(FIX_OFFSET(pHdr->skinindex)),
-linearBoneOffset(FIX_OFFSET(pHdr->linearboneindex)), boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), boneCount(static_cast<int>(pHdr->boneCount)), boneStateOffset(offsetof(r5::studiohdr_v16_t, boneStateOffset) + FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), localSequenceOffset(FIX_OFFSET(pHdr->localseqindex)), localSequenceCount(pHdr->numlocalseq),
-groupCount(pHdr->groupHeaderCount), groups(), bvhOffset(FIX_OFFSET(pHdr->bvhOffset)), baseptr(reinterpret_cast<const char*>(pHdr))
-{
-	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
-
-	for (int i = 0; i < groupCount; i++)
-	{
-		if (i == 8)
-			break;
-
-		groups[i] = studio_hw_groupdata_t(pHdr->pLODGroup(static_cast<uint16_t>(i)));
-		hwDataSize += groups[i].dataSizeDecompressed;
-	}
-
 };
 #undef FIX_FILE_OFFSET
+
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v16_t* const pHdr, int dataSizePhys, int dataSizeModel) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->sznameindex), length(dataSizeModel), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(0.0f), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
+
+	// bone
+	boneCount(pHdr->boneCount), boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(FIX_OFFSET(pHdr->hitboxsetindex)), localAnimationCount(-1), localAnimationOffset(-1), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(FIX_OFFSET(pHdr->localseqindex)),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(FIX_OFFSET(pHdr->localattachmentindex)), linearBoneOffset(FIX_OFFSET(pHdr->linearboneindex)), srcBoneTransformCount(pHdr->numsrcbonetransform), srcBoneTransformOffset(FIX_OFFSET(pHdr->srcbonetransformindex)), boneStateOffset(FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), bvhOffset(FIX_OFFSET(pHdr->bvhOffset)),
+
+	// material
+	textureCount(pHdr->numtextures), textureOffset(FIX_OFFSET(pHdr->textureindex)), cdTexturesCount(-1), cdTexturesOffset(-1), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(FIX_OFFSET(pHdr->skinindex)),
+
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(-1), constdirectionallightdot(-1), fadeDistance(pHdr->fadeDistance), gatherSize(pHdr->gatherSize), illumpositionattachmentindex(pHdr->illumpositionattachmentindex),
+
+	// file
+	vtxOffset(-1), vvdOffset(-1), vvcOffset(-1), vvwOffset(-1), phyOffset(0),
+	vtxSize(-1), vvdSize(-1), vvcSize(-1), vvwSize(-1), phySize(dataSizePhys), hwDataSize(0),
+	groupCount(pHdr->groupHeaderCount), groups(),
+
+	pad()
+{
+	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
+
+	for (int i = 0; i < groupCount; i++)
+	{
+		if (i == 8)
+			break;
+
+		groups[i] = studio_hw_groupdata_t(pHdr->pLODGroup(static_cast<uint16_t>(i)));
+		hwDataSize += groups[i].dataSizeDecompressed;
+	}
+};
+
+studiohdr_generic_t::studiohdr_generic_t(const r5::studiohdr_v17_t* const pHdr, int dataSizePhys, int dataSizeModel) : baseptr(reinterpret_cast<const char*>(pHdr)), szNameOffset(pHdr->sznameindex), length(dataSizeModel), flags(pHdr->flags), mass(pHdr->mass), contents(pHdr->contents),
+	eyeposition(0.0f), illumposition(pHdr->illumposition), hull_min(pHdr->hull_min), hull_max(pHdr->hull_max), view_bbmin(pHdr->view_bbmin), view_bbmax(pHdr->view_bbmax),
+
+	// bone
+	boneCount(pHdr->boneCount), boneOffset(FIX_OFFSET(pHdr->boneHdrOffset)), boneDataOffset(FIX_OFFSET(pHdr->boneDataOffset)), hitboxSetCount(pHdr->numhitboxsets), hitboxSetOffset(FIX_OFFSET(pHdr->hitboxsetindex)), localAnimationCount(-1), localAnimationOffset(-1), localSequenceCount(pHdr->numlocalseq), localSequenceOffset(FIX_OFFSET(pHdr->localseqindex)),
+	localAttachmentCount(pHdr->numlocalattachments), localAttachmentOffset(FIX_OFFSET(pHdr->localattachmentindex)), linearBoneOffset(FIX_OFFSET(pHdr->linearboneindex)), srcBoneTransformCount(pHdr->numsrcbonetransform), srcBoneTransformOffset(FIX_OFFSET(pHdr->srcbonetransformindex)), boneStateOffset(FIX_OFFSET(pHdr->boneStateOffset)), boneStateCount(pHdr->boneStateCount), bvhOffset(FIX_OFFSET(pHdr->bvhOffset)),
+
+	// material
+	textureCount(pHdr->numtextures), textureOffset(FIX_OFFSET(pHdr->textureindex)), cdTexturesCount(-1), cdTexturesOffset(-1), numSkinRef(pHdr->numskinref), numSkinFamilies(pHdr->numskinfamilies), skinOffset(FIX_OFFSET(pHdr->skinindex)),
+
+	// misc
+	surfacePropOffset(pHdr->surfacepropindex), keyValueOffset(pHdr->keyvalueindex), keyValueSize(-1), constdirectionallightdot(-1), fadeDistance(pHdr->fadeDistance), gatherSize(pHdr->gatherSize), illumpositionattachmentindex(pHdr->illumpositionattachmentindex),
+
+	// file
+	vtxOffset(-1), vvdOffset(-1), vvcOffset(-1), vvwOffset(-1), phyOffset(0),
+	vtxSize(-1), vvdSize(-1), vvcSize(-1), vvwSize(-1), phySize(dataSizePhys), hwDataSize(0),
+	groupCount(pHdr->groupHeaderCount), groups(),
+
+	pad()
+{
+	assertm(pHdr->groupHeaderCount <= 8, "model has more than 8 lods");
+
+	for (int i = 0; i < groupCount; i++)
+	{
+		if (i == 8)
+			break;
+
+		groups[i] = studio_hw_groupdata_t(pHdr->pLODGroup(static_cast<uint16_t>(i)));
+		hwDataSize += groups[i].dataSizeDecompressed;
+	}
+};
+
 
 // per version funcs that utilize generic data
 namespace r1

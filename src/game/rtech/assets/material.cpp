@@ -157,7 +157,16 @@ void LoadMaterialAsset(CAssetContainer* const container, CAsset* const asset)
     case 22:
     case 23:
     {
-        if (pakAsset->data()->headerStructSize == sizeof(MaterialAssetHeader_v23_1_t) && pakAsset->version() == 23)
+        switch (pakAsset->data()->headerStructSize)
+        {
+        case sizeof(MaterialAssetHeader_v22_t):
+        {
+            MaterialAssetHeader_v22_t* hdr = reinterpret_cast<MaterialAssetHeader_v22_t*>(pakAsset->header());
+            materialAsset = new MaterialAsset(hdr, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
+
+            break;
+        }
+        case sizeof(MaterialAssetHeader_v23_1_t):
         {
             pakAsset->SetAssetVersion({ 23, 1 }); // [rika]: set minor version
 
@@ -167,11 +176,22 @@ void LoadMaterialAsset(CAssetContainer* const container, CAsset* const asset)
 
             break;
         }
+        case sizeof(MaterialAssetHeader_v23_2_t):
+        {
+            pakAsset->SetAssetVersion({ 23, 2 }); // [rika]: set minor version
 
-        assertm(pakAsset->data()->headerStructSize == sizeof(MaterialAssetHeader_v22_t), "incorrect header");
+            MaterialAssetHeader_v23_2_t* hdr = reinterpret_cast<MaterialAssetHeader_v23_2_t*>(pakAsset->header());
+            MaterialAssetCPU_t* const cpu = pakAsset->cpu() ? reinterpret_cast<MaterialAssetCPU_t* const>(pakAsset->cpu()) : hdr->cpuDataPtr;
+            materialAsset = new MaterialAsset(hdr, cpu);
 
-        MaterialAssetHeader_v22_t* hdr = reinterpret_cast<MaterialAssetHeader_v22_t*>(pakAsset->header());
-        materialAsset = new MaterialAsset(hdr, reinterpret_cast<MaterialAssetCPU_t*>(pakAsset->cpu()));
+            break;
+        }
+        default:
+        {
+            assertm(false, "incorrect header");
+            break;
+        }
+        }        
 
         break;
     }

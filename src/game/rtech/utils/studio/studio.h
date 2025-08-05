@@ -1,6 +1,7 @@
 #pragma once
 #include <game/rtech/utils/studio/optimize.h>
 #include <game/rtech/utils/studio/phyfile.h>
+#include <game/rtech/utils/bsp/bspflags.h>
 
 #define FIX_OFFSET(offset) static_cast<int>(static_cast<int>(offset & 0xFFFE) << (4 * (offset & 1))) // C6297 please fix!!
 #define MAX_NUM_LODS 8 // consistent across games
@@ -667,6 +668,15 @@ namespace vg
 // STUDIO MODEL DATA
 //===================
 
+struct mstudiosrcbonetransform_t
+{
+	int			sznameindex;
+	inline const char* const pszName() const { return reinterpret_cast<const char* const>(this) + sznameindex; }
+
+	matrix3x4_t	pretransform;
+	matrix3x4_t	posttransform;
+};
+
 struct mstudio_meshvertexloddata_t
 {
 	int modelvertexdataUnusedPad; // likely has none of the funny stuff because unused
@@ -795,6 +805,33 @@ static const char* s_StudioLooseDataExtensions[StudioLooseData_t::LooseDataType:
 	".vvc",
 	".vvw",
 };
+
+inline const char* StudioContentFlagString(const int contents)
+{
+	switch (contents)
+	{
+	case CONTENTS_EMPTY:
+		return "notsolid";
+	case CONTENTS_SOLID:
+		return "solid";
+	case CONTENTS_GRATE:
+		return "grate";
+	case CONTENTS_MONSTER:
+		return "monster";
+	case CONTENTS_DEBRIS:
+		return "debris";
+	case CONTENTS_LADDER:
+	{
+		assertm(false, "reSource doesn't support this, would be different in r5 as well.");
+		return "ladder";
+	}
+	default:
+	{
+		assertm(false, "invalid or new studio content flag");
+		return nullptr;
+	}
+	};
+}
 
 // generic pre def
 struct animmovement_t;

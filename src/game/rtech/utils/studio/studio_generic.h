@@ -215,39 +215,49 @@ struct studiohdr_generic_t
 	studiohdr_generic_t(const r5::studiohdr_v16_t* const pHdr, int dataSizePhys, int dataSizeModel);
 	studiohdr_generic_t(const r5::studiohdr_v17_t* const pHdr, int dataSizePhys, int dataSizeModel);
 
-	const char* baseptr;
+	const char* baseptr;	// studiohdr_t pointer and by extension mdl/rmdl ptr
 
-	int length; // size of rmdl file in bytes
-	int flags; // studio flags
-	int contents; // contents mask, see bspflags.h
+	int szNameOffset;		// file path and interally stored path, this should match across the real directory, name[64] memeber, and sznameindex member.
+	inline const char* const pszName() const { return baseptr + szNameOffset; }
 
-	int vtxOffset; // VTX
-	int vvdOffset; // VVD / IDSV
-	int vvcOffset; // VVC / IDCV
-	int vvwOffset; // index will come last after other vertex files
-	int phyOffset; // VPHY / IVPS
+	int length;				// file length in bytes
 
-	int vtxSize;
-	int vvdSize;
-	int vvcSize;
-	int vvwSize;
-	int phySize; // still used in models using vg
-	size_t hwDataSize;
+	Vector eyeposition;		// ideal eye position
+	Vector illumposition;	// illumination center
 
-	int linearBoneOffset;
-	int boneOffset;
-	int boneDataOffset; // guh
+	Vector hull_min;	// ideal movement hull size
+	Vector hull_max;	// ideal movement hull size
+
+	Vector view_bbmin;	// clipping bounding box
+	Vector view_bbmax;	// clipping bounding box
+
+	int flags;
+
 	int boneCount;
+	int boneOffset;		// offset to mstudiobone_t or mstudiobonehdr_t
+	int boneDataOffset; // offset to mstudiobonedata_t (rmdl v16+)
 	inline const char* const pBones() const { return baseptr + boneOffset; };
 	inline const char* const pBoneData() const { return baseptr + boneDataOffset; };
 	inline const char* const pLinearBone() const { return baseptr + linearBoneOffset; };
 
-	int textureOffset;
+	int hitboxSetCount;
+	int hitboxSetOffset;
+
+	int localAnimationCount;
+	int localAnimationOffset;	// offset to mstudioanimdesc_t (unused in apex, removed in retail)
+
+	int localSequenceCount;
+	int localSequenceOffset;	// offset to mstudioseqdesc_t
+
 	int textureCount;
+	int textureOffset;	// offset to mstudiotexture_t
 	inline const char* const pTextures() const { return baseptr + textureOffset; }
 
-	int numSkinRef;
-	int numSkinFamilies;
+	int cdTexturesCount;
+	int cdTexturesOffset;
+
+	int numSkinRef;			// skingroup width (how many textures/indices per group)
+	int numSkinFamilies;	// number of skingroups
 	int skinOffset;
 	inline const int16_t* const pSkinFamily(const int i) const { return reinterpret_cast<const int16_t*>(baseptr + skinOffset) + (numSkinRef * i); };
 	inline const char* const pSkinName(const int i) const
@@ -280,19 +290,68 @@ struct studiohdr_generic_t
 		return name;
 	}
 
-	int localSequenceOffset;
-	int localSequenceCount;
+	// bodypart
 
+	int localAttachmentCount;
+	int localAttachmentOffset;	// offset to mstudioattachment_t
+
+	// node
+
+	// ikchain
+
+	// poseparm
+
+	int surfacePropOffset;	// offset to surface prop string
+	inline const char* const pszSurfaceProp() const { return baseptr + surfacePropOffset; }
+
+	int keyValueOffset;		// offset to keyvalues
+	int keyValueSize;		// removed in later rmdl, keyvalues are null terminated
+
+	float mass;
+	int contents;	// contents mask, see bspflags.h
+
+	// includemodel
+
+	char constdirectionallightdot;
+
+	char pad[3];
+
+	float fadeDistance; // set to -1 to never fade. set above 0 if you want it to fade out, distance is in feet.
+	float gatherSize;
+
+	int	illumpositionattachmentindex;
+
+	int linearBoneOffset; // offset to mstudiolinearbone_t (null if not present)
+
+	int srcBoneTransformCount;
+	int srcBoneTransformOffset;
+	inline const mstudiosrcbonetransform_t* const pSrcBoneTransform(const int i) const { return reinterpret_cast<const mstudiosrcbonetransform_t* const>(baseptr + srcBoneTransformOffset) + i; }
+
+	int vtxOffset; // VTX
+	int vvdOffset; // VVD / IDSV
+	int vvcOffset; // VVC / IDCV
+	int vvwOffset; // index will come last after other vertex files
+	int phyOffset; // VPHY / IVPS
+
+	int vtxSize;
+	int vvdSize;
+	int vvcSize;
+	int vvwSize;
+	int phySize; // still used in models using vg
+
+	size_t hwDataSize;
+	
 	int boneStateOffset;
 	int boneStateCount;
 	inline const uint8_t* const pBoneStates() const { return boneStateCount > 0 ? reinterpret_cast<uint8_t*>((char*)baseptr + boneStateOffset) : nullptr; }
 
+	int bvhOffset;
+
 	int groupCount;
 	studio_hw_groupdata_t groups[8]; // early 'vg' will only have one group
-
-	int bvhOffset;
 };
 
+// make x axis y axis, and y axis negative x axis
 inline void StaticPropFlipFlop(Vector& in)
 {
 	const Vector tmp(in);

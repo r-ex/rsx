@@ -277,7 +277,7 @@ void ParseSourceModelTextureData(ModelParsedData_t* const parsedData)
             matlData.guid = 0;
         }
 
-        matlData.name = texture->pszName();
+        matlData.SetName(texture->pszName());
     }
 
     // [rika]: skin names will be fixed up in the load function
@@ -393,10 +393,12 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
     CSourceModelAsset* const srcMdlAsset = static_cast<CSourceModelAsset*>(asset);
     assertm(srcMdlAsset, "Asset should be valid.");
 
-
     CDXDrawData* const drawData = srcMdlAsset->GetDrawData();
     if (!drawData)
         return nullptr;
+
+    drawData->vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_vs", s_PreviewVertexShader, eShaderType::Vertex);;
+    drawData->pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_ps", s_PreviewPixelShader, eShaderType::Pixel);
 
     ModelParsedData_t* const parsedData = srcMdlAsset->GetParsedData();
 
@@ -404,8 +406,8 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
     static size_t lastSelectedBodypartIndex = 0;
     static size_t selectedBodypartIndex = 0;
 
-    static size_t lastSelectedSkinIndex = 0;
     static size_t selectedSkinIndex = 0;
+    static size_t lastSelectedSkinIndex = 0;
 
     static size_t lodLevel = 0;
 
@@ -425,7 +427,8 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
     ImGui::Text("Bones: %llu", parsedData->bones.size());
     ImGui::Text("LODs: %llu", parsedData->lods.size());
     //ImGui::Text("Rigs: %i", modelAsset->numAnimRigs);
-    ImGui::Text("Sequences: %i", srcMdlAsset->GetSequenceCount());
+    //ImGui::Text("Sequences: %i", modelAsset->numAnimSeqs);
+    ImGui::Text("Local Sequences: %i", parsedData->NumLocalSeq());
 
     if (parsedData->skins.size())
     {
@@ -532,15 +535,7 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
         const ModelMeshData_t& mesh = lodData.meshes.at(i);
         DXMeshDrawData_t* const meshDrawData = &drawData->meshBuffers[i];
 
-        // the rest of this loop requires the material to be valid
-        // so if it isn't just continue to the next iteration
-        CPakAsset* const matlAsset = parsedData->materials.at(skinData.indices[mesh.materialId]).asset;
-        if (!matlAsset)
-            continue;
-
         meshDrawData->indexFormat = DXGI_FORMAT_R16_UINT;
-
-        const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlAsset->extraData());
 
         // If this body part is disabled, don't draw the mesh.
         drawData->meshBuffers[i].visible = parsedData->bodyParts[mesh.bodyPartIndex].IsPreviewEnabled();
@@ -551,6 +546,14 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
             drawData->meshBuffers[i].visible = true;
         else
             drawData->meshBuffers[i].visible = false;
+
+        // the rest of this loop requires the material to be valid
+        // so if it isn't just continue to the next iteration
+        CPakAsset* const matlAsset = parsedData->materials.at(skinData.indices[mesh.materialId]).asset;
+        if (!matlAsset)
+            continue;
+
+        const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlAsset->extraData());
 
 #if defined(ADVANCED_MODEL_PREVIEW)
         if (matl->shaderSetAsset)
@@ -593,7 +596,11 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
     {
         D3D11_BUFFER_DESC desc{};
 
+#if defined(ADVANCED_MODEL_PREVIEW)
+        constexpr UINT transformsBufferSizeAligned = IALIGN(sizeof(CBufModelInstance), 16);
+#else
         constexpr UINT transformsBufferSizeAligned = IALIGN(sizeof(VS_TransformConstants), 16);
+#endif
 
         desc.ByteWidth = transformsBufferSizeAligned;
 
@@ -619,10 +626,37 @@ void* PreviewSourceModelAsset(CAsset* const asset, const bool firstFrameForAsset
     const XMMATRIX model = XMMatrixTranslationFromVector(drawData->position.AsXMVector());
     const XMMATRIX projection = g_dxHandler->GetProjMatrix();
 
+#if !defined(ADVANCED_MODEL_PREVIEW)
     VS_TransformConstants* const transforms = reinterpret_cast<VS_TransformConstants*>(resource.pData);
     transforms->modelMatrix = XMMatrixTranspose(model);
     transforms->viewMatrix = XMMatrixTranspose(view);
     transforms->projectionMatrix = XMMatrixTranspose(projection);
+#else
+    CBufModelInstance* const modelInstance = reinterpret_cast<CBufModelInstance*>(resource.pData);
+    CBufModelInstance::ModelInstance& mi = modelInstance->c_modelInst;
+
+    // sub_18001FB40 in r2
+    XMMATRIX modelMatrix = {};
+    memcpy(&modelMatrix, &modelAsset->bones[0].poseToBone, sizeof(ModelBone_t::poseToBone));
+
+    modelMatrix.r[3].m128_f32[3] = 1.f;
+
+    mi.objectToCameraRelativePrevFrame = mi.objectToCameraRelative;
+
+    modelMatrix.r[0].m128_f32[3] += camera->position.x;
+    modelMatrix.r[1].m128_f32[3] += camera->position.y;
+    modelMatrix.r[2].m128_f32[3] += camera->position.z;
+
+    modelMatrix -= XMMatrixRotationRollPitchYaw(camera->rotation.x, camera->rotation.y, camera->rotation.z);
+
+    modelMatrix = XMMatrixTranspose(modelMatrix);
+
+    mi.diffuseModulation = { 1.f, 1.f, 1.f, 1.f };
+
+    XMStoreFloat3x4(&mi.objectToCameraRelative, modelMatrix);
+    XMStoreFloat3x4(&mi.objectToCameraRelativePrevFrame, modelMatrix);
+
+#endif
 
     if (lastSelectedBodypartIndex != selectedBodypartIndex)
         lastSelectedBodypartIndex = selectedBodypartIndex;

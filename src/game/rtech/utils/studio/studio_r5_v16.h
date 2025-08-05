@@ -298,6 +298,17 @@ namespace r5
 		uint16_t procindex; // procedural rule
 	};
 
+	struct mstudioattachment_v16_t
+	{
+		uint16_t sznameindex;
+		inline const char* const pszName() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(sznameindex); }
+
+		uint16_t localbone; // parent bone
+		int flags;
+
+		matrix3x4_t localmatrix; // attachment point
+	};
+
 	struct mstudiomesh_v16_t
 	{
 		uint16_t material;
@@ -348,7 +359,7 @@ namespace r5
 
 		float mass;
 
-		int unk_0x30; // this is not version
+		int contents; // this is not version
 
 		uint16_t hitboxsetindex;
 		uint8_t numhitboxsets;
@@ -431,7 +442,7 @@ namespace r5
 
 		// 
 		float fadeDistance;
-		float gathersize; // what. from r5r struct
+		float gatherSize; // what. from r5r struct
 
 		uint16_t numsrcbonetransform;
 		uint16_t srcbonetransformindex;
@@ -480,7 +491,7 @@ namespace r5
 
 		float mass;
 
-		int unk_0x30; // this is not version
+		int contents; // this is not version
 
 		uint16_t hitboxsetindex;
 		uint8_t numhitboxsets;
@@ -563,7 +574,7 @@ namespace r5
 
 		// 
 		float fadeDistance;
-		float gathersize; // what. from r5r struct
+		float gatherSize; // what. from r5r struct
 
 		uint16_t numsrcbonetransform;
 		uint16_t srcbonetransformindex;

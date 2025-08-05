@@ -76,7 +76,11 @@ namespace r2
 
 		// points to next bone in the list
 		inline int* pNextOffset() const { return reinterpret_cast<int*>(pData() + 20); }
-		inline mstudio_rle_anim_t* pNext() const { return pNextOffset() ? reinterpret_cast<mstudio_rle_anim_t*>((char*)this + *pNextOffset()) : nullptr; }
+		inline mstudio_rle_anim_t* pNext() const
+		{
+			const int nextOffset = *pNextOffset();
+			return nextOffset ? reinterpret_cast<mstudio_rle_anim_t*>((char*)this + nextOffset) : nullptr;
+		}
 	};
 	static_assert(sizeof(mstudio_rle_anim_t) == 0x8);
 

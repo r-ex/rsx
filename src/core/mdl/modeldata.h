@@ -120,37 +120,114 @@ struct ModelLODData_t
 struct ModelBone_t
 {
 	ModelBone_t() = default;
-	ModelBone_t(const r1::mstudiobone_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-	ModelBone_t(const r2::mstudiobone_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-	ModelBone_t(const r5::mstudiobone_v8_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-	ModelBone_t(const r5::mstudiobone_v12_1_t* bone) : name(bone->pszName()), parentIndex(bone->parent), flags(bone->flags), poseToBone(bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
-	ModelBone_t(const r5::mstudiobonehdr_v16_t* bonehdr, const r5::mstudiobonedata_v16_t* bonedata) : name(bonehdr->pszName()), parentIndex(bonedata->parent), flags(bonedata->flags), poseToBone(bonedata->poseToBone), pos(bonedata->pos), quat(bonedata->quat), rot(bonedata->rot), scale(bonedata->scale) {};
-	ModelBone_t(const r5::mstudiobonehdr_v16_t* bonehdr, const r5::mstudiobonedata_v19_t* bonedata, const r5::mstudiolinearbone_v19_t* linearbone, const int bone) : name(bonehdr->pszName()), parentIndex(bonedata->parent), flags(bonedata->flags),
-		poseToBone(*linearbone->pPoseToBone(bone)), pos(*linearbone->pPos(bone)), quat(*linearbone->pQuat(bone)), rot(*linearbone->pRot(bone)), scale(*linearbone->pScale(bone)) {};
+
+	ModelBone_t(const r1::mstudiobone_t* const bone) : baseptr(reinterpret_cast<const char* const>(bone)), name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procindex(bone->procindex), physicsbone(bone->physicsbone), surfacepropidx(bone->surfacepropidx), contents(bone->contents),
+		poseToBone(&bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
+
+	ModelBone_t(const r2::mstudiobone_t* const bone) : baseptr(reinterpret_cast<const char* const>(bone)), name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procindex(bone->procindex), physicsbone(bone->physicsbone), surfacepropidx(bone->surfacepropidx), contents(bone->contents),
+		poseToBone(&bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
+
+	ModelBone_t(const r5::mstudiobone_v8_t* const bone) : baseptr(reinterpret_cast<const char* const>(bone)), name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procindex(bone->procindex), physicsbone(bone->physicsbone), surfacepropidx(bone->surfacepropidx), contents(bone->contents),
+		poseToBone(&bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
+
+	ModelBone_t(const r5::mstudiobone_v12_1_t* const bone) : baseptr(reinterpret_cast<const char* const>(bone)), name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procindex(bone->procindex), physicsbone(bone->physicsbone), surfacepropidx(bone->surfacepropidx), contents(bone->contents),
+		poseToBone(&bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
+
+	ModelBone_t(const r5::mstudiobonehdr_v16_t* const bonehdr, const r5::mstudiobonedata_v16_t* const bonedata) : baseptr(reinterpret_cast<const char* const>(bonehdr)), name(bonehdr->pszName()), parent(bonedata->parent), flags(bonedata->flags), proctype(bonedata->proctype), procindex(bonedata->procindex),
+		physicsbone(bonehdr->physicsbone), surfacepropidx(bonehdr->surfacepropidx), contents(bonehdr->contents),
+		poseToBone(&bonedata->poseToBone), pos(bonedata->pos), quat(bonedata->quat), rot(bonedata->rot), scale(bonedata->scale)
+	{
+		const int64_t tmpOffset = reinterpret_cast<const char* const>(bonedata) - reinterpret_cast<const char* const>(bonehdr);
+		procindex += static_cast<int>(tmpOffset); // adjust procindex to be based off the bone header
+	};
+
+	ModelBone_t(const r5::mstudiobonehdr_v16_t* const bonehdr, const r5::mstudiobonedata_v19_t* const bonedata, const r5::mstudiolinearbone_v19_t* const linearbone, const int bone) : baseptr(reinterpret_cast<const char* const>(bonehdr)), name(bonehdr->pszName()), parent(bonedata->parent), flags(bonedata->flags), proctype(bonedata->proctype), procindex(bonedata->procindex),
+		physicsbone(bonehdr->physicsbone), surfacepropidx(bonehdr->surfacepropidx), contents(bonehdr->contents),
+		poseToBone(linearbone->pPoseToBone(bone)), pos(*linearbone->pPos(bone)), quat(*linearbone->pQuat(bone)), rot(*linearbone->pRot(bone)), scale(*linearbone->pScale(bone))
+	{
+		const int64_t tmpOffset = reinterpret_cast<const char* const>(bonedata) - reinterpret_cast<const char* const>(bonehdr);
+		procindex += static_cast<int>(tmpOffset); // adjust procindex to be based off the bone header
+	};
+
+	const char* baseptr;
 
 	const char* name;
-	int parentIndex;
+	inline const char* const pszName() const { return name; }
+
+	int parent;
 
 	int flags;
+	int proctype;
+	int procindex; // procedural rule offset
+	int physicsbone; // index into physically simulated bone
+	inline const void* const pProcedure() const { return procindex ? reinterpret_cast<const void* const>(baseptr + procindex) : nullptr; };
 
-	matrix3x4_t poseToBone;
+	int surfacepropidx; // index into string tablefor property name
+	inline const char* const pszSurfaceProp() const { return baseptr + surfacepropidx; }
 
-	Vector pos;
-	Quaternion quat;
-	RadianEuler rot;
-	Vector scale;
+	int contents; // See BSPFlags.h for the contents flags
+
+	const matrix3x4_t* poseToBone; // use a pointer for this type since it's very large
+
+	const Vector pos;
+	const Quaternion quat;
+	const RadianEuler rot;
+	const Vector scale;
+
+	ModelBone_t& operator=(const ModelBone_t& bone)
+	{
+		memcpy_s(this, sizeof(ModelBone_t), &bone, sizeof(ModelBone_t));
+
+		return *this;
+	}
+};
+
+struct ModelAttachment_t
+{
+	ModelAttachment_t() = default;
+	ModelAttachment_t(const r5::mstudioattachment_v8_t* const attachment) : name(attachment->pszName()), flags(attachment->flags), localbone(attachment->localbone), localmatrix(&attachment->localmatrix) {}
+	ModelAttachment_t(const r5::mstudioattachment_v16_t* const attachment) : name(attachment->pszName()), flags(attachment->flags), localbone(attachment->localbone), localmatrix(&attachment->localmatrix) {}
+
+	const char* name;
+	int flags;
+
+	int localbone;
+	const matrix3x4_t* localmatrix;
 };
 
 struct ModelMaterialData_t
 {
+	~ModelMaterialData_t()
+	{
+		FreeAllocArray(stored);
+	}
+
 	// pointer to the referenced material asset
 	CPakAsset* asset;
 
 	// also store guid and name just in case the material is not loaded
 	uint64_t guid;
-	std::string name;
+	const char* name;
+	const char* stored;
 
 	inline MaterialAsset* const GetMaterialAsset() const { return asset ? reinterpret_cast<MaterialAsset* const>(asset->extraData()) : nullptr; }
+
+	// [rika]: originally had this as one function but it's wasted performance to check in cases it'd never happen
+	inline void SetName(const char* const str)
+	{
+		name = str;
+		stored = nullptr;
+	}
+
+	inline void StoreName(const char* const str)
+	{
+		const size_t length = strnlen_s(str, MAX_PATH) + 1;
+		char* buf = new char[length] {};
+		strncpy_s(buf, length, str, length - 1);
+
+		stored = buf;
+		name = stored;
+	}
 };
 
 struct ModelSkinData_t
@@ -238,6 +315,7 @@ public:
 	CRamen meshVertexData;
 
 	std::vector<ModelBone_t> bones;
+	std::vector<ModelAttachment_t> attachments;
 
 	std::vector<ModelLODData_t> lods;
 	std::vector<ModelMaterialData_t> materials;
@@ -253,6 +331,12 @@ public:
 	studiohdr_generic_t studiohdr;
 
 	inline const studiohdr_generic_t* const pStudioHdr() const { return &studiohdr; }
+	inline const ModelBone_t* const pBone(const int i) const { return &bones.at(i); }
+	inline const ModelAttachment_t* const pAttachment(const int i) const { return &attachments.at(i); }
+	inline const ModelMaterialData_t* const pMaterial(const int i) const { return &materials.at(i); }
+
+	inline const int BoneCount() const { return studiohdr.boneCount; }
+
 	inline const int NumLocalSeq() const { return studiohdr.localSequenceCount; }
 	inline const seqdesc_t* const LocalSeq(const int seq) const { return &sequences[seq]; }
 
@@ -272,6 +356,9 @@ void ParseModelBoneData_v8(ModelParsedData_t* const parsedData);
 void ParseModelBoneData_v12_1(ModelParsedData_t* const parsedData);
 void ParseModelBoneData_v16(ModelParsedData_t* const parsedData);
 void ParseModelBoneData_v19(ModelParsedData_t* const parsedData);
+
+void ParseModelAttachmentData_v8(ModelParsedData_t* const parsedData);
+void ParseModelAttachmentData_v16(ModelParsedData_t* const parsedData);
 
 void ParseModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const drawData, const uint64_t lod);
 

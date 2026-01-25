@@ -655,9 +655,6 @@ const bool CPakFile::DecompressFileBuffer(const char* fileBuffer, std::shared_pt
         // copy all of the decoded data into the decompressed buffer
         memcpy_s(dcmpBuf.get() + header->pakHdrSize, header->dcmpSize, data.get(), decodeSize);
 
-        // release the oodle decomp buffer now we are done with it
-        data.release();
-
         if (outBuffer->get() != nullptr)
             outBuffer->reset();
 

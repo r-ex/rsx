@@ -1,5 +1,7 @@
 #pragma once
 
+#include <shared_mutex>
+
 #define RSX_CACHE_DB_FILENAME "rsx_cache_db.bin"
 
 // v1: intial revision
@@ -66,16 +68,15 @@ public:
 	bool SaveToFile(const std::string& path);
 	bool LoadFromFile(const std::string& path);
 
-	bool LookupGuid(const uint64_t guid, CCacheEntry* const outEntry = nullptr) const
+	std::optional<CCacheEntry> TryGetEntry(const uint64_t guid) const
 	{
-		const bool foundGuid = m_cacheEntries.contains(guid);
+		std::shared_lock lock(m_cacheMutex);
 
-		// must copy! if an asset calls CCacheDBManager::Add from another thread
-		// while LookupGuid is being called, we end up with UB from a bad pointer
-		if (foundGuid && outEntry)
-			*outEntry = m_cacheEntries.at(guid);
+		auto iter = m_cacheEntries.find(guid);
+		if (iter == m_cacheEntries.end())
+			return std::nullopt;
 
-		return foundGuid;
+		return iter->second;
 	}
 
 	void Add(const std::string& str);
@@ -97,7 +98,7 @@ private:
 private:
 	std::unordered_map<uint64_t, CCacheEntry> m_cacheEntries;
 
-	std::mutex m_cacheMutex;
+	mutable std::shared_mutex m_cacheMutex;
 
 	uint32_t m_sourceCRC;
 };

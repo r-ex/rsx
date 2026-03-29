@@ -950,7 +950,9 @@ bool ExportTextureAsset(CAsset* const asset, const int setting)
     std::filesystem::path exportPath = g_ExportSettings.GetExportDirectory();
     const std::filesystem::path texturePath(asset->GetAssetName());
 
-    const bool hasFullPath = txtrAsset->name != nullptr || g_cacheDBManager.LookupGuid(pakAsset->GetAssetGUID(), nullptr);
+    const bool hasFullPath =
+        txtrAsset->name != nullptr ||
+        g_cacheDBManager.TryGetEntry(pakAsset->GetAssetGUID()).has_value();
 
     // [rika]: there is no point to add the parent path if we don't have a proper name (it will just end up in 's_PathPrefixTXTR' anyway)
     if (hasFullPath && g_ExportSettings.exportPathsFull)

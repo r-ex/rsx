@@ -185,7 +185,7 @@ void CCacheDBManager::Add(const CCacheEntry& entry)
 
 void CCacheDBManager::AddInternal(const CCacheEntry& entry)
 {
-	std::lock_guard lock(m_cacheMutex);
+	std::unique_lock lock(m_cacheMutex);
 
 	m_cacheEntries.emplace(entry.guid, entry);
 }

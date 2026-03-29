@@ -339,11 +339,13 @@ public:
 	{
 		if (g_ExportSettings.disableCachedNames)
 			return;
-		
-		CCacheEntry entry;
 
-		if (g_cacheDBManager.LookupGuid(GetAssetGUID(), &entry))
-			m_assetName = std::filesystem::path(entry.origString).make_preferred().string();
+		if (auto entry = g_cacheDBManager.TryGetEntry(GetAssetGUID()))
+		{
+			m_assetName = std::filesystem::path(entry->origString)
+				.make_preferred()
+				.string();
+		}
 	}
 
 	void SetAssetVersion(const AssetVersion_t& version)
@@ -536,7 +538,7 @@ public:
 
 #define GET_LOG_MSG_VARIADIC(args, returnVar, fmt) std::vector<char> buf(1+std::vsnprintf(NULL, 0, fmt, args)); \
 											   va_list args2; \
-                                               va_copy(args2, args); \
+											   va_copy(args2, args); \
 											   va_end(args); \
 											   std::vsnprintf(buf.data(), buf.size(), fmt, args2); \
 											   va_end(args2); \

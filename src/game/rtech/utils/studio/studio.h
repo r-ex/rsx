@@ -35,7 +35,9 @@ static constexpr int s_MaxStudioTriIndices	= s_MaxStudioTriangles * 3; // max nu
 #define MAXSTUDIONAME			128
 #define MAXSTUDIOWEIGHTLIST		128
 
-#define UNPACKWEIGHT(w) static_cast<float>((w+1)/32768.f) // weights in vvw and vg are packed into a signed 16 bit value that uses the entire number range
+constexpr float UnpackWeight(uint16_t w) {
+	return (w + 1) / 32768.f;
+}
 
 //===================
 // STUDIO VERTEX DATA
@@ -258,10 +260,10 @@ namespace vvw
 {
 	struct mstudioboneweightextra_t
 	{
-		short	weight; // weight = this / 32767.0
-		short   bone;
+		uint16_t	weight;
+		uint16_t	bone; // actually 8 bit on older, 12 bit on newer versions
 
-		inline float Weight() const { return UNPACKWEIGHT(weight); }
+		inline float Weight() const { return UnpackWeight(weight); }
 	};
 
 	struct vertexBoneWeightsExtraFileHeader_t
@@ -329,9 +331,9 @@ namespace vg
 
 	struct BlendWeightsPacked_s
 	{
-		uint16_t weight[2];	// packed weight with a max value of 32767, divide value by 32767 to get weight. weights will always correspond to first and second bone
+		uint16_t weight[2];	// packed weight with a max value of 32768, divide value by 32768 to get weight. weights will always correspond to first and second bone
 		// if the mesh has extra bone weights the second value will be used as an index into the array of extra bone weights, max value of 65535.
-		inline float Weight(const int i) const { return UNPACKWEIGHT(weight[i]); }
+		inline float Weight(const int i) const { return UnpackWeight(weight[i]); }
 		inline const uint16_t ExtraWeightsStartIndex() const { return weight[1]; }
 	};
 
@@ -342,6 +344,20 @@ namespace vg
 		uint32_t lastBone : 10;
 		uint32_t unk : 4;
 		uint32_t boneCount : 8;
+
+		uint32_t operator[](int i) const
+		{
+			assert(i >= 0 && i <= 2);
+
+			switch (i)
+			{
+			case 0: return firstBone;
+			case 1: return lastBone;
+			case 2: return unk;
+			}
+
+			__assume(false);
+		}
 	};
 
 	// Templated to the number of bits for each complex bone index

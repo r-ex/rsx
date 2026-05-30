@@ -20,7 +20,17 @@ extern CPreviewDrawData g_currentPreviewDrawData;
 //
 #define VERT_DATA(t, d, o) reinterpret_cast<const t* const>(d + o)
 #define MAP_BONE(b) bigBones ? reinterpret_cast<const uint16_t* const>(boneMap)[b] : (uint16_t)reinterpret_cast<const uint8_t* const>(boneMap)[b];
-bool Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const weights, Vector2D* const texcoords, ModelMeshData_t* const mesh, const char* const rawVertexData, const void* const boneMap, const vvw::mstudioboneweightextra_t* const weightExtra, bool bigBones, int& weightIdx)
+bool Vertex_t::ParseVertexFromVG(
+	Vertex_t* const vert,
+	VertexWeight_t* const weights,
+	Vector2D* const texcoords,
+	ModelMeshData_t* const mesh,
+	const char* const rawVertexData,
+	const void* const boneMap,
+	const vvw::mstudioboneweightextra_t* const weightExtra,
+	bool bigBones,
+	int& weightIdx
+)
 {
 	int offset = 0;
 
@@ -85,7 +95,7 @@ bool Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const wei
 		memcpy_s(&vert->blendData, sizeof(vert->blendData), blendWeights, sizeof(vert->blendData));
 
 		uint8_t curIdx = 0; // current weight
-		uint16_t remaining = 32767; // 'weight' remaining to assign to the last bone
+		uint16_t remaining = 32768; // 'weight' remaining to assign to the last bone
 
 		// model has more than 3 weights per vertex
 		if (nullptr != weightExtra)
@@ -119,7 +129,7 @@ bool Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const wei
 				// im just using bigBones as a flag for >=v19.2 lmao
 				const int16_t finalBoneIndex = bigBones ? static_cast<uint16_t>(blendIndices->Packed()->lastBone) : blendIndices->bone[1];
 				weights[curIdx].bone = MAP_BONE(finalBoneIndex);
-				weights[curIdx].weight = UNPACKWEIGHT(remaining);
+				weights[curIdx].weight = UnpackWeight(remaining);
 
 				curIdx++;
 			}
@@ -133,7 +143,7 @@ bool Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const wei
 			//const bool singleExtraBigBone = bigBones && blendIndices->boneCount == 1;
 			for (uint8_t i = 0; i < blendIndices->boneCount; i++)
 			{
-				weights[curIdx].bone = MAP_BONE(blendIndices->bone[curIdx]);
+				weights[curIdx].bone = MAP_BONE(bigBones ? static_cast<uint16_t>(blendIndices->Packed()->operator[](curIdx)) : blendIndices->bone[curIdx]);
 				weights[curIdx].weight = blendWeights->Weight(curIdx);
 
 				remaining -= blendWeights->weight[curIdx];
@@ -141,8 +151,8 @@ bool Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const wei
 				curIdx++;
 			}
 
-			weights[curIdx].bone = MAP_BONE(blendIndices->bone[curIdx]);
-			weights[curIdx].weight = UNPACKWEIGHT(remaining);
+			weights[curIdx].bone = MAP_BONE(bigBones ? static_cast<uint16_t>(blendIndices->Packed()->operator[](curIdx)) : blendIndices->bone[curIdx]);
+			weights[curIdx].weight = UnpackWeight(remaining);
 
 			curIdx++;
 		}

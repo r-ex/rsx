@@ -569,4 +569,21 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <Target Name="CopyDxcRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <DxcRuntimeDll Include="$(ProjectDir)thirdparty\dxc\dxcompiler.dll" />
+      <DxcRuntimeDll Include="$(ProjectDir)thirdparty\dxc\dxil.dll" />
+      <DxcRuntimeLicense Include="$(ProjectDir)thirdparty\dxc\LICENSE-MS.txt">
+        <NoticeFile>$(OutDir)thirdparty-notices\dxc\LICENSE-MS.txt</NoticeFile>
+      </DxcRuntimeLicense>
+      <DxcRuntimeLicense Include="$(ProjectDir)thirdparty\dxc\LICENSE-MIT.txt">
+        <NoticeFile>$(OutDir)thirdparty-notices\dxc\LICENSE-MIT.txt</NoticeFile>
+      </DxcRuntimeLicense>
+      <DxcRuntimeLicense Include="$(ProjectDir)thirdparty\dxc\LICENSE-LLVM.txt">
+        <NoticeFile>$(OutDir)thirdparty-notices\dxc\LICENSE-LLVM.txt</NoticeFile>
+      </DxcRuntimeLicense>
+    </ItemGroup>
+    <Copy SourceFiles="@(DxcRuntimeDll)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DxcRuntimeLicense)" DestinationFiles="@(DxcRuntimeLicense->'%(NoticeFile)')" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

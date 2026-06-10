@@ -100,6 +100,7 @@ void PostLoadShaderSetAsset(CAssetContainer* const pak, CAsset* const asset)
 	case 12:
 	case 13:
 	case 14:
+	case 15:
 		break;
 	default:
 		return;

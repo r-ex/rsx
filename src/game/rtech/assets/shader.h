@@ -414,19 +414,38 @@ struct DXBCHeader
 struct ShaderResource
 {
     ShaderResource(const char* n, RDEFResourceBinding bind) : name(n), binding(bind) { };
+    ShaderResource(std::string n, RDEFResourceBinding bind) : ownedName(std::move(n)), name(ownedName.c_str()), binding(bind) { };
+    ShaderResource(const ShaderResource& o) : ownedName(o.ownedName), name(ownedName.empty() ? o.name : ownedName.c_str()), binding(o.binding) { };
+    ShaderResource& operator=(const ShaderResource& o)
+    {
+        if (this == &o)
+            return *this;
+
+        ownedName = o.ownedName;
+        name = ownedName.empty() ? o.name : ownedName.c_str();
+        binding = o.binding;
+        return *this;
+    }
+
+    std::string ownedName;
     const char* name;
     RDEFResourceBinding binding;
 };
 
 struct TmpConstBufVar
 {
-    TmpConstBufVar(const char* n, D3D_SHADER_VARIABLE_TYPE t, int s) : name(n), type(t), size(s) {};
-    const char* name;
+    TmpConstBufVar(const char* n, D3D_SHADER_VARIABLE_TYPE t, int s, int o) : name(n ? n : ""), type(t), layoutSize(s), packedSize(s), offset(o) {};
+    TmpConstBufVar(std::string n, D3D_SHADER_VARIABLE_TYPE t, int s, int o) : name(std::move(n)), type(t), layoutSize(s), packedSize(s), offset(o) {};
+    std::string name;
+    std::string structTypeName;
     D3D_SHADER_VARIABLE_TYPE type;
-    uint32_t size;
+    uint32_t layoutSize;
+    uint32_t packedSize;
+    uint32_t offset;
+    std::vector<TmpConstBufVar> members;
 };
 
 class CPakAsset; // hate u
 
 std::map<uint32_t, ShaderResource> ResourceBindingFromDXBlob(CPakAsset* const asset, D3D_SHADER_INPUT_TYPE inputType);
-std::vector<TmpConstBufVar> ConstBufVarFromDXBlob(CPakAsset* const asset, const char* constBufName);
+std::vector<TmpConstBufVar> ConstBufVarFromDXBlob(CPakAsset* const asset, const char* constBufName, uint32_t expectedConstBufSize = 0);

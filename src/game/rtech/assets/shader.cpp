@@ -4,10 +4,254 @@
 #include <game/rtech/utils/utils.h>
 
 #include <imgui.h>
+#include <dxcapi.h>
+#include <d3d12shader.h>
 
 extern CDXParentHandler* g_dxHandler;
 
 extern ExportSettings_t g_ExportSettings;
+
+#define DXBC_FOURCC_DXIL    (('L'<<24)+('I'<<16)+('X'<<8)+'D')
+
+static HMODULE LoadDxCompilerDll()
+{
+	static HMODULE dxCompiler = nullptr;
+	static bool didLoad = false;
+
+	if (didLoad)
+		return dxCompiler;
+
+	didLoad = true;
+	dxCompiler = LoadLibraryA("dxcompiler.dll");
+
+	return dxCompiler;
+}
+
+static bool IsValidDXBCContainer(const char* const shaderData, const int shaderDataSize)
+{
+	if (!shaderData || shaderDataSize < static_cast<int>(sizeof(DXBCHeader)))
+		return false;
+
+	const DXBCHeader* const hdr = reinterpret_cast<const DXBCHeader*>(shaderData);
+	if (!hdr->isValid() || hdr->ContainerSizeInBytes > static_cast<uint32_t>(shaderDataSize))
+		return false;
+
+	const uint64_t blobOffsetTableSize = sizeof(DXBCHeader) + (static_cast<uint64_t>(hdr->BlobCount) * sizeof(uint32_t));
+	if (blobOffsetTableSize > hdr->ContainerSizeInBytes)
+		return false;
+
+	for (uint32_t blobIdx = 0; blobIdx < hdr->BlobCount; blobIdx++)
+	{
+		const uint32_t blobOffset = hdr->BlobOffset(blobIdx);
+		if (blobOffset > hdr->ContainerSizeInBytes || hdr->ContainerSizeInBytes - blobOffset < sizeof(DXBCBlobHeader))
+			return false;
+
+		const DXBCBlobHeader* const blob = hdr->pBlob(blobIdx);
+		if (blob->BlobSize > hdr->ContainerSizeInBytes - blobOffset - sizeof(DXBCBlobHeader))
+			return false;
+	}
+
+	return true;
+}
+
+static ID3D12ShaderReflection* CreateDXILShaderReflection(const char* const shaderData, const int shaderDataSize)
+{
+	if (!IsValidDXBCContainer(shaderData, shaderDataSize))
+		return nullptr;
+
+	const DXBCHeader* const hdr = reinterpret_cast<const DXBCHeader*>(shaderData);
+
+	bool hasDXIL = false;
+	for (uint32_t blobIdx = 0; blobIdx < hdr->BlobCount; blobIdx++)
+	{
+		const DXBCBlobHeader* const blob = hdr->pBlob(blobIdx);
+		if (blob->BlobFourCC == DXBC_FOURCC_DXIL)
+		{
+			hasDXIL = true;
+			break;
+		}
+	}
+
+	if (!hasDXIL)
+		return nullptr;
+
+	const HMODULE dxCompiler = LoadDxCompilerDll();
+	if (!dxCompiler)
+		return nullptr;
+
+	const DxcCreateInstanceProc dxcCreateInstance = reinterpret_cast<DxcCreateInstanceProc>(GetProcAddress(dxCompiler, "DxcCreateInstance"));
+	if (!dxcCreateInstance)
+		return nullptr;
+
+	IDxcUtils* utils = nullptr;
+	if (FAILED(dxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils))) || !utils)
+		return nullptr;
+
+	IDxcBlobEncoding* blob = nullptr;
+	HRESULT hr = utils->CreateBlobFromPinned(shaderData, hdr->ContainerSizeInBytes, CP_ACP, &blob);
+	utils->Release();
+
+	if (FAILED(hr) || !blob)
+		return nullptr;
+
+	IDxcContainerReflection* containerReflection = nullptr;
+	hr = dxcCreateInstance(CLSID_DxcContainerReflection, IID_PPV_ARGS(&containerReflection));
+	if (FAILED(hr) || !containerReflection)
+	{
+		blob->Release();
+		return nullptr;
+	}
+
+	hr = containerReflection->Load(blob);
+	blob->Release();
+
+	if (FAILED(hr))
+	{
+		containerReflection->Release();
+		return nullptr;
+	}
+
+	UINT32 dxilPart = 0;
+	hr = containerReflection->FindFirstPartKind(DXBC_FOURCC_DXIL, &dxilPart);
+	if (FAILED(hr))
+	{
+		containerReflection->Release();
+		return nullptr;
+	}
+
+	ID3D12ShaderReflection* shaderReflection = nullptr;
+	hr = containerReflection->GetPartReflection(dxilPart, IID_PPV_ARGS(&shaderReflection));
+	containerReflection->Release();
+
+	if (FAILED(hr))
+		return nullptr;
+
+	return shaderReflection;
+}
+
+static uint32_t DXILShaderTypePackedSize(const D3D12_SHADER_TYPE_DESC& typeDesc)
+{
+	uint32_t elementSize = 0;
+	switch (typeDesc.Type)
+	{
+	case D3D_SVT_BOOL:
+	case D3D_SVT_INT:
+	case D3D_SVT_UINT:
+	case D3D_SVT_FLOAT:
+		elementSize = 4;
+		break;
+	case D3D_SVT_DOUBLE:
+	case D3D_SVT_INT64:
+	case D3D_SVT_UINT64:
+		elementSize = 8;
+		break;
+	case D3D_SVT_INT16:
+	case D3D_SVT_UINT16:
+	case D3D_SVT_FLOAT16:
+		elementSize = 2;
+		break;
+	case D3D_SVT_UINT8:
+		elementSize = 1;
+		break;
+	default:
+		return 0;
+	}
+
+	uint32_t count = 1;
+	switch (typeDesc.Class)
+	{
+	case D3D_SVC_SCALAR:
+		break;
+	case D3D_SVC_VECTOR:
+		count = std::max<UINT>(typeDesc.Columns, 1);
+		break;
+	case D3D_SVC_MATRIX_ROWS:
+	case D3D_SVC_MATRIX_COLUMNS:
+		count = std::max<UINT>(typeDesc.Rows, 1) * std::max<UINT>(typeDesc.Columns, 1);
+		break;
+	default:
+		return 0;
+	}
+
+	if (typeDesc.Elements)
+		count *= typeDesc.Elements;
+
+	return elementSize * count;
+}
+
+static std::string DXILStructTypeName(const char* const name)
+{
+	if (!name)
+		return "UnnamedStruct";
+
+	std::string typeName(name);
+	if (typeName.starts_with("struct."))
+		typeName.erase(0, 7);
+
+	for (char& c : typeName)
+	{
+		if (!isalnum(static_cast<unsigned char>(c)) && c != '_')
+			c = '_';
+	}
+
+	return typeName.empty() ? "UnnamedStruct" : typeName;
+}
+
+static TmpConstBufVar DXILConstBufVarFromType(ID3D12ShaderReflectionType* const type, const char* const name, const uint32_t offset, const uint32_t fallbackSize)
+{
+	if (!type)
+		return TmpConstBufVar(name, D3D_SVT_VOID, 0, offset);
+
+	D3D12_SHADER_TYPE_DESC typeDesc{};
+	if (FAILED(type->GetDesc(&typeDesc)))
+		return TmpConstBufVar(name, D3D_SVT_VOID, 0, offset);
+
+	if (typeDesc.Class == D3D_SVC_STRUCT && typeDesc.Members)
+	{
+		TmpConstBufVar structVar(name, D3D_SVT_VOID, fallbackSize, offset);
+		structVar.structTypeName = DXILStructTypeName(typeDesc.Name);
+
+		for (UINT memberIdx = 0; memberIdx < typeDesc.Members; memberIdx++)
+		{
+			ID3D12ShaderReflectionType* const memberType = type->GetMemberTypeByIndex(memberIdx);
+			if (!memberType)
+				continue;
+
+			D3D12_SHADER_TYPE_DESC memberTypeDesc{};
+			if (FAILED(memberType->GetDesc(&memberTypeDesc)))
+				continue;
+
+			uint32_t memberFallbackSize = 0;
+			if (fallbackSize && memberTypeDesc.Offset < fallbackSize)
+			{
+				uint32_t memberEndOffset = fallbackSize;
+				if (memberIdx + 1 < typeDesc.Members)
+				{
+					ID3D12ShaderReflectionType* const nextMemberType = type->GetMemberTypeByIndex(memberIdx + 1);
+					D3D12_SHADER_TYPE_DESC nextMemberTypeDesc{};
+					if (nextMemberType && SUCCEEDED(nextMemberType->GetDesc(&nextMemberTypeDesc)) && nextMemberTypeDesc.Offset > memberTypeDesc.Offset)
+						memberEndOffset = nextMemberTypeDesc.Offset;
+				}
+
+				memberFallbackSize = memberEndOffset - memberTypeDesc.Offset;
+			}
+
+			const char* const memberName = type->GetMemberTypeName(memberIdx);
+			structVar.members.emplace_back(DXILConstBufVarFromType(memberType, memberName, offset + memberTypeDesc.Offset, memberFallbackSize));
+		}
+
+		return structVar;
+	}
+
+	const uint32_t reflectedPackedSize = DXILShaderTypePackedSize(typeDesc);
+	const uint32_t layoutSize = fallbackSize ? fallbackSize : reflectedPackedSize;
+	if (!layoutSize)
+		return TmpConstBufVar(name, typeDesc.Type, 0, offset);
+
+	TmpConstBufVar var(std::string(name ? name : ""), typeDesc.Type, layoutSize, offset);
+	var.packedSize = reflectedPackedSize ? reflectedPackedSize : layoutSize;
+	return var;
+}
 
 void LoadShaderAsset(CAssetContainer* pak, CAsset* asset)
 {
@@ -751,13 +995,10 @@ std::map<uint32_t, ShaderResource> ResourceBindingFromDXBlob(CPakAsset* const as
 
 	std::map<uint32_t, ShaderResource> bindings;
 
-	if (!shaderAsset || !shaderAsset->data)
+	if (!shaderAsset || !shaderAsset->data || !IsValidDXBCContainer(shaderAsset->data, shaderAsset->dataSize))
 		return bindings;
 
 	const DXBCHeader* const hdr = reinterpret_cast<DXBCHeader*>(shaderAsset->data);
-
-	if (!hdr->isValid())
-		return bindings;
 
 	for (uint32_t blobIdx = 0; blobIdx < hdr->BlobCount; blobIdx++)
 	{
@@ -780,23 +1021,52 @@ std::map<uint32_t, ShaderResource> ResourceBindingFromDXBlob(CPakAsset* const as
 		break;
 	}
 
+	if (bindings.empty())
+	{
+		ID3D12ShaderReflection* const reflection = CreateDXILShaderReflection(shaderAsset->data, shaderAsset->dataSize);
+		if (!reflection)
+			return bindings;
+
+		D3D12_SHADER_DESC shaderDesc{};
+		if (SUCCEEDED(reflection->GetDesc(&shaderDesc)))
+		{
+			for (UINT resIdx = 0; resIdx < shaderDesc.BoundResources; resIdx++)
+			{
+				D3D12_SHADER_INPUT_BIND_DESC resource{};
+				if (FAILED(reflection->GetResourceBindingDesc(resIdx, &resource)) || resource.Type != inputType)
+					continue;
+
+				RDEFResourceBinding binding{};
+				binding.Type = resource.Type;
+				binding.ReturnType = resource.ReturnType;
+				binding.Dimension = static_cast<D3D10_SRV_DIMENSION>(resource.Dimension);
+				binding.NumSamples = resource.NumSamples;
+				binding.BindPoint = resource.BindPoint;
+				binding.BindCount = resource.BindCount;
+				binding.Flags = static_cast<D3D_SHADER_INPUT_FLAGS>(resource.uFlags);
+
+				const ShaderResource tmp(std::string(resource.Name ? resource.Name : ""), binding);
+				bindings.emplace(resource.BindPoint, tmp);
+			}
+		}
+
+		reflection->Release();
+	}
+
 	return bindings;
 }
 
-std::vector<TmpConstBufVar> ConstBufVarFromDXBlob(CPakAsset* const asset, const char* constBufName)
+std::vector<TmpConstBufVar> ConstBufVarFromDXBlob(CPakAsset* const asset, const char* constBufName, uint32_t expectedConstBufSize)
 {
 	const ShaderAsset* const shaderAsset = asset->extraData<const ShaderAsset* const>();
 	assertm(shaderAsset, "Extra asset data should be valid at this point.");
 
 	std::vector<TmpConstBufVar> vars;
 
-	if (!shaderAsset->data)
+	if (!shaderAsset->data || !IsValidDXBCContainer(shaderAsset->data, shaderAsset->dataSize))
 		return vars;
 
 	const DXBCHeader* const hdr = reinterpret_cast<DXBCHeader*>(shaderAsset->data);
-
-	if (!hdr->isValid())
-		return vars;
 
 	for (uint32_t blobIdx = 0; blobIdx < hdr->BlobCount; blobIdx++)
 	{
@@ -812,12 +1082,19 @@ std::vector<TmpConstBufVar> ConstBufVarFromDXBlob(CPakAsset* const asset, const 
 			if (strncmp(constBufName, constBuf->Name(rdefBlob), 64))
 				continue;
 
+			if (expectedConstBufSize && constBuf->ConstBufSize > expectedConstBufSize)
+			{
+				Log("SHDR: Skipping RDEF constant buffer '%s' for %s, reflected size %u exceeds expected %u\n",
+					constBuf->Name(rdefBlob), asset->GetAssetName().c_str(), constBuf->ConstBufSize, expectedConstBufSize);
+				continue;
+			}
+
 			for (uint32_t constIdx = 0; constIdx < constBuf->ConstCount; constIdx++)
 			{
 				const RDEFConst* const constVar = constBuf->pConst(rdefBlob, constIdx);
 				const RDEFType* const constType = constVar->pType(rdefBlob);
 
-				const TmpConstBufVar tmp(constVar->Name(rdefBlob), static_cast<D3D_SHADER_VARIABLE_TYPE>(constType->Type), constVar->Size);
+				const TmpConstBufVar tmp(constVar->Name(rdefBlob), static_cast<D3D_SHADER_VARIABLE_TYPE>(constType->Type), constVar->Size, constVar->StartOffset);
 				vars.push_back(tmp);
 			}
 
@@ -825,6 +1102,73 @@ std::vector<TmpConstBufVar> ConstBufVarFromDXBlob(CPakAsset* const asset, const 
 		}
 
 		break;
+	}
+
+	if (vars.empty())
+	{
+		ID3D12ShaderReflection* const reflection = CreateDXILShaderReflection(shaderAsset->data, shaderAsset->dataSize);
+		if (!reflection)
+			return vars;
+
+		D3D12_SHADER_DESC shaderDesc{};
+		const HRESULT descHr = reflection->GetDesc(&shaderDesc);
+
+		ID3D12ShaderReflectionConstantBuffer* constBuf = nullptr;
+		D3D12_SHADER_BUFFER_DESC constBufDesc{};
+
+		if (SUCCEEDED(descHr))
+		{
+			for (UINT constBufIdx = 0; constBufIdx < shaderDesc.ConstantBuffers; constBufIdx++)
+			{
+				ID3D12ShaderReflectionConstantBuffer* const reflectedConstBuf = reflection->GetConstantBufferByIndex(constBufIdx);
+				if (!reflectedConstBuf)
+					continue;
+
+				D3D12_SHADER_BUFFER_DESC reflectedConstBufDesc{};
+				if (FAILED(reflectedConstBuf->GetDesc(&reflectedConstBufDesc)) || !reflectedConstBufDesc.Name || strncmp(constBufName, reflectedConstBufDesc.Name, 64))
+					continue;
+
+				if (expectedConstBufSize && reflectedConstBufDesc.Size > expectedConstBufSize)
+				{
+					Log("SHDR: Skipping DXIL constant buffer '%s' for %s, reflected size %u exceeds expected %u\n",
+						reflectedConstBufDesc.Name ? reflectedConstBufDesc.Name : "<null>",
+						asset->GetAssetName().c_str(), reflectedConstBufDesc.Size, expectedConstBufSize);
+					continue;
+				}
+
+				constBuf = reflectedConstBuf;
+				constBufDesc = reflectedConstBufDesc;
+				break;
+			}
+		}
+
+		if (constBuf)
+		{
+			TmpConstBufVar root(constBufDesc.Name ? constBufDesc.Name : constBufName, D3D_SVT_VOID, constBufDesc.Size, 0);
+			root.structTypeName = DXILStructTypeName(constBufDesc.Name);
+
+			for (UINT constIdx = 0; constIdx < constBufDesc.Variables; constIdx++)
+			{
+				ID3D12ShaderReflectionVariable* const constVar = constBuf->GetVariableByIndex(constIdx);
+				if (!constVar)
+					continue;
+
+				D3D12_SHADER_VARIABLE_DESC constVarDesc{};
+				if (FAILED(constVar->GetDesc(&constVarDesc)))
+					continue;
+
+				ID3D12ShaderReflectionType* const constType = constVar->GetType();
+				if (!constType)
+					continue;
+
+				root.members.emplace_back(DXILConstBufVarFromType(constType, constVarDesc.Name, constVarDesc.StartOffset, constVarDesc.Size));
+			}
+
+			if (!root.members.empty())
+				vars.push_back(std::move(root));
+		}
+
+		reflection->Release();
 	}
 
 	return vars;

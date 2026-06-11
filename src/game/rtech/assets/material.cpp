@@ -250,7 +250,11 @@ void PostLoadMaterialAsset(CAssetContainer* const container, CAsset* const asset
         if (shdsAsset->pixelShaderAsset)
         {
             materialAsset->resourceBindings = ResourceBindingFromDXBlob(shdsAsset->pixelShaderAsset, D3D10_SIT_TEXTURE);
-            materialAsset->cpuDataBuf = ConstBufVarFromDXBlob(shdsAsset->pixelShaderAsset, "CBufUberStatic");
+            materialAsset->cpuDataBuf = ConstBufVarFromDXBlob(shdsAsset->pixelShaderAsset, "CBufUberStatic", materialAsset->cpuDataSize);
+
+            // with dxil they started using a wrapper struct
+            if (materialAsset->cpuDataBuf.empty())
+                materialAsset->cpuDataBuf = ConstBufVarFromDXBlob(shdsAsset->pixelShaderAsset, "CBufUberStaticSingular", materialAsset->cpuDataSize);
         }
     }
 
@@ -715,73 +719,132 @@ bool ExportRawMaterialAsset(const MaterialAsset* const materialAsset, std::files
     return true;
 }
 
+static void WriteMaterialStructVar(std::ostringstream& ss, const TmpConstBufVar& var, const char* const cpuData, const uint32_t cpuDataSize, const int indent)
+{
+    const std::string indentStr(indent, '\t');
+
+    if (!var.members.empty())
+    {
+        const std::string structName = var.structTypeName.empty() ? var.name : var.structTypeName;
+
+        ss << indentStr << "struct " << structName << "\n";
+        ss << indentStr << "{\n";
+
+        for (const TmpConstBufVar& member : var.members)
+            WriteMaterialStructVar(ss, member, cpuData, cpuDataSize, indent + 1);
+
+        ss << indentStr << "} " << var.name << ";\n";
+        return;
+    }
+
+    const uint32_t packedSize = var.packedSize ? var.packedSize : var.layoutSize;
+    if (var.offset > cpuDataSize || packedSize > cpuDataSize - var.offset)
+        return;
+
+    const char* const ptr = cpuData + var.offset;
+
+    ss << indentStr;
+
+    switch (var.type)
+    {
+    case D3D_SVT_INT:
+    {
+        const int elementCount = packedSize / sizeof(int32_t);
+        if (elementCount == 1)
+        {
+            ss << std::format("int {} = {};", var.name, *reinterpret_cast<const int32_t*>(ptr));
+            break;
+        }
+
+        std::string valStr;
+        for (int i = 0; i < elementCount; ++i)
+        {
+            valStr += std::format("{}", *reinterpret_cast<const int32_t*>(ptr + (i * sizeof(int32_t))));
+
+            if (i != elementCount - 1)
+                valStr += ", ";
+        }
+
+        ss << std::format("int {}[{}] = {{ {} }};", var.name, elementCount, valStr.c_str());
+        break;
+    }
+    case D3D_SVT_UINT:
+    {
+        const int elementCount = packedSize / sizeof(uint32_t);
+        if (elementCount == 1)
+        {
+            ss << std::format("uint32_t {} = {};", var.name, *reinterpret_cast<const uint32_t*>(ptr));
+            break;
+        }
+
+        std::string valStr;
+        for (int i = 0; i < elementCount; ++i)
+        {
+            valStr += std::format("{}", *reinterpret_cast<const uint32_t*>(ptr + (i * sizeof(uint32_t))));
+
+            if (i != elementCount - 1)
+                valStr += ", ";
+        }
+
+        ss << std::format("uint32_t {}[{}] = {{ {} }};", var.name, elementCount, valStr.c_str());
+        break;
+    }
+    case D3D_SVT_FLOAT:
+    {
+        const int elementCount = packedSize / sizeof(float);
+
+        if (elementCount == 1)
+        {
+            ss << std::format("float {} = {};", var.name, *reinterpret_cast<const float*>(ptr));
+            break;
+        }
+
+        std::string valStr;
+        for (int i = 0; i < elementCount; ++i)
+        {
+            valStr += std::format("{}", *reinterpret_cast<const float*>(ptr + (i * sizeof(float))));
+
+            if (i != elementCount - 1)
+                valStr += ", ";
+        }
+
+        ss << std::format("float {}[{}] = {{ {} }};", var.name, elementCount, valStr.c_str());
+        break;
+    }
+    default:
+    {
+        ss << std::format("char UNIMPLEMENTED_{}[{}];", var.name, var.layoutSize);
+        break;
+    }
+    }
+
+    ss << "\n";
+}
+
 // [rika]: this sucks but I don't wanna redo rn (so it is yoinked from begion)
 bool ExportStructMaterialAsset(const MaterialAsset* const materialAsset, std::filesystem::path& exportPath)
 {
     exportPath.replace_extension(".uber_struct");
 
     std::ostringstream ss;
-    ss << "struct CBufUberStatic\n{\n";
+    const char* const cpuData = reinterpret_cast<const char*>(materialAsset->cpuData);
 
-    char* ptr = reinterpret_cast<char*>(materialAsset->cpuData);
-    for (auto& it : materialAsset->cpuDataBuf)
+    if (materialAsset->cpuDataBuf.size() == 1 && !materialAsset->cpuDataBuf[0].members.empty())
     {
-        ss << "\t";
+        const TmpConstBufVar& root = materialAsset->cpuDataBuf[0];
+        const std::string structName = root.structTypeName.empty() ? root.name : root.structTypeName;
 
-        switch (it.type)
-        {
-        case D3D_SVT_INT:
-        {
-            std::string str = std::format("int {} = {};", it.name, *reinterpret_cast<uint32_t*>(ptr));
-            ss << str.c_str();
-            break;
-        }
-        case D3D_SVT_UINT:
-        {
-            std::string str = std::format("uint32_t {} = {};", it.name, *reinterpret_cast<uint32_t*>(ptr));
-            ss << str.c_str();
-            break;
-        }
-        case D3D_SVT_FLOAT:
-        {
-            int elementCount = it.size / sizeof(float);
+        ss << "struct " << structName << "\n{\n";
+        for (const TmpConstBufVar& member : root.members)
+            WriteMaterialStructVar(ss, member, cpuData, materialAsset->cpuDataSize, 1);
+    }
+    else
+    {
+        ss << "struct CBufUberStatic\n{\n";
+        for (const TmpConstBufVar& it : materialAsset->cpuDataBuf)
+            WriteMaterialStructVar(ss, it, cpuData, materialAsset->cpuDataSize, 1);
+    }
 
-            std::string str = "";
-            switch (elementCount)
-            {
-            case 1:
-            {
-                str = std::format("float {} = {};", it.name, *reinterpret_cast<float*>(ptr));
-                break;
-            }
-            default:
-            {
-                std::string valStr = "";
-                for (int i = 0; i < elementCount; ++i)
-                {
-                    valStr += std::format("{}", *reinterpret_cast<float*>(ptr + (i * sizeof(float))));
-
-                    if (i != elementCount - 1)
-                        valStr += ", ";
-                }
-
-                str = std::format("float {}[{}] = {{ {} }};", it.name, elementCount, valStr.c_str());
-                break;
-            }
-            }
-            ss << str.c_str();
-            break;
-        }
-        default:
-            std::string str = std::format("char UNIMPLEMENTED_{}[{}];", it.name, it.size);
-            ss << str.c_str();
-            break;
-        }
-
-        ptr += it.size;
-
-        ss << "\n";
-    };
     ss << "};";
 
     StreamIO out(exportPath.string(), eStreamIOMode::Write);
@@ -823,11 +886,18 @@ static void RemoveRenderPassSuffix(std::string& textureName)
 }
 
 // [rika]: generate the best possible texture name from the provided data
-static inline void TextureNameGenerated(MaterialTextureExportInfo_s& info, const MaterialAsset* const materialAsset, const std::string& materialStem, const uint32_t entryIdx, const eTextureType txtrType)
+static inline void TextureNameGenerated(
+    MaterialTextureExportInfo_s& info,
+    const MaterialAsset* const materialAsset,
+    const std::string& materialStem,
+    const uint32_t entryIdx,
+    const eTextureType txtrType,
+    std::optional<std::string_view> oldMaterialStem = std::nullopt
+)
 {
     if (materialAsset->resourceBindings.count(entryIdx))
     {
-        info.exportName = std::format("{}_{}", materialStem, materialAsset->resourceBindings.at(entryIdx).name);
+        info.exportName = std::format("{}_{}", oldMaterialStem ? *oldMaterialStem : materialStem, materialAsset->resourceBindings.at(entryIdx).name);
         return;
     }
 
@@ -918,13 +988,13 @@ void ParseMaterialTextureExportInfo(std::unordered_map<uint32_t, MaterialTexture
                 break;
             }
 
-            TextureNameGenerated(info, materialAsset, materialStem, entry.index, thisTexture->type);
+            TextureNameGenerated(info, materialAsset, materialStem, entry.index, thisTexture->type, oldMaterialStem);
 
             break;
         }
         case eTextureExportName::TXTR_NAME_SMTC:
         {
-            TextureNameGenerated(info, materialAsset, materialStem, entry.index, thisTexture->type);
+            TextureNameGenerated(info, materialAsset, materialStem, entry.index, thisTexture->type, oldMaterialStem);
 
             break;
         }

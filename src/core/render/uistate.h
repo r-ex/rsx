@@ -124,4 +124,6 @@ public:
 
 	const char* newVersionType;
 	GitHubReleaseInfo_s newVersionReleaseInfo;
+
+	std::atomic<bool> isLoading;
 };

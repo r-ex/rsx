@@ -737,12 +737,19 @@ void ItemflavWnd_Draw(CUIState* uiState)
         // Always render the refresh button, but also try to grab everything the first time the window is shown
         if ((ImGui::Button("Refresh data") || !flavData->triedToInitialise) && g_assetData.m_donePostLoad)
         {
-            ItemflavWindow_RefreshData(uiState);
+            CThread([uiState]() {
+                uiState->isLoading = true;
+                ItemflavWindow_RefreshData(uiState);
+                uiState->isLoading = false;
+                }).detach();
+            
 
             flavData->triedToInitialise = true;
         }
 
-        if (ImGui::BeginTabBar("##SkinFinderTabs"))
+        if (!flavData->triedToInitialise || uiState->isLoading)
+            ImGui::TextDisabled("Gathering data...");
+        else if (ImGui::BeginTabBar("##SkinFinderTabs"))
         {
             if (ImGui::BeginTabItem("Legends"))
             {

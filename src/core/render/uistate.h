@@ -94,7 +94,12 @@ struct CUI_ItemflavWindowData
 
 		localizationAsset = nullptr;
 		selectedCharacterName = "(none)";
+		selectedWeaponName = "(none)";
 		selectedCharacterIdx = -1;
+		selectedWeaponIdx = -1;
+
+		characterData.clear();
+		weaponData.clear();
 	}
 };
 
@@ -108,6 +113,14 @@ public:
 	inline void ClearAssetData()
 	{
 		itemFlavorListAsset = nullptr;
+
+		itemflavData.Reset();
+	}
+
+	CUIState() : settingsWindowVisible(false), itemflavWindowVisible(false),
+		logWindowVisible(false), sceneWindowHovered(false), itemFlavorListAsset(nullptr),
+		itemflavData{}
+	{
 
 		itemflavData.Reset();
 	}

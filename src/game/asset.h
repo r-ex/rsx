@@ -573,7 +573,7 @@ public:
 	template<typename T>
 	T* const FindAsset(const std::string_view& str)
 	{
-		FindAssetByGUID<T>(RTech::StringToGuid(str.data()));
+		return FindAssetByGUID<T>(RTech::StringToGuid(str.data()));
 	}
 
 	void ClearAssetData()

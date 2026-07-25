@@ -538,6 +538,10 @@ const bool CPakFile::ParseStreamedFile(const std::string& fileName, bool opt)
     if (fileName.length() == 0)
         return false;
 
+    // don't parse starpaks if we are in validation mode
+    if (!DO_ASSET_LOAD())
+        return false;
+
     // TODO: make this cache entries in g_assetData instead of rediscovering for every pak...
 
 #if (PAKLOAD_DEBUG == PAKLOAD_DEBUG_LOG)

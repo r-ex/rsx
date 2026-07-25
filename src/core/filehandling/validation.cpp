@@ -15,7 +15,7 @@
 struct PakAssetValidationValues_t
 {
 	// Version -> Vector of known header sizes
-	std::unordered_map<int, std::vector<int>> knownVersions;
+	std::unordered_map<int, std::vector<uint32_t>> knownVersions;
 	
 	bool expectStarpakOffset : 1;  // Expect that the asset type can have a starpak offset
 	bool requireStarpakOffset : 1; // Require that the asset type has a starpak offset
@@ -54,6 +54,7 @@ void CreateValidationDataBank()
 	shdr.knownVersions[15] = { sizeof(ShaderAssetHeader_v15_t) };
 	shdr.knownVersions[16] = { sizeof(ShaderAssetHeader_v15_t) };
 	shdr.knownVersions[17] = { sizeof(ShaderAssetHeader_v15_t) };
+	shdr.knownVersions[19] = { sizeof(ShaderAssetHeader_v14_t) };
 	shdr.expectDataPage = true;
 
 	// Shader Set
@@ -97,6 +98,7 @@ bool ValidateLoadedPakFiles()
 
 	uint32_t numSegmentErrors = 0;
 	uint32_t numAssetErrors = 0;
+	uint32_t numAssetWarnings = 0;
 
 	std::unordered_map<uint32_t, PakLoadedAssetTypeInfo_t> foundAssetTypes;
 
@@ -128,6 +130,37 @@ bool ValidateLoadedPakFiles()
 		
 			numAssetErrors += loadedInfo.inconsistentHeaderSize + loadedInfo.inconsistentVersions;
 
+			// Validate against the data bank
+			auto& v = VALIDATION_DATA_BANK;
+			if (auto rules = v.find((AssetType_t)type); rules != v.end())
+			{
+				if (auto knownVersions = rules->second.knownVersions.find(loadedInfo.version); knownVersions != rules->second.knownVersions.end())
+				{
+					bool foundHeaderSize = false;
+
+					// Vector of known header sizes for this version
+					for (auto& it : knownVersions->second)
+					{
+						if (it == loadedInfo.headerSize)
+						{
+							foundHeaderSize = true;
+							break;
+						}
+					}
+
+					if (!foundHeaderSize)
+					{
+						printf("\tWarning: asset type '%s' has an unknown header size: v%u, %u bytes\n", assetTypeFourCC.c_str(), loadedInfo.version, loadedInfo.headerSize);
+						numAssetWarnings++;
+					}
+				}
+				else
+				{
+					printf("\tWarning: asset type '%s' has an unknown version and header size: v%u, %u bytes\n", assetTypeFourCC.c_str(), loadedInfo.version, loadedInfo.headerSize);
+					numAssetWarnings++;
+				}
+			}
+
 			if (foundAssetTypes.count(type) == 0)
 				foundAssetTypes[type] = loadedInfo;
 			else
@@ -140,11 +173,12 @@ bool ValidateLoadedPakFiles()
 	{
 		const std::string assetTypeFourCC = fourCCToString(type);
 
-		printf("\t%s: v%u, %llu assets\n", assetTypeFourCC.c_str(), loadedInfo.version, loadedInfo.assetCount);
+		printf("\t%s: v%u, hdr %u bytes%s, %llu assets\n", assetTypeFourCC.c_str(), loadedInfo.version, loadedInfo.headerSize, loadedInfo.inconsistentHeaderSize ? "*" : "", loadedInfo.assetCount);
 	}
 
 	const uint32_t numContainerErrors = g_assetData.m_numFailedContainerLoads + numSegmentErrors + numAssetErrors;
 	printf("Found %i problems:\n\t%u segment padding errors, %u asset data errors, %u files failed to load\n", numContainerErrors, numSegmentErrors, numAssetErrors, g_assetData.m_numFailedContainerLoads);
+	printf("Found %i warnings:\n\t%u unknown asset versions\n", numAssetWarnings, numAssetWarnings);
 
 	return true;
 }

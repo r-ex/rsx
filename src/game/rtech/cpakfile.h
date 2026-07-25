@@ -652,6 +652,20 @@ struct PakLoadedAssetTypeInfo_t
     // the same file. Used for validation mode.
     bool inconsistentHeaderSize : 1;
     bool inconsistentVersions : 1;
+
+    // Merge loaded asset type infos from two different paks into a single struct. This is used for the CLI pak validation mode
+    // Excludes:
+    //   - offsetToNextHeaderInCollection - validation doesn't care
+    //   - headerSize                     - should be the same and gets flagged separately if not
+    void Merge(const PakLoadedAssetTypeInfo_t& rhs)
+    {
+        assetCount += rhs.assetCount;
+
+        inconsistentHeaderSize |= rhs.inconsistentHeaderSize;
+        inconsistentVersions |= rhs.inconsistentVersions;
+
+        version = std::max(version, rhs.version);
+    }
 };
 #endif // #if defined(PAKLOAD_PATCHING_ANY)
 

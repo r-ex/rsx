@@ -611,6 +611,7 @@ static void MainWnd_WelcomeBox()
                         ImGui::PushID(i);
                         ImGui::TableNextRow();
 
+                        // eventually this will also support EA app as well as steam so this needs its own column
                         if (ImGui::TableSetColumnIndex(0))
                         {
                             ImGui::TextUnformatted("Steam");

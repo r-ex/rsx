@@ -98,6 +98,8 @@ bool ValidateLoadedPakFiles()
 	uint32_t numSegmentErrors = 0;
 	uint32_t numAssetErrors = 0;
 
+	std::unordered_map<uint32_t, PakLoadedAssetTypeInfo_t> foundAssetTypes;
+
 	for (CAssetContainer* container : g_assetData.v_assetContainers)
 	{
 		if (container->GetContainerType() != CAssetContainer::ContainerType::PAK)
@@ -125,7 +127,20 @@ bool ValidateLoadedPakFiles()
 				printf("\t\tError: asset type '%s' has inconsistent asset versions\n", assetTypeFourCC.c_str());
 		
 			numAssetErrors += loadedInfo.inconsistentHeaderSize + loadedInfo.inconsistentVersions;
+
+			if (foundAssetTypes.count(type) == 0)
+				foundAssetTypes[type] = loadedInfo;
+			else
+				foundAssetTypes[type].Merge(loadedInfo);
 		}
+	}
+
+	printf("Found %llu asset types:\n", foundAssetTypes.size());
+	for (auto& [type, loadedInfo] : foundAssetTypes)
+	{
+		const std::string assetTypeFourCC = fourCCToString(type);
+
+		printf("\t%s: v%u, %llu assets\n", assetTypeFourCC.c_str(), loadedInfo.version, loadedInfo.assetCount);
 	}
 
 	const uint32_t numContainerErrors = g_assetData.m_numFailedContainerLoads + numSegmentErrors + numAssetErrors;

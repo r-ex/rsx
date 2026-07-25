@@ -501,8 +501,8 @@ void MainWnd_MenuBar()
             if (ImGui::MenuItem("Settings"))
                 uiState.ShowSettingsWindow(true);
 
-            if (ImGui::MenuItem("Skin Finder"))
-                uiState.ShowItemflavWindow(true);
+            //if (ImGui::MenuItem("Skin Finder"))
+            //    uiState.ShowItemflavWindow(true);
 
             if (ImGui::MenuItem("Logs"))
                 uiState.ShowLogWindow(true);
@@ -1129,7 +1129,7 @@ void HandleRenderFrame()
     if (uiState.settingsWindowVisible)
         SettingsWnd_Draw(&uiState);
 
-    if (uiState.itemflavWindowVisible)
+    if (!SHOW_WELCOME_BOX && uiState.itemflavWindowVisible)
         ItemflavWnd_Draw(&uiState);
 
     if (uiState.logWindowVisible)

@@ -741,7 +741,7 @@ void ItemflavWnd_Draw(CUIState* uiState)
                 uiState->isLoading = true;
                 ItemflavWindow_RefreshData(uiState);
                 uiState->isLoading = false;
-                }).detach();
+            }).detach();
             
 
             flavData->triedToInitialise = true;

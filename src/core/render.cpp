@@ -1129,7 +1129,7 @@ void HandleRenderFrame()
     if (uiState.settingsWindowVisible)
         SettingsWnd_Draw(&uiState);
 
-    if (!SHOW_WELCOME_BOX && uiState.itemflavWindowVisible)
+    if (uiState.itemflavWindowVisible && g_assetData.v_assetContainers.size() > 0 && !inJobAction)
         ItemflavWnd_Draw(&uiState);
 
     if (uiState.logWindowVisible)

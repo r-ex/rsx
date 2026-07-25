@@ -75,7 +75,7 @@ void HandlePakLoad(std::vector<std::string> filePaths)
                 const std::string topPatchFileName = std::format("{}({:02}).rpak", pakStem, patchVersion);
                 fsPath.replace_filename(topPatchFileName);
 
-                Log("Loading highest patch '%s' instead of requested file '%s'\n", topPatchFileName.c_str(), path.c_str());
+                Log("PTCH: Using patch file \"%s\" for base pak \"%s\"\n", topPatchFileName.c_str(), pakStem.c_str());
             }
         }
 
@@ -155,8 +155,7 @@ FORCEINLINE void HandleExportBindingForAsset(CAsset* const asset, const bool exp
             HandleExportBindingForAssetEx(dependency);
         }
     }
-    else
-        HandleExportBindingForAssetEx(asset);
+    else HandleExportBindingForAssetEx(asset);
 }
 
 void HandlePakAssetExportList(std::deque<CAsset*> selectedAssets, const bool exportDependencies)

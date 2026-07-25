@@ -511,7 +511,7 @@ const bool CPakFile::ParseFromFile(const std::string& filePath, std::shared_ptr<
 {
 #if (PAKLOAD_DEBUG == PAKLOAD_DEBUG_LOG)
     const std::filesystem::path fsPath(filePath);
-    Log("RPAK: Decompressing pak file: %s\n", fsPath.filename().string().c_str());
+    Log("RPAK: Decompressing pak file: \"%s\"\n", fsPath.filename().string().c_str());
 #endif // #if (PAKLOAD_DEBUG >= PAKLOAD_DEBUG_LOG)
 
     if (!FileSystem::ReadFileData(filePath, &buf))
@@ -531,8 +531,10 @@ const bool CPakFile::ParseStreamedFile(const std::string& fileName, bool opt)
     if (fileName.length() == 0)
         return false;
 
+    // TODO: make this cache entries in g_assetData instead of rediscovering for every pak...
+
 #if (PAKLOAD_DEBUG == PAKLOAD_DEBUG_LOG)
-    Log("LOAD: parsing starpak file from path: ('%s')\n", fileName.c_str());
+    Log("STRM: Parsing starpak file: \"%s\"\n", fileName.c_str());
 #endif // #if (PAKLOAD_DEBUG >= PAKLOAD_DEBUG_LOG)
 
     struct StarPakStreamEntry_t

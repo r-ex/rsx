@@ -115,6 +115,8 @@ public:
 		itemFlavorListAsset = nullptr;
 
 		itemflavData.Reset();
+
+		itemflavWindowVisible = false;
 	}
 
 	CUIState() : settingsWindowVisible(false), itemflavWindowVisible(false),

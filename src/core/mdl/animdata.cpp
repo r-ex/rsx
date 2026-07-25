@@ -532,7 +532,7 @@ ModelSeq_t::ModelSeq_t(const r5::mstudioseqdesc_v8_t* const seqdesc) : baseptr(r
 			// fps can't be negative, fps practically shouldn't be more than 2048, 128k frames is an absurd amount, so this is a very good check, since the number (int) should never have those last bits filled.
 			if (ANIMDESC_SANITY_CHECK(pAnimdesc))
 			{
-				Log("Sequence %s had animation(s) (index %i), but no animation description, skipping...\n", seqdesc->pszLabel(), i);
+				Log("ASEQ: %s had animation(s) (index %i), but no animdesc; skipping...\n", seqdesc->pszLabel(), i);
 				numblends = 0;
 				break;
 			}
@@ -611,7 +611,7 @@ ModelSeq_t::ModelSeq_t(const r5::mstudioseqdesc_v8_t* const seqdesc, const char*
 			// fps can't be negative, fps practically shouldn't be more than 2048, 128k frames is an absurd amount, so this is a very good check, since the number (int) should never have those last bits filled.
 			if (ANIMDESC_SANITY_CHECK(pAnimdesc))
 			{
-				Log("Sequence %s had animation(s) (index %i), but no animation description, skipping...\n", seqdesc->pszLabel(), i);
+				Log("ASEQ: %s had animation(s) (index %i), but no animdesc; skipping...\n", seqdesc->pszLabel(), i);
 				numblends = 0;
 				break;
 			}
@@ -703,7 +703,7 @@ ModelSeq_t::ModelSeq_t(const r5::mstudioseqdesc_v16_t* const seqdesc, const char
 			// fps can't be negative, fps practically shouldn't be more than 2048, 128k frames is an absurd amount, so this is a very good check, since the number (int) should never have those last bits filled.
 			if (ANIMDESC_SANITY_CHECK(pAnimdesc))
 			{
-				Log("Sequence %s had animation(s) (index %i), but no animation description, skipping...\n", seqdesc->pszLabel(), i);
+				Log("ASEQ: %s had animation(s) (index %i), but no animdesc; skipping...\n", seqdesc->pszLabel(), i);
 				numblends = 0;
 				break;
 			}
@@ -786,7 +786,7 @@ ModelSeq_t::ModelSeq_t(const r5::mstudioseqdesc_v18_t* const seqdesc, const char
 				// fps can't be negative, fps practically shouldn't be more than 2048, 128k frames is an absurd amount, so this is a very good check, since the number (int) should never have those last bits filled.
 				if (ANIMDESC_SANITY_CHECK(pAnimdesc))
 				{
-					Log("Sequence %s had animation(s) (index %i), but no animation description, skipping...\n", seqdesc->pszLabel(), i);
+					Log("ASEQ: %s had animation(s) (index %i), but no animdesc; skipping...\n", seqdesc->pszLabel(), i);
 					numblends = 0;
 					break;
 				}
@@ -806,7 +806,7 @@ ModelSeq_t::ModelSeq_t(const r5::mstudioseqdesc_v18_t* const seqdesc, const char
 				// fps can't be negative, fps practically shouldn't be more than 2048, 128k frames is an absurd amount, so this is a very good check, since the number (int) should never have those last bits filled.
 				if (ANIMDESC_SANITY_CHECK(pAnimdesc))
 				{
-					Log("Sequence %s had animation(s) (index %i), but no animation description, skipping...\n", seqdesc->pszLabel(), i);
+					Log("ASEQ: %s had animation(s) (index %i), but no animdesc; skipping...\n", seqdesc->pszLabel(), i);
 					numblends = 0;
 					break;
 				}

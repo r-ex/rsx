@@ -86,7 +86,10 @@ const uint32_t UIFontHeader::TextureFromUnicode(int unicode) const
         unicode = FONT_UTF16_BOX;
     }
 
+#if (PAKLOAD_DEBUG == PAKLOAD_DEBUG_VERBOSE)
+    // very spammy print
     Log("Font %s doesn't have the code point U+%04X which is required to display a missing glyph.\n", name, FONT_UTF16_BOX);
+#endif
 
     return FONT_TEXTURE_IDX_INVALID;
 }

@@ -68,14 +68,14 @@ bool ExportTextureAnimationAsset(CAsset* const asset, const int setting)
 
     StreamIO txanOut(exportPath.string(), eStreamIOMode::Write);
 
-    TextureAnimFileHeader_t fileHdr;
-
-    fileHdr.magic = TXAN_FILE_MAGIC;
-    fileHdr.fileVersion = TXAN_FILE_VERSION;
-    fileHdr.assetVersion = static_cast<unsigned short>(pakAsset->data()->version);
-    fileHdr.layerCount = hdr->layerCount;
-    fileHdr.slotCount = GetSlotCount(hdr);
-
+    TextureAnimFileHeader_t fileHdr{
+        .magic = TXAN_FILE_MAGIC,
+        .fileVersion = TXAN_FILE_VERSION,
+        .assetVersion = static_cast<unsigned short>(pakAsset->data()->version),
+        .layerCount = hdr->layerCount,
+        .slotCount = GetSlotCount(hdr)
+    };
+    
     txanOut.write(fileHdr);
     txanOut.write((const char*)hdr->layers, fileHdr.layerCount * sizeof(TextureAnimLayer_t));
     txanOut.write((const char*)hdr->slots, fileHdr.slotCount);

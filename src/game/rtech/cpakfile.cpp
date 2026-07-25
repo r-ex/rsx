@@ -65,11 +65,12 @@ const bool CPakFile::ParseFileBuffer(const std::string& path, bool* alreadyLoade
     else
         SetFilePath(path);
 
-    if (!ParseFromFile(GetFilePath().string(), this->m_Buf))
-        return false;
+    // Pre-parse the header to make sure that we don't waste time decompressing data needlessly
 
-    // parse our initial header (subject to change)
-    ParsePakFileHeader(m_Buf.get());
+    std::shared_ptr<char[]> headerBuf;
+    FileSystem::ReadFileData(GetFilePath().string(), &headerBuf, 0x80); // 0x80 bytes is the max rpak header size
+
+    ParsePakFileHeader(headerBuf.get());
 
     // Block loading of effects.rpak and effects(01).rpak from R5Reloaded.
     // These files are very strange and cause some problems, so to allow for bulk processing of R5Reloaded's pak files,
@@ -83,6 +84,12 @@ const bool CPakFile::ParseFileBuffer(const std::string& path, bool* alreadyLoade
 
         return false;
     }
+
+    if (!ParseFromFile(GetFilePath().string(), this->m_Buf))
+        return false;
+
+    // parse our initial header (subject to change)
+    ParsePakFileHeader(m_Buf.get());
 
     switch (header()->version)
     {

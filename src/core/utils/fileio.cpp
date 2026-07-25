@@ -114,4 +114,17 @@ namespace FileSystem
         file.read(buffer->get(), file.size());
         return true;
     }
+
+	bool ReadFileData(const std::string& filePath, std::shared_ptr<char[]>* buffer, size_t readSize)
+	{
+		StreamIO file;
+		if (!file.open(filePath, eStreamIOMode::Read))
+			return false;
+
+		readSize = std::clamp(readSize, 0ull, file.size());
+
+		*buffer = std::shared_ptr<char[]>(new char[readSize]);
+		file.read(buffer->get(), readSize);
+		return true;
+	}
 }

@@ -349,4 +349,5 @@ FILE* FileFromHandle(HANDLE handle, const eStreamIOMode mode);
 namespace FileSystem
 {
     bool ReadFileData(const std::string& filePath, std::shared_ptr<char[]>* buffer);
+    bool ReadFileData(const std::string& filePath, std::shared_ptr<char[]>* buffer, size_t readSize);
 }

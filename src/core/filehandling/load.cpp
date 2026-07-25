@@ -43,8 +43,7 @@ static void HandleFileLoad(std::vector<std::string> filePaths, HandleFileLoadCal
                     GroupPathByExtension(&pathsByExtension, dirEntry.path());
             }
         }
-        else
-            GroupPathByExtension(&pathsByExtension, fsPath);
+        else GroupPathByExtension(&pathsByExtension, fsPath);
     }
 
     g_assetData.m_validate = cli && cli->HasParam("-validate");

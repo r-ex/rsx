@@ -123,7 +123,6 @@ public:
 		logWindowVisible(false), sceneWindowHovered(false), itemFlavorListAsset(nullptr),
 		itemflavData{}
 	{
-
 		itemflavData.Reset();
 	}
 

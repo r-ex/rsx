@@ -465,14 +465,16 @@ void ClearLoadState()
     g_dxHandler->GetUIState().ClearAssetData();
 }
 
-void ShowOpenFileDialog()
+static void ShowOpenFileDialog()
 {
     ClearLoadState();
 
     CThread(HandleOpenFileDialog, g_dxHandler->GetWindowHandle()).detach();
 }
 
-void MainWnd_MenuBar()
+#define LOADING_TOOLTIP() if (inJobAction) ImGui::SetItemTooltip("Unable to open new files while file loading is still in progress")
+
+static void MainWnd_MenuBar()
 {
     if (ImGui::BeginMainMenuBar())
     {
@@ -480,8 +482,7 @@ void MainWnd_MenuBar()
         {
             if (ImGui::MenuItem("Open", "CTRL+O", false, !inJobAction))
                 ShowOpenFileDialog();
-            if (inJobAction) ImGui::SetItemTooltip("Unable to open new files while file loading is still in progress");
-
+            LOADING_TOOLTIP();
 
             if (ImGui::MenuItem("Unload Files", "CTRL+W", false, !inJobAction))
             {
@@ -490,7 +491,7 @@ void MainWnd_MenuBar()
 
                 ClearLoadState();
             }
-            if (inJobAction) ImGui::SetItemTooltip("Unable to open new files while file loading is still in progress");
+            LOADING_TOOLTIP();
 
             ImGui::EndMenu();
         }
@@ -500,9 +501,6 @@ void MainWnd_MenuBar()
             CUIState& uiState = g_dxHandler->GetUIState();
             if (ImGui::MenuItem("Settings"))
                 uiState.ShowSettingsWindow(true);
-
-            //if (ImGui::MenuItem("Skin Finder"))
-            //    uiState.ShowItemflavWindow(true);
 
             if (ImGui::MenuItem("Logs"))
                 uiState.ShowLogWindow(true);
@@ -527,6 +525,7 @@ void MainWnd_MenuBar()
         ImGui::EndMainMenuBar();
     }
 }
+#undef LOADING_TOOLTIP
 
 extern void HandlePakLoad(std::vector<std::string> filePaths);
 
@@ -550,7 +549,7 @@ static void MainWnd_LaunchSkinFinderForGame(const std::filesystem::path& dirPath
             g_assetData.ProcessAssetsPostLoad();
 
             inJobAction = false;
-            }, std::move(filePaths)).detach();
+        }, std::move(filePaths)).detach();
     }
 };
 

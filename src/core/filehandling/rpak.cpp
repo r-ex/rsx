@@ -13,7 +13,7 @@ void HandlePakLoad(std::vector<std::string> filePaths)
     std::atomic<uint32_t> pakLoadingProgress = 0;
     const ProgressBarEvent_t* const pakLoadProgress = g_pImGuiHandler->AddProgressBarEvent("Loading Paks..", static_cast<uint32_t>(filePaths.size()), &pakLoadingProgress, true);
 
-    // If post-load has already been done when this function is called, then an ODL pak has been requested
+    // Allow ODL paks to be loaded without clearing out the patch master
     if (!g_assetData.m_donePostLoad)
     {
         if (g_assetData.m_pakPatchMaster)
@@ -51,12 +51,13 @@ void HandlePakLoad(std::vector<std::string> filePaths)
                 }
                 else
                 {
+                    g_assetData.Log_Error(g_assetData.m_pakPatchMaster, "Failed to load patch_master.rpak\n");
+
                     assertm(false, "Parsing patch_master from file failed.");
                     delete g_assetData.m_pakPatchMaster;
                     g_assetData.m_pakPatchMaster = nullptr;
-                }
 
-                //Log("[PTCH] Found %lld patch entries.\n", g_assetData.m_patchMasterEntries.size());           
+                }
             }
         }
 
@@ -78,8 +79,6 @@ void HandlePakLoad(std::vector<std::string> filePaths)
                 Log("PTCH: Using patch file \"%s\" for base pak \"%s\"\n", topPatchFileName.c_str(), pakStem.c_str());
             }
         }
-
-        printf("\n");
 
         bool alreadyLoaded = false;
         if (CPakFile* const pak = new CPakFile(); pak->ParseFileBuffer(fsPath.string(), &alreadyLoaded))
@@ -180,7 +179,6 @@ void HandlePakAssetExportList(std::deque<CAsset*> selectedAssets, const bool exp
     parallelProcessTask.execute();
     parallelProcessTask.wait();
     g_pImGuiHandler->FinishProgressBarEvent(exportAssetListEvent);
-
 
     ImGui::InsertNotification({ ImGuiToastType::Success, 3000, 150.f, "Exported %lld asset%s!", selectedAssets.size(), selectedAssets.size() == 1 ? "" : "s"});
 }

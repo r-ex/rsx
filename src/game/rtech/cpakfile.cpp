@@ -550,7 +550,7 @@ const bool CPakFile::ParseStreamedFile(const std::string& fileName, bool opt)
     StreamIO file;
     if (!file.open(path, eStreamIOMode::Read))
     {
-        g_assetData.Log_Warning(this, "Failed to find StarPak file \"%s\" on disk. Assets may be missing data", fileName.c_str());
+        g_assetData.Log_Warning(this, "Failed to open StarPak file \"%s\". Assets may be missing data", fileName.c_str());
         return false;
     }
 

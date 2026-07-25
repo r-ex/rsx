@@ -151,9 +151,9 @@ void CGlobalAssetData::Log_Info(const CAssetContainer* const container, const ch
     std::string msg;
     GET_LOG_MSG_VARIADIC(args, msg, fmt);
 
-    const std::string sourceName = container ? container->GetFilePath().filename().string() : "N/A";
+    const std::string sourceName = container ? " [" + container->GetFilePath().filename().string() + "]: " : "";
 
-    Log("[%s] %s\n", sourceName.c_str(), msg.c_str());
+    Log("%s%s\n", sourceName.c_str(), msg.c_str());
     LogMessages_Append(ContainerMessage_t::MessageType_e::MSG_INFO, sourceName, msg);
 
 #ifndef BUILD_NOGUI
@@ -170,9 +170,9 @@ void CGlobalAssetData::Log_Warning(const CAssetContainer* const container, const
     std::string msg;
     GET_LOG_MSG_VARIADIC(args, msg, fmt);
 
-    const std::string sourceName = container ? container->GetFilePath().filename().string() : "N/A";
+    const std::string sourceName = container ? " [" + container->GetFilePath().filename().string() + "]" : "";
 
-    Log("WARNING [%s]: %s\n", sourceName.c_str(), msg.c_str());
+    Log("WARNING%s: %s\n", sourceName.c_str(), msg.c_str());
 
     m_logErrorListInfo.AddWarning();
 
@@ -191,9 +191,9 @@ void CGlobalAssetData::Log_Error(const CAssetContainer* const container, const c
     std::string msg;
     GET_LOG_MSG_VARIADIC(args, msg, fmt);
 
-    const std::string sourceName = container ? container->GetFilePath().filename().string() : "N/A";
+    const std::string sourceName = container ? " [" + container->GetFilePath().filename().string() + "]" : "";
 
-    Log("ERROR [%s]: %s\n", sourceName.c_str(), msg.c_str());
+    Log("ERROR%s: %s\n", sourceName.c_str(), msg.c_str());
 
     m_logErrorListInfo.AddError();
 

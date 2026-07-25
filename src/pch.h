@@ -133,6 +133,8 @@
 #define IS_NOGUI(cli) ((cli) && (cli)->HasParam("-nogui"))
 #endif
 
+#define DO_ASSET_LOAD() !g_assetData.m_validate || g_assetData.m_validateAssetLoading
+
 
 #define CONCAT(a, b) XCONCAT(a, b)
 #define XCONCAT(a, b) a ## b

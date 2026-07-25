@@ -1233,7 +1233,7 @@ void CPakFile::ProcessAssets()
             CPakAsset* const asset = new CPakAsset(this, pAsset, tempName);
 
             // Load assets as long as we are not in validation mode without -validateload
-            if (!g_assetData.m_validate || g_assetData.m_validateAssetLoading)
+            if (DO_ASSET_LOAD())
             {
                 parallelLoadTask.addTask([this, pAsset, asset] {
                     if (auto it = g_assetData.m_assetTypeBindings.find(pAsset->type); it != g_assetData.m_assetTypeBindings.end())
@@ -1273,28 +1273,31 @@ void CPakFile::ProcessAssets()
 
     parallelLoadTask.execute();
 
-    // we pre-sort each pak for post load callbacks by certain priority order.
-    std::sort(g_assetData.v_assets.begin(), g_assetData.v_assets.end(), [](const CGlobalAssetData::AssetLookup_t& a, const CGlobalAssetData::AssetLookup_t& b)
+    if (DO_ASSET_LOAD())
     {
-        const auto itA = std::find(s_postLoadOrderOverrides.begin(), s_postLoadOrderOverrides.end(), a.m_asset->GetAssetType());
-        const auto itB = std::find(s_postLoadOrderOverrides.begin(), s_postLoadOrderOverrides.end(), b.m_asset->GetAssetType());
+        // we pre-sort each pak for post load callbacks by certain priority order.
+        std::sort(g_assetData.v_assets.begin(), g_assetData.v_assets.end(), [](const CGlobalAssetData::AssetLookup_t& a, const CGlobalAssetData::AssetLookup_t& b)
+        {
+            const auto itA = std::find(s_postLoadOrderOverrides.begin(), s_postLoadOrderOverrides.end(), a.m_asset->GetAssetType());
+            const auto itB = std::find(s_postLoadOrderOverrides.begin(), s_postLoadOrderOverrides.end(), b.m_asset->GetAssetType());
 
-        // if both types are found in the custom order, compare their positions.
-        if (itA != s_postLoadOrderOverrides.end() && itB != s_postLoadOrderOverrides.end())
-        {
-            return std::distance(s_postLoadOrderOverrides.begin(), itA) < std::distance(s_postLoadOrderOverrides.begin(), itB);
-        }
+            // if both types are found in the custom order, compare their positions.
+            if (itA != s_postLoadOrderOverrides.end() && itB != s_postLoadOrderOverrides.end())
+            {
+                return std::distance(s_postLoadOrderOverrides.begin(), itA) < std::distance(s_postLoadOrderOverrides.begin(), itB);
+            }
 
-        // handle cases where types are not in the custom order.
-        if (itA == s_postLoadOrderOverrides.end())
-        {
-            return false; // 'a' is placed after 'b'.
-        }
-        else 
-        {
-            return true; // 'b' is placed after 'a'.
-        }
-    });
+            // handle cases where types are not in the custom order.
+            if (itA == s_postLoadOrderOverrides.end())
+            {
+                return false; // 'a' is placed after 'b'.
+            }
+            else
+            {
+                return true; // 'b' is placed after 'a'.
+            }
+        });
+    }
 
     parallelLoadTask.wait();
 

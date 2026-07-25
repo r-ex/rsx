@@ -544,7 +544,7 @@ const bool CPakFile::ParseStreamedFile(const std::string& fileName, bool opt)
     };
     std::unique_ptr<StarPak_t> pakEntry = std::make_unique<StarPak_t>();
 
-    std::string path = std::filesystem::path(GetFilePath()).parent_path().string().append("\\" + fileName);
+    const std::string path = std::filesystem::path(GetFilePath()).parent_path().string().append("\\" + fileName);
     pakEntry.get()->filePath = path;
 
     StreamIO file;

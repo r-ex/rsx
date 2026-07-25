@@ -72,8 +72,8 @@ bool ExportTextureAnimationAsset(CAsset* const asset, const int setting)
         .magic = TXAN_FILE_MAGIC,
         .fileVersion = TXAN_FILE_VERSION,
         .assetVersion = static_cast<unsigned short>(pakAsset->data()->version),
-        .layerCount = hdr->layerCount,
-        .slotCount = GetSlotCount(hdr)
+        .layerCount = static_cast<unsigned int>(hdr->layerCount),
+        .slotCount = static_cast<unsigned int>(GetSlotCount(hdr))
     };
     
     txanOut.write(fileHdr);

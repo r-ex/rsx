@@ -120,7 +120,7 @@ const uint32_t UIFontHeader::TextureFromGlyph(int glyph) const
         glyph = LOBYTE(errorGlyph) << 16; // 
     }
 
-    Log("Font %s doesn't have the glyph index %u which is required to display a missing glyph.\n", name, 0u);
+    Log("FONT: %s doesn't have the glyph index %u which is required to display a missing glyph.\n", name, 0u);
 
     return FONT_TEXTURE_IDX_INVALID;
 }

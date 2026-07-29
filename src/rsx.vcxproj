@@ -64,7 +64,7 @@
     <ClInclude Include="core\utils\curlutils.h" />
     <ClInclude Include="core\utils\exportsettings.h" />
     <ClInclude Include="core\utils\fileio.h" />
-    <ClInclude Include="core\utils\gamefinder.hpp" />
+    <ClInclude Include="core\utils\gamefinder.h" />
     <ClInclude Include="core\utils\jsonutils.h" />
     <ClInclude Include="core\utils\keyvalue_parser.h" />
     <ClInclude Include="core\utils\ramen.h" />

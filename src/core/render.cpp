@@ -23,7 +23,7 @@
 #include "render/ui/styles.h"
 #include <core/fonts/codicons.h>
 
-#include <core/utils/gamefinder.hpp>
+#include <core/utils/gamefinder.h>
 #include <misc/ImGuiNotify.hpp>
 
 extern CDXParentHandler* g_dxHandler;
@@ -571,7 +571,9 @@ static void MainWnd_WelcomeBox()
         // registry/FS accesses
         if (firstTimeWelcoming)
         {
+            GameFinder_FindAllCompatibleEAGames(&gfResults);
             GameFinder_FindAllCompatibleSteamGames(&gfResults);
+
 
             firstTimeWelcoming = false;
         }
@@ -592,7 +594,7 @@ static void MainWnd_WelcomeBox()
             if (ImGui::Button("Open File..."))
                 ShowOpenFileDialog();
 
-            if (gfResults.gamePaths.size() > 0)
+            if (gfResults.gameDescriptors.size() > 0)
             {
                 ImGui::Separator();
                 ImGui::TextUnformatted("Compatible Game Installations");
@@ -606,7 +608,7 @@ static void MainWnd_WelcomeBox()
                     ImGui::TableHeadersRow();
 
                     int i = 0;
-                    for (auto& path : gfResults.gamePaths)
+                    for (GameFinderResults_s::GameDescriptor_s& gameDescriptor : gfResults.gameDescriptors)
                     {
                         ImGui::PushID(i);
                         ImGui::TableNextRow();
@@ -614,13 +616,25 @@ static void MainWnd_WelcomeBox()
                         // eventually this will also support EA app as well as steam so this needs its own column
                         if (ImGui::TableSetColumnIndex(0))
                         {
-                            ImGui::TextUnformatted("Steam");
+                            switch (gameDescriptor.gameDistributionPlatform)
+                            {
+                            case GameDistributionPlatform_e::STEAM:
+                            {
+                                ImGui::TextUnformatted("Steam");
+                                break;
+                            }
+                            case GameDistributionPlatform_e::EA:
+                            {
+                                ImGui::TextUnformatted("EA");
+                                break;
+                            }
+                            }
                         }
 
                         if (ImGui::TableSetColumnIndex(1))
                         {
                             const bool selected = selectedGameDirectoryIdx == i;
-                            if (ImGui::Selectable(path.string().c_str(), selected, ImGuiSelectableFlags_SpanAllColumns))
+                            if (ImGui::Selectable(gameDescriptor.gamePath.string().c_str(), selected, ImGuiSelectableFlags_SpanAllColumns))
                                 selectedGameDirectoryIdx = i;
                         }
 
@@ -634,8 +648,10 @@ static void MainWnd_WelcomeBox()
 
                 if (selectedGameDirectoryIdx != -1)
                 {
+                    GameFinderResults_s::GameDescriptor_s* const gameDescriptor = &gfResults.gameDescriptors[selectedGameDirectoryIdx];
+
                     const char* buttonLabel = "Open";
-                    switch (gfResults.gameTypes[selectedGameDirectoryIdx])
+                    switch (gameDescriptor->gameType)
                     {
                     case GameFinderGame_e::TITANFALL_1: // wait r1 doesn't have rpaks... good thing the gamefinder doesn't search for r1 yet!
                     case GameFinderGame_e::TITANFALL_2:
@@ -655,7 +671,7 @@ static void MainWnd_WelcomeBox()
                                 }).detach();
                             }, true);
 
-                        MainWnd_LaunchSkinFinderForGame(gfResults.gamePaths[selectedGameDirectoryIdx], gfResults.gameTypes[selectedGameDirectoryIdx]);
+                        MainWnd_LaunchSkinFinderForGame(gameDescriptor->gamePath, gameDescriptor->gameType);
                     }
                 }
             }

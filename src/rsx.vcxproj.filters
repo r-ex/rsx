@@ -480,7 +480,7 @@
     <ClInclude Include="thirdparty\imgui\misc\imgui_memory_editor.h">
       <Filter>thirdparty\imgui\misc</Filter>
     </ClInclude>
-    <ClInclude Include="core\utils\gamefinder.hpp">
+    <ClInclude Include="core\utils\gamefinder.h">
       <Filter>core\utils</Filter>
     </ClInclude>
     <ClInclude Include="thirdparty\valvefilevdf\vdf_parser.hpp">

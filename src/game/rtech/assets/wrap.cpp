@@ -165,9 +165,7 @@ void PostLoadWrapAsset(CAssetContainer* const pak, CAsset* const asset)
     {
     case WrapAssetType_e::BSP:
     {
-#if defined(HAS_BSP_SUPPORT)
-        wrapAsset->parsedDataType = eWrapAssetParsedDataType::BSP;
-
+#if (HAS_BSP_SUPPORT)
         std::unique_ptr<char[]> wrapData = GetWrapAssetData(asset, nullptr);
 
         CBSPData* bspData = new CBSPData(assetPath.stem().string());
@@ -234,8 +232,8 @@ bool ExportWrapAsset(CAsset* const asset, const int setting)
         wrapOut.close();
         break;
     }
-#if defined(HAS_BSP_SUPPORT)
-    case eWrapAssetParsedDataType::BSP:
+#if (HAS_BSP_SUPPORT)
+    case WrapAssetType_e::BSP:
     {
         StreamIO wrapOut;
 
@@ -314,13 +312,13 @@ void* PreviewWrapAsset(CAsset* const asset, const bool firstFrameForAsset)
 
     switch (wrapAsset->type)
     {
-#if !defined(HAS_BSP_SUPPORT) // if no bsp-specific support, just show it as a binary file
+#if !(HAS_BSP_SUPPORT) // if no bsp-specific support, just show it as a binary file
     case WrapAssetType_e::BSP:
 #endif
     case WrapAssetType_e::TEXT:
     case WrapAssetType_e::UNKNOWN:
         return Wrap_PreviewTextOrBinary(asset, wrapAsset, firstFrameForAsset);
-#if defined(HAS_BSP_SUPPORT)
+#if (HAS_BSP_SUPPORT)
     case WrapAssetType_e::BSP:
         return reinterpret_cast<CBSPData*>(wrapAsset->parsedData)->ConstructPreviewData();
 #endif

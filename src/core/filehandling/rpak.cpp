@@ -171,6 +171,7 @@ void HandlePakAssetExportList(std::deque<CAsset*> selectedAssets, const bool exp
             }, 1u);
     }
 
+#if !defined(BUILD_NOGUI)
     const ProgressBarEvent_t* const exportAssetListEvent = g_pImGuiHandler->AddProgressBarEvent(
         "Exporting asset list...",
         parallelProcessTask.getRemainingTasks(),
@@ -181,6 +182,7 @@ void HandlePakAssetExportList(std::deque<CAsset*> selectedAssets, const bool exp
     g_pImGuiHandler->FinishProgressBarEvent(exportAssetListEvent);
 
     ImGui::InsertNotification({ ImGuiToastType::Success, 3000, 150.f, "Exported %lld asset%s!", selectedAssets.size(), selectedAssets.size() == 1 ? "" : "s"});
+#endif
 }
 
 void HandleExportAllPakAssets(std::vector<CGlobalAssetData::AssetLookup_t>* const pakAssets, const bool exportDependencies)
@@ -198,6 +200,7 @@ void HandleExportAllPakAssets(std::vector<CGlobalAssetData::AssetLookup_t>* cons
             }, 1u);
     }
 
+#if !defined(BUILD_NOGUI)
     const ProgressBarEvent_t* const exportAllAssetsEvent = g_pImGuiHandler->AddProgressBarEvent(
         "Exporting all assets...",
         parallelProcessTask.getRemainingTasks(),
@@ -207,6 +210,7 @@ void HandleExportAllPakAssets(std::vector<CGlobalAssetData::AssetLookup_t>* cons
     parallelProcessTask.execute();
     parallelProcessTask.wait();
     g_pImGuiHandler->FinishProgressBarEvent(exportAllAssetsEvent);
+#endif
 }
 
 void HandleExportSelectedAssetType(std::vector<CGlobalAssetData::AssetLookup_t> pakAssets, const bool exportDependencies)

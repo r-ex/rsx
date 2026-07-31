@@ -2360,7 +2360,7 @@ void* PreviewParsedData(ModelPreviewInfo_t* const info, ModelParsedData_t* const
 	}
 
 	// Load these first so we don't have to look them up for every mesh.
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
 	const CShader* const vertexShader = g_dxHandler->GetShaderManager()->LoadShader("C:/p4/rtech_utils_imgui/src/shaders/amp_vs", eShaderType::Vertex);
 #else
 	const CShader* const vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_vs", s_PreviewVertexShader, eShaderType::Vertex);
@@ -2401,7 +2401,7 @@ void* PreviewParsedData(ModelPreviewInfo_t* const info, ModelParsedData_t* const
 
 		const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlAsset->extraData());
 
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
 		// If the material has a valid shaderset loaded, try and grab its shaders to use for this mesh's advanced model preview
 		if (matl->shaderSetAsset)
 		{

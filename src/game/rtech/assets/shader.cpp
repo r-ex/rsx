@@ -453,7 +453,7 @@ void PostLoadShaderAsset(CAssetContainer* const pak, CAsset* const asset)
 
 	}
 
-#if defined(ADVANCED_MODEL_PREVIEW) // saves some memory and loading time if we don't create these when AMP is not enabled
+#if (ADVANCED_MODEL_PREVIEW) // saves some memory and loading time if we don't create these when AMP is not enabled
 	HRESULT hr = E_INVALIDARG;
 
 	switch (shaderAsset->type)

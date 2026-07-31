@@ -34,7 +34,7 @@ constexpr char ADDTL_CRASH_INFO[] = {
 #if defined(BUILD_NOGUI)
 	"// \tBUILD_NOGUI\n"
 #endif
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
 	"// \tAMP\n"
 #endif
 #if defined(DEBUG_NO_ASEQ_POSTLOAD)

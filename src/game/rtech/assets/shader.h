@@ -208,7 +208,7 @@ public:
         numShaders = shaderCount;
     }
 
-#if defined(ADVANCED_MODEL_PREVIEW) // shader instances are only created when AMP is enabled
+#if (ADVANCED_MODEL_PREVIEW) // shader instances are only created when AMP is enabled
     ~ShaderAsset()
     {
         if (!data)

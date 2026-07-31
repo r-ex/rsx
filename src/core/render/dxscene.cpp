@@ -28,7 +28,7 @@ void CDXScene::UpdateCubemapSamples()
 
 void CDXScene::MapAndUpdateLightBuffer(ID3D11Device* device, ID3D11DeviceContext* ctx)
 {
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
 	// This should be checked before calling, but we don't want to accidentally forget
 	// since unnecessarily mapping and copying data is wasteful.
 	assert(NeedsLightingUpdate());
@@ -84,7 +84,7 @@ void CDXScene::MapAndUpdateLightBuffer(ID3D11Device* device, ID3D11DeviceContext
 
 void CDXScene::MapAndUpdateCubemapSamplesBuffer(ID3D11Device* device, ID3D11DeviceContext* ctx)
 {
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
 	// This should be checked before calling, but we don't want to accidentally forget
 	// since unnecessarily mapping and copying data is wasteful.
 	// check if we have to (re)create the buffer

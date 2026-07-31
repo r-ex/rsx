@@ -40,7 +40,7 @@ void Preview_Model(CDXDrawData* drawData, float dt)
     ctx->RSSetState(g_dxHandler->GetRasterizerState());
     ctx->OMSetDepthStencilState(g_dxHandler->GetDepthStencilState(true), 1u);
 
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
     // Update CBufCommonPerCamera
     g_dxHandler->GetCamera()->CommitCameraDataBufferUpdates();
 

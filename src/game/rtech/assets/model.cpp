@@ -510,7 +510,7 @@ static void ParseModelVertexData_v12_1(CPakAsset* const asset, ModelAsset* const
                         const vvw::mstudioboneweightextra_t* const weights = mesh->pBoneWeights();
                         const uint16_t* const meshIndexData = mesh->pIndices(); // pointer to all of the index data for this mesh
 
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
                         meshData.rawVertexData = new char[mesh->vertCacheSize * mesh->vertCount]; // get a pointer to the raw vertex data for use with the game's shaders
 
                         memcpy(meshData.rawVertexData, rawVertexData, static_cast<uint64_t>(mesh->vertCacheSize) * mesh->vertCount);
@@ -688,7 +688,7 @@ static void ParseModelVertexData_v14(CPakAsset* const asset, ModelAsset* const m
                         const vvw::mstudioboneweightextra_t* const weights = mesh->pBoneWeights();
                         const uint16_t* const meshIndexData = mesh->pIndices(); // pointer to all of the index data for this mesh
 
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
                         meshData.rawVertexData = new char[mesh->vertCacheSize * mesh->vertCount]; // get a pointer to the raw vertex data for use with the game's shaders
 
                         memcpy(meshData.rawVertexData, rawVertexData, static_cast<uint64_t>(mesh->vertCacheSize) * mesh->vertCount);
@@ -893,7 +893,7 @@ static void ParseModelVertexData_v16(CPakAsset* const asset, ModelAsset* const m
                         const vvw::mstudioboneweightextra_t* const weights = mesh->pBoneWeights();
                         const uint16_t* const meshIndexData = mesh->pIndices(); // pointer to all of the index data for this mesh
 
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
                         meshData.rawVertexData = new char[mesh->vertCacheSize * mesh->vertCount]; // get a pointer to the raw vertex data for use with the game's shaders
 
                         memcpy(meshData.rawVertexData, rawVertexData, static_cast<uint64_t>(mesh->vertCacheSize)* mesh->vertCount);
@@ -1099,7 +1099,7 @@ static void ParseModelVertexData_v19_2(CPakAsset* const asset, ModelAsset* const
                         const vvw::mstudioboneweightextra_t* const weights = mesh->pBoneWeights();
                         const uint16_t* const meshIndexData = mesh->pIndices(); // pointer to all of the index data for this mesh
 
-#if defined(ADVANCED_MODEL_PREVIEW)
+#if (ADVANCED_MODEL_PREVIEW)
                         meshData.rawVertexData = new char[mesh->vertCacheSize * mesh->vertCount]; // get a pointer to the raw vertex data for use with the game's shaders
 
                         memcpy(meshData.rawVertexData, rawVertexData, static_cast<uint64_t>(mesh->vertCacheSize) * mesh->vertCount);

@@ -223,7 +223,7 @@ void Bridge_SetupSocketThread()
 
     if (serverSocket == -1)
     {
-        perror("socket");
+        Log("BRIDGE: Failed to create the socket. Error: %x\n", WSAGetLastError());
         return;
     }
 
@@ -238,7 +238,7 @@ void Bridge_SetupSocketThread()
 
     if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) != 0)
     {
-        perror("bind");
+        Log("BRIDGE: Failed to bind the socket address. Error: %x\n", WSAGetLastError());
         return;
     }
 

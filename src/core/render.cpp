@@ -245,14 +245,18 @@ void SettingsWnd_Draw(CUIState* uiState)
     ImGui::SetNextWindowSize(ImVec2(0.f, 500.f), ImGuiCond_FirstUseEver);
     if (ImGui::Begin("Settings", &uiState->settingsWindowVisible, ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoCollapse))
     {
+        ImGui::SeparatorText("General");
 #if !defined(_DEBUG) && !defined(NO_LIBCURL)
         // ===============================================================================================================
-        ImGui::SeparatorText("General");
 
         ImGui::Checkbox("Check for updates", &UtilsConfig->checkForUpdates);
         ImGui::SameLine();
         ImGuiExt::HelpMarker("RSX will check for updates against the GitHub repository when opened.\nIf there is a new update available, a message will be displayed on the RSX welcome dialog box");
 #endif
+
+        ImGui::InputScalar("RSX Bridge Port##BridgePortNum", ImGuiDataType_U16, reinterpret_cast<uint16_t*>(&g_rsxSettings.bridgePort), nullptr, nullptr, "%u", ImGuiInputTextFlags_CharsDecimal);
+        ImGui::SameLine();
+        ImGuiExt::HelpMarker("The UDP port that RSX listens to for Bridge requests");
         
         // ===============================================================================================================
         ImGui::SeparatorText("Export");
@@ -788,6 +792,7 @@ static ImVec2 s_previousAvailableSizeForPreview(-1, -1);
 
 void HandleRenderFrame()
 {
+    std::lock_guard lock(g_assetData.m_uiMutex);
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();

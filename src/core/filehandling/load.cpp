@@ -251,7 +251,7 @@ void HandleOpenFileDialog(const HWND windowHandle)
 
     openFileName.lStructSize = sizeof(OPENFILENAMEA);
     openFileName.hwndOwner = windowHandle;
-    openFileName.lpstrFilter = "reSource Asset Files (*.rpak, *.mbnk, *.mdl)\0*.RPAK;*.MBNK;*.MDL;*.BPK\0";
+    openFileName.lpstrFilter = "reSource Asset Files (*.rpak, *.mbnk, *.mdl, *.bpk)\0*.RPAK;*.MBNK;*.MDL;*.BPK\0";
     openFileName.lpstrFile = fileNames->Buffer();
     openFileName.nMaxFile = static_cast<DWORD>(CBufferManager::MaxBufferSize());
     openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_NOCHANGEDIR;
@@ -287,5 +287,12 @@ void HandleOpenFileDialog(const HWND windowHandle)
     g_BufferManager.RelieveBuffer(fileNames);
 
     // We are done with pak loading.
+    inJobAction = false;
+}
+
+void Bridge_HandleLoad(std::vector<std::string> filePaths)
+{
+    inJobAction = true;
+    HandleFileLoad(std::move(filePaths));
     inJobAction = false;
 }

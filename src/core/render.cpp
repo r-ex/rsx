@@ -256,7 +256,7 @@ void SettingsWnd_Draw(CUIState* uiState)
 
         ImGui::InputScalar("RSX Bridge Port##BridgePortNum", ImGuiDataType_U16, reinterpret_cast<uint16_t*>(&g_rsxSettings.bridgePort), nullptr, nullptr, "%u", ImGuiInputTextFlags_CharsDecimal);
         ImGui::SameLine();
-        ImGuiExt::HelpMarker("The UDP port that RSX listens to for Bridge requests");
+        ImGuiExt::HelpMarker("The UDP port that RSX listens to for Bridge requests. RSX must be restarted for changes to take effect.");
         
         // ===============================================================================================================
         ImGui::SeparatorText("Export");

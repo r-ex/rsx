@@ -489,6 +489,7 @@
     <ClInclude Include="thirdparty\imgui\misc\ImGuiNotify.hpp">
       <Filter>thirdparty\imgui\misc</Filter>
     </ClInclude>
+    <ClInclude Include="core\bridge\bridge.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -821,6 +822,7 @@
     <ClCompile Include="core\render\preview\texpreview.cpp">
       <Filter>core\render\preview</Filter>
     </ClCompile>
+    <ClCompile Include="core\bridge\bridge.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

@@ -6,6 +6,7 @@
 #include <misc/imgui_utility.h>
 #include <core/filehandling/export.h>
 
+#if HAS_BRIDGE
 #pragma comment(lib, "WS2_32.lib")
 
 static void Bridge_ProcessPacket(SOCKET serverSock, const sockaddr& to, const char* buffer, int len)
@@ -257,3 +258,4 @@ void Bridge_SetupSocketThread()
             Bridge_ProcessPacket(serverSocket, clientAddr, buffer, res);
     }
 }
+#endif

@@ -353,8 +353,10 @@ int main(int argc, char* argv[])
 
     if (!IS_NOGUI(&cli))
     {
+#if HAS_BRIDGE
         CThread sockThread(Bridge_SetupSocketThread);
         sockThread.detach();
+#endif
 
         RunWindowMsgLoop();
     }

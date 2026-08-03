@@ -106,6 +106,9 @@
     <Filter Include="thirdparty\ValveFileVDF">
       <UniqueIdentifier>{955a9656-f388-4f2e-893f-47097eb705bc}</UniqueIdentifier>
     </Filter>
+    <Filter Include="game\vpk">
+      <UniqueIdentifier>{20e17b08-8fd9-421f-8a16-9e0992bf2f76}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -489,6 +492,9 @@
     <ClInclude Include="thirdparty\imgui\misc\ImGuiNotify.hpp">
       <Filter>thirdparty\imgui\misc</Filter>
     </ClInclude>
+    <ClInclude Include="game\vpk\vpk.h">
+      <Filter>game\vpk</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -820,6 +826,12 @@
     </ClCompile>
     <ClCompile Include="core\render\preview\texpreview.cpp">
       <Filter>core\render\preview</Filter>
+    </ClCompile>
+    <ClCompile Include="game\vpk\vpk.cpp">
+      <Filter>game\vpk</Filter>
+    </ClCompile>
+    <ClCompile Include="core\filehandling\valvepak.cpp">
+      <Filter>core\filehandling</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

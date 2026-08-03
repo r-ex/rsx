@@ -149,7 +149,7 @@ void PostLoadWrapAsset(CAssetContainer* const pak, CAsset* const asset)
     WrapAsset* const wrapAsset = reinterpret_cast<WrapAsset*>(pakAsset->extraData());
 
     // Default wrap asset type is "unknown"; basically if the file's extension isn't registered against a file type, it's previewed as binary data
-    wrapAsset->type = WrapAssetType_e::UNKNOWN;
+    wrapAsset->type = VPKFileType_e::UNKNOWN;
 
     std::string assetName = asset->GetAssetName();
     
@@ -158,12 +158,13 @@ void PostLoadWrapAsset(CAssetContainer* const pak, CAsset* const asset)
     std::filesystem::path assetPath = std::filesystem::path(assetName);
     const std::string extension = assetPath.extension().string();
 
-    if (auto it = s_wrapAssetExtensions.find(extension); it != s_wrapAssetExtensions.end())
+    // wrapped filesystem is the successor of vpk so we use VPK types, not the other way around
+    if (auto it = s_vpkFileTypes.find(extension); it != s_vpkFileTypes.end())
         wrapAsset->type = it->second;
 
     switch (wrapAsset->type)
     {
-    case WrapAssetType_e::BSP:
+    case VPKFileType_e::BSP:
     {
 #if (HAS_BSP_SUPPORT)
         std::unique_ptr<char[]> wrapData = GetWrapAssetData(asset, nullptr);
@@ -206,8 +207,8 @@ bool ExportWrapAsset(CAsset* const asset, const int setting)
 
     switch (wrapAsset->type)
     {
-    case WrapAssetType_e::UNKNOWN:
-    case WrapAssetType_e::TEXT:
+    case VPKFileType_e::UNKNOWN:
+    case VPKFileType_e::TEXT:
     {
         StreamIO wrapOut;
 
@@ -225,7 +226,7 @@ bool ExportWrapAsset(CAsset* const asset, const int setting)
 
         // If the file has been detected as a text file and the last byte of the data is a null terminator, adjust the file size so we don't write it
         // In theory, the last byte will ALWAYS be a null byte, but it doesn't hurt to double check
-        if (wrapAsset->type == WrapAssetType_e::TEXT && wrapData[wrapOutSize - 1] == '\0')
+        if (wrapAsset->type == VPKFileType_e::TEXT && wrapData[wrapOutSize - 1] == '\0')
             wrapOutSize--;
 
         wrapOut.write(wrapData.get(), wrapOutSize);
@@ -279,9 +280,9 @@ void* Wrap_PreviewTextOrBinary(CAsset* const asset, WrapAsset* const wrapAsset, 
         wrapAsset->rawData = std::move(wrapData);
     }
 
-    if (ImGui::BeginChild("Wrap Preview", ImVec2(-1, -1), true, ImGuiWindowFlags_HorizontalScrollbar))
+    if (ImGui::BeginChild("##Wrap Preview", ImVec2(-1, -1), true, ImGuiWindowFlags_HorizontalScrollbar))
     {
-        if(wrapAsset->type == WrapAssetType_e::TEXT)
+        if(wrapAsset->type == VPKFileType_e::TEXT)
             ImGui::TextUnformatted(reinterpret_cast<const char*>(wrapAsset->rawData.get()));
         else
         {
@@ -313,10 +314,10 @@ void* PreviewWrapAsset(CAsset* const asset, const bool firstFrameForAsset)
     switch (wrapAsset->type)
     {
 #if !(HAS_BSP_SUPPORT) // if no bsp-specific support, just show it as a binary file
-    case WrapAssetType_e::BSP:
+    case VPKFileType_e::BSP:
 #endif
-    case WrapAssetType_e::TEXT:
-    case WrapAssetType_e::UNKNOWN:
+    case VPKFileType_e::TEXT:
+    case VPKFileType_e::UNKNOWN:
         return Wrap_PreviewTextOrBinary(asset, wrapAsset, firstFrameForAsset);
 #if (HAS_BSP_SUPPORT)
     case WrapAssetType_e::BSP:

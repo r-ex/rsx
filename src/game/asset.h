@@ -85,6 +85,8 @@ enum class AssetType_t
 
 	// bluepoint pak
 	BPWF = MAKEFOURCC('b', 'p', 'w', 'f'),
+
+	VPKF = MAKEFOURCC('v', 'p', 'k', 'f'),
 };
 
 static std::map<AssetType_t, Color4> s_AssetTypeColours =
@@ -227,6 +229,9 @@ static const std::map<AssetType_t, const char*> s_AssetTypePaths =
 	{ AssetType_t::ODLA, "odl_asset" },
 	{ AssetType_t::ODLC, "odl_ctx" },
 	{ AssetType_t::ODLP, "odl_pak" },
+
+
+	{ AssetType_t::VPKF, "vpk" },
 };
 
 // This vector defines the order in which certain asset types should be processed post-load by RSX
@@ -330,6 +335,7 @@ public:
 		MDL,
 		AUDIO,
 		BP_PAK,
+		VPK,
 
 
 		_COUNT

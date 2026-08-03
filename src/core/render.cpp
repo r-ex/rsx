@@ -90,6 +90,7 @@ void ColouredTextForAssetType(const CAsset* const asset)
     case CAsset::ContainerType::AUDIO:
     case CAsset::ContainerType::MDL:
     case CAsset::ContainerType::BP_PAK:
+    case CAsset::ContainerType::VPK:
     {
         const AssetType_t assetType = static_cast<AssetType_t>(asset->GetAssetType());
         if (s_AssetTypeColours.contains(assetType))

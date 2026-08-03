@@ -1279,7 +1279,6 @@ public:
 private:
     CPakFile* const pak() { return static_cast<CPakFile*>(m_containerFile); };
     const CPakFile* const pak() const { return static_cast<const CPakFile*>(m_containerFile); };
-
 };
 
 

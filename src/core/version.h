@@ -2,9 +2,9 @@
 
 // RSX's versioning system is genuinely horrible...
 #define VERSION_MAJOR 2
-#define VERSION_MINOR 1
+#define VERSION_MINOR 2
 #define VERSION_PATCH 0
-#define VERSION_REVIS "a" // If there is no revision letter, leave this as ""
+#define VERSION_REVIS "" // If there is no revision letter, leave this as ""
 
 #define STR2(x) #x
 #define STR(x) STR2(x)

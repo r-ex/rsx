@@ -255,10 +255,12 @@ void SettingsWnd_Draw(CUIState* uiState)
         ImGuiExt::HelpMarker("RSX will check for updates against the GitHub repository when opened.\nIf there is a new update available, a message will be displayed on the RSX welcome dialog box");
 #endif
 
+#if HAS_BRIDGE
         ImGui::InputScalar("RSX Bridge Port##BridgePortNum", ImGuiDataType_U16, reinterpret_cast<uint16_t*>(&g_rsxSettings.bridgePort), nullptr, nullptr, "%u", ImGuiInputTextFlags_CharsDecimal);
         ImGui::SameLine();
         ImGuiExt::HelpMarker("The UDP port that RSX listens to for Bridge requests. RSX must be restarted for changes to take effect.");
-        
+#endif
+
         // ===============================================================================================================
         ImGui::SeparatorText("Export");
 
@@ -556,6 +558,23 @@ static void MainWnd_LaunchSkinFinderForGame(const std::filesystem::path& dirPath
             inJobAction = false;
         }, std::move(filePaths)).detach();
     }
+    else if (gameType == GameFinderGame_e::TITANFALL_2)
+    {
+        const std::vector<std::string> filePaths = {
+            (dirPath / "r2/paks/Win64/common.rpak").string(),
+        };
+
+        CThread([](const std::vector<std::string> filePaths) {
+            inJobAction = true;
+
+            ClearLoadState();
+
+            HandlePakLoad(std::move(filePaths));
+            g_assetData.ProcessAssetsPostLoad();
+
+            inJobAction = false;
+            }, std::move(filePaths)).detach();
+    }
 };
 
 #define SHOW_WELCOME_BOX (!inJobAction && g_assetData.v_assetContainers.empty())
@@ -670,11 +689,14 @@ static void MainWnd_WelcomeBox()
                     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.f);
                     if (ImGui::Button(buttonLabel))
                     {
-                        g_assetData.AddPostLoadFinishedCallback([]() {
-                            CThread([]() {
-                                g_dxHandler->GetUIState().ShowItemflavWindow(true);
-                                }).detach();
-                            }, true);
+                        if (gameDescriptor->gameType == GameFinderGame_e::APEX_LEGENDS)
+                        {
+                            g_assetData.AddPostLoadFinishedCallback([]() {
+                                CThread([]() {
+                                    g_dxHandler->GetUIState().ShowItemflavWindow(true);
+                                    }).detach();
+                                }, true);
+                        }
 
                         MainWnd_LaunchSkinFinderForGame(gameDescriptor->gamePath, gameDescriptor->gameType);
                     }

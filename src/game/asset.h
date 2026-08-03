@@ -529,6 +529,7 @@ public:
 	ContainerMessage_t* m_logMessages;
 
 	std::mutex m_logMutex;
+	std::mutex m_uiMutex;
 
 	LogErrorListInfo_t m_logErrorListInfo;
 	uint32_t m_numLogMessages;
@@ -639,36 +640,7 @@ public:
 		return m_numLogMessages;
 	}
 
-	void LogMessages_Append(ContainerMessage_t::MessageType_e type, const std::string& sourceName, const std::string& msg)
-	{
-		const time_t t = std::time(nullptr);
-		tm tm;
-		if (localtime_s(&tm, &t))
-		{
-			assertm(0, "failed to get time");
-			return;
-		}
-
-		std::ostringstream oss;
-		oss << std::put_time(&tm, "%H:%M:%S");
-
-		std::lock_guard lock(m_logMutex);
-
-		ContainerMessage_t* const newMessages = reinterpret_cast<ContainerMessage_t*>(realloc(m_logMessages, sizeof(ContainerMessage_t) * (m_numLogMessages + 1)));
-
-		if (!newMessages)
-			return;
-
-		m_logMessages = newMessages;
-
-		ContainerMessage_t* m = &m_logMessages[m_numLogMessages];
-		m->type = type;
-		m->timestampStr = _strdup(oss.str().c_str());
-		m->message = _strdup(msg.c_str());
-		m->sourceName = _strdup(sourceName.c_str());
-
-		m_numLogMessages++;
-	}
+	void LogMessages_Append(ContainerMessage_t::MessageType_e type, const std::string& sourceName, const std::string& msg);
 
 	void FreeLogMessages()
 	{

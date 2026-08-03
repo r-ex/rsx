@@ -67,6 +67,10 @@ public:
     bool Draw(const char* label = "Filter", const char* hint="incl,-excl", float width = 0.0f);
     bool PassFilter(const char* text, const char* textEnd = nullptr) const;
     void Build();
+    void SetText(const std::string_view& str)
+    {
+        inputBuf = str;
+    }
 
     void Clear()
     {

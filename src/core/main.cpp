@@ -23,6 +23,7 @@
 #include "update/update.h"
 #include <game/asset.h>
 #include <core/logging/logger.h>
+#include "bridge/bridge.h"
 
 #pragma warning(push, 0)
 #pragma warning( disable: 4127 )
@@ -351,7 +352,12 @@ int main(int argc, char* argv[])
     HandleLoadFromCommandLine(&cli);
 
     if (!IS_NOGUI(&cli))
+    {
+        CThread sockThread(Bridge_SetupSocketThread);
+        sockThread.detach();
+
         RunWindowMsgLoop();
+    }
 
     g_cacheDBManager.SaveToFile((std::filesystem::current_path() / RSX_CACHE_DB_FILENAME).string());
 

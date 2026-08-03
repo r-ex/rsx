@@ -60,6 +60,8 @@ struct RSXSettings_t
     bool exportPhysicsFilterExclusive;
     bool exportPhysicsFilterAND;
 
+    uint16_t bridgePort; // https://en.wikipedia.org/wiki/Bridgeport,_Connecticut
+
     std::filesystem::path exportDirectory;
 
     std::unordered_map<uint32_t, std::vector<UISetting_t>> assetSettings;

@@ -7,6 +7,7 @@
 
 #include <game/rtech/cpakfile.h>
 #include <misc/ImGuiNotify.hpp>
+#include <core/bridge/bridge.h>
 
 void HandlePakLoad(std::vector<std::string> filePaths)
 {
@@ -181,6 +182,7 @@ void HandlePakAssetExportList(std::deque<CAsset*> selectedAssets, const bool exp
     parallelProcessTask.wait();
     g_pImGuiHandler->FinishProgressBarEvent(exportAssetListEvent);
 
+    g_bridgeData.PostNotification("", std::format("Exported {} asset{}!", selectedAssets.size(), selectedAssets.size() == 1 ? "" : "s"));
     ImGui::InsertNotification({ ImGuiToastType::Success, 3000, 150.f, "Exported %lld asset%s!", selectedAssets.size(), selectedAssets.size() == 1 ? "" : "s"});
 #endif
 }

@@ -294,3 +294,10 @@ void HandleOpenFileDialog(const HWND windowHandle)
     // We are done with pak loading.
     inJobAction = false;
 }
+
+void Bridge_HandleLoad(std::vector<std::string> filePaths)
+{
+    inJobAction = true;
+    HandleFileLoad(std::move(filePaths));
+    inJobAction = false;
+}

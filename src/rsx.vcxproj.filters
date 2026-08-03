@@ -492,6 +492,9 @@
     <ClInclude Include="thirdparty\imgui\misc\ImGuiNotify.hpp">
       <Filter>thirdparty\imgui\misc</Filter>
     </ClInclude>
+    <ClInclude Include="core\bridge\bridge.h">
+      <Filter>core\bridge</Filter>
+    </ClInclude>
     <ClInclude Include="game\vpk\vpk.h">
       <Filter>game\vpk</Filter>
     </ClInclude>
@@ -826,6 +829,9 @@
     </ClCompile>
     <ClCompile Include="core\render\preview\texpreview.cpp">
       <Filter>core\render\preview</Filter>
+    </ClCompile>
+    <ClCompile Include="core\bridge\bridge.cpp">
+      <Filter>core\bridge</Filter>
     </ClCompile>
     <ClCompile Include="game\vpk\vpk.cpp">
       <Filter>game\vpk</Filter>

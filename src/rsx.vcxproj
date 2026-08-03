@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="core\audio\audioplayer.h" />
+    <ClInclude Include="core\bridge\bridge.h" />
     <ClInclude Include="core\cache\cachedb.h" />
     <ClInclude Include="core\crashhandler.h" />
     <ClInclude Include="core\features.h" />
@@ -160,6 +161,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="core\audio\audioplayer.cpp" />
+    <ClCompile Include="core\bridge\bridge.cpp" />
     <ClCompile Include="core\cache\cachedb.cpp" />
     <ClCompile Include="core\crashhandler.cpp" />
     <ClCompile Include="core\filehandling\bpk.cpp" />

@@ -167,6 +167,8 @@ static void ExportSettings_ReadLine(ImGuiContext* const ctx, ImGuiSettingsHandle
         ImGuiReadSetting("ExportTruncatedMaterials=%i",     settings->exportModelMatsTruncated, i, int);
         ImGuiReadSetting("ExportQCIFiles=%i",               settings->exportQCIFiles, i, int);
 
+        ImGuiReadSetting("BridgePortNum=%i", settings->bridgePort, i, uint16_t);
+
         //ImGuiReadSetting("UseOrigScriptExportExtensions=%i", settings->useOrigScriptExportExtensions, i, int);
         settings->useOrigScriptExportExtensions = true; // cant decide if i wanna keep this setting or not so let's just force it to true for now
     }
@@ -196,6 +198,8 @@ static void ExportSettings_WriteAll(ImGuiContext* const ctx, ImGuiSettingsHandle
     buf->appendf("ExportQCIFiles=%i\n",             g_rsxSettings.exportQCIFiles);
 
     buf->appendf("UseOrigScriptExportExtensions=%i\n", g_rsxSettings.useOrigScriptExportExtensions);
+
+    buf->appendf("BridgePortNum=%i\n", g_rsxSettings.bridgePort);
 
     buf->appendf("\n");
 }

@@ -106,6 +106,8 @@ static void RegisterAssetTypeBindings(const CCommandLine* const cli)
 
     extern void InitCubeAssetType();
 
+    extern void InitVPKFileAssetType();
+
 
     // call func
     // model
@@ -174,6 +176,8 @@ static void RegisterAssetTypeBindings(const CCommandLine* const cli)
     InitBluepointWrappedFileAssetType();
 
     InitCubeAssetType();
+
+    InitVPKFileAssetType();
 
 #if defined(DEBUG_NO_ASEQ_POSTLOAD)
     g_assetData.Log_Warning(nullptr, "Built with DEBUG_NO_ASEQ_POSTLOAD. Animation Sequence (aseq) assets will not work properly!");

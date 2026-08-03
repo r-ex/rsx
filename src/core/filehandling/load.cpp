@@ -24,6 +24,8 @@ void GroupPathByExtension(PathExtensionArray_t* pathsByExtension, const std::fil
         (*pathsByExtension)[CAsset::ContainerType::MDL].emplace_back(path.string());
     else if (extension == ".bpk")
         (*pathsByExtension)[CAsset::ContainerType::BP_PAK].emplace_back(path.string());
+    else if (extension == ".vpk")
+        (*pathsByExtension)[CAsset::ContainerType::VPK].emplace_back(path.string());
 }
 
 static void HandleFileLoad(std::vector<std::string> filePaths, HandleFileLoadCallback_t cb = nullptr, const CCommandLine* const cli = nullptr)
@@ -68,6 +70,9 @@ static void HandleFileLoad(std::vector<std::string> filePaths, HandleFileLoadCal
             break;
         case CAsset::ContainerType::BP_PAK:
             HandleBPKLoad(pathsByExtension[i]);
+            break;
+        case CAsset::ContainerType::VPK:
+            HandleVPKLoad(pathsByExtension[i]);
             break;
         }
     }
@@ -251,7 +256,7 @@ void HandleOpenFileDialog(const HWND windowHandle)
 
     openFileName.lStructSize = sizeof(OPENFILENAMEA);
     openFileName.hwndOwner = windowHandle;
-    openFileName.lpstrFilter = "reSource Asset Files (*.rpak, *.mbnk, *.mdl, *.bpk)\0*.RPAK;*.MBNK;*.MDL;*.BPK\0";
+    openFileName.lpstrFilter = "reSource Asset Files (*.rpak, *.mbnk, *.mdl, *.bpk, *_dir.vpk)\0*.RPAK;*.MBNK;*.MDL;*.BPK;*_DIR.VPK\0";
     openFileName.lpstrFile = fileNames->Buffer();
     openFileName.nMaxFile = static_cast<DWORD>(CBufferManager::MaxBufferSize());
     openFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_ALLOWMULTISELECT | OFN_NOCHANGEDIR;

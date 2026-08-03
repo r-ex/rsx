@@ -6,6 +6,8 @@
 #include <misc/imgui_utility.h>
 #include <core/filehandling/export.h>
 
+#pragma comment(lib, "WS2_32.lib")
+
 static void Bridge_ProcessPacket(SOCKET serverSock, const sockaddr& to, const char* buffer, int len)
 {
     if (len < sizeof(BridgePacketBase_s))

@@ -842,7 +842,6 @@ void HandleRenderFrame()
         {
             DockBuilder(dockspaceId)
                 .Window("Scene", true)
-                .Window("Skin Finder", true)
                 .DockLeft(0.25f)
                     .Window("Asset List")
                     .Done()
@@ -1138,11 +1137,12 @@ void HandleRenderFrame()
 
     // The "scene" preview window must always be in the center.
     // Setting NoMove seems to be the best way to stop it from being undocked
-    if (!SHOW_WELCOME_BOX && ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoMove))
+    
+    if (ImGui::Begin("Scene", nullptr, ImGuiWindowFlags_NoMove))
     {
         const ImVec2 avail = ImGui::GetContentRegionAvail();
 
-        if (avail != s_previousAvailableSizeForPreview || !g_dxHandler->GetPreviewRTV())
+        if ((avail != s_previousAvailableSizeForPreview && avail.x != 0 && avail.y != 0) || !g_dxHandler->GetPreviewRTV())
         {
             g_dxHandler->CleanupForPreviewResize();
             g_dxHandler->CreateViewForSceneWindow(static_cast<uint16_t>(avail.x), static_cast<uint16_t>(avail.y));
@@ -1168,7 +1168,7 @@ void HandleRenderFrame()
             }
         }
     }
-    if (!SHOW_WELCOME_BOX) ImGui::End();
+    ImGui::End();
 
     if (uiState.settingsWindowVisible)
         SettingsWnd_Draw(&uiState);

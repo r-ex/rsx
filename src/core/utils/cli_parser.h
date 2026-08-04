@@ -94,5 +94,5 @@ private:
 	char** argv;
 };
 
-std::vector<uint32_t> GetExportFilterTypes(const CCommandLine* const cli);
+std::unordered_set<uint32_t> CLI_GetCommaSeparatedAssetTypes(const CCommandLine* const cli, const char* const paramName);
 void GetTextFilterForExport(const char* filterString, TextFilter* filter);

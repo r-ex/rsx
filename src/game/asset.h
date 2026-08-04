@@ -241,11 +241,13 @@ const static std::vector<uint32_t> s_postLoadOrderOverrides =
 	'rtxt', // txtr - Texture first.
 	'gmiu', // uimg - UI Atlas
 
+	'pnsm',
 	'rdhs', // shdr - Shader
 	'sdhs', // shds - Shader Set
 	'ltam', // matl - Material
 
 	// [rika]: aseq after arig/model that way the skeleton is set before parsing
+	'dqsa',
 	'gira', // arig - Animation Rig
 	'_ldm', // mdl_ - Model
 	'qesa', // aseq - Animation Sequence

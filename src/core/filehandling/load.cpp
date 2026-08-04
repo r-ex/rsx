@@ -28,6 +28,23 @@ void GroupPathByExtension(PathExtensionArray_t* pathsByExtension, const std::fil
         (*pathsByExtension)[CAsset::ContainerType::VPK].emplace_back(path.string());
 }
 
+// Update "load asset type" settings for all type bindings according to whether they are specified in the --loadwhitelist param
+static void CLI_HandleAssetTypeWhitelist(const CCommandLine* const cli)
+{
+    if (!cli)
+        return;
+
+    if (!IS_NOGUI(cli))
+        return;
+
+    const std::unordered_set<uint32_t> filterTypes = CLI_GetCommaSeparatedAssetTypes(cli, "--loadwhitelist");
+
+    for (auto& [fourCC, binding] : g_assetData.m_assetTypeBindings)
+    {
+        binding._loadAssetType = filterTypes.contains(fourCC);
+    }
+}
+
 static void HandleFileLoad(std::vector<std::string> filePaths, HandleFileLoadCallback_t cb = nullptr, const CCommandLine* const cli = nullptr)
 {
     PathExtensionArray_t pathsByExtension;
@@ -47,6 +64,8 @@ static void HandleFileLoad(std::vector<std::string> filePaths, HandleFileLoadCal
         }
         else GroupPathByExtension(&pathsByExtension, fsPath);
     }
+
+    CLI_HandleAssetTypeWhitelist(cli);
 
     g_assetData.m_validate = cli && cli->HasParam("-validate");
     g_assetData.m_validateAssetLoading = cli && cli->HasParam("-validateload");
@@ -94,7 +113,7 @@ bool FilterAssetsByType_CommandLine(
     const std::vector<CGlobalAssetData::AssetLookup_t>& assetsIn,
     std::vector<CGlobalAssetData::AssetLookup_t>& assetsOut)
 {
-    std::vector<uint32_t> filterTypes = GetExportFilterTypes(cli);
+    std::unordered_set<uint32_t> filterTypes = CLI_GetCommaSeparatedAssetTypes(cli, "--exporttypes");
     if (filterTypes.size() != 0)
     {
         printf("\nEXPORT: Filtering assets for export using type string \"%s\" (%lld valid type%s)\n", cli->GetParamValue("--exporttypes"), filterTypes.size(), filterTypes.size() == 1 ? "" : "s");

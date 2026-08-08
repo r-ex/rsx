@@ -178,8 +178,13 @@ void HandlePakAssetExportList(std::deque<CAsset*> selectedAssets, const bool exp
         parallelProcessTask.getRemainingTasks(),
         &parallelProcessTask,
         PB_FNCLASS_TO_VOID(&CParallelTask::getRemainingTasks));
+#endif
+    // execute()/wait() must run in NoGui builds too. Leaving them inside the
+    // BUILD_NOGUI guard queues export tasks that never run (CLI -export writes
+    // zero files and exits 0).
     parallelProcessTask.execute();
     parallelProcessTask.wait();
+#if !defined(BUILD_NOGUI)
     g_pImGuiHandler->FinishProgressBarEvent(exportAssetListEvent);
 
     g_bridgeData.PostNotification("", std::format("Exported {} asset{}!", selectedAssets.size(), selectedAssets.size() == 1 ? "" : "s"));
@@ -209,8 +214,11 @@ void HandleExportAllPakAssets(std::vector<CGlobalAssetData::AssetLookup_t>* cons
         &parallelProcessTask,
         PB_FNCLASS_TO_VOID(&CParallelTask::getRemainingTasks)
     );
+#endif
+    // Same as HandlePakAssetExportList: export work must not be NoGui-only.
     parallelProcessTask.execute();
     parallelProcessTask.wait();
+#if !defined(BUILD_NOGUI)
     g_pImGuiHandler->FinishProgressBarEvent(exportAllAssetsEvent);
 #endif
 }

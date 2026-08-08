@@ -37,6 +37,13 @@ static void CLI_HandleAssetTypeWhitelist(const CCommandLine* const cli)
     if (!IS_NOGUI(cli))
         return;
 
+    // Only apply the whitelist when --loadwhitelist was actually given.
+    // Unconditionally setting _loadAssetType = filterTypes.contains(fourCC)
+    // with an empty set disables every asset type on a normal nogui run
+    // (no loads, no post-loads, no exports).
+    if (!cli->GetParamValue("--loadwhitelist"))
+        return;
+
     const std::unordered_set<uint32_t> filterTypes = CLI_GetCommaSeparatedAssetTypes(cli, "--loadwhitelist");
 
     for (auto& [fourCC, binding] : g_assetData.m_assetTypeBindings)

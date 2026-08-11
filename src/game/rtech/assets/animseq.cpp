@@ -34,8 +34,6 @@ void LoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	}
 	case eSeqVersion::VERSION_7_1:
 	{
-		asset->SetAssetVersion({ 7, 1 });
-
 		AnimSeqAssetHeader_v7_1_t* hdr = reinterpret_cast<AnimSeqAssetHeader_v7_1_t*>(pakAsset->header());
 		seqAsset = new AnimSeqAsset(hdr, streamEntry, ver);
 		break;
@@ -45,21 +43,33 @@ void LoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	case eSeqVersion::VERSION_10:
 	case eSeqVersion::VERSION_11:
 	case eSeqVersion::VERSION_12:
-	{
-		AnimSeqAssetHeader_v8_t* hdr = reinterpret_cast<AnimSeqAssetHeader_v8_t*>(pakAsset->header());
-		seqAsset = new AnimSeqAsset(hdr, streamEntry, ver);
-		break;
-	}
 	case eSeqVersion::VERSION_12_1:
+	case eSeqVersion::VERSION_13:
 	{
-		asset->SetAssetVersion({ 12, 1 });
-
 		AnimSeqAssetHeader_v8_t* hdr = reinterpret_cast<AnimSeqAssetHeader_v8_t*>(pakAsset->header());
 		seqAsset = new AnimSeqAsset(hdr, streamEntry, ver);
 		break;
 	}
 	default:
 		return;
+	}
+
+	switch (ver)
+	{
+	case eSeqVersion::VERSION_7_1:
+	{
+		asset->SetAssetVersion({ 7, 1 });
+
+		break;
+	}
+	case eSeqVersion::VERSION_12_1:
+	{
+		asset->SetAssetVersion({ 12, 1 });
+
+		break;
+	}
+	default:
+		break;
 	}
 
 	pakAsset->SetAssetName(seqAsset->name, true);
@@ -120,8 +130,20 @@ bool AnimSeq_ParseExtraData(CPakAsset* pakAsset)
 			seqAsset->UpdateDataSize_V12_1(static_cast<int>(bones->size()));
 
 		// [rika]: I love changing assets, but never ever would change a version!
-		ParseAnimSeqDataForSeq(&seqAsset->seqdesc, bones->size());
+		ParseAnimSeqDataForSeq(&seqAsset->seqdesc, bones->size(), ANIM_BONEFLAG_BITS_4);
 		ParseSequence(&seqAsset->seqdesc, bones, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA);
+
+		break;
+	}
+	case eSeqVersion::VERSION_13:
+	{
+		// [rika]: parse the animseq's raw data size in post load if we couldn't determine a bone count before.
+		if (seqAsset->dataSize == 0)
+			seqAsset->UpdateDataSize_V12_1(static_cast<int>(bones->size()));
+
+		// [rika]: I love changing assets, but never ever would change a version!
+		ParseAnimSeqDataForSeq(&seqAsset->seqdesc, bones->size(), ANIM_BONEFLAG_BITS_6);
+		ParseSequence(&seqAsset->seqdesc, bones, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA, ANIM_BONEFLAG_BITS_6);
 
 		break;
 	}

@@ -1034,7 +1034,7 @@ void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* co
 	}
 }
 
-void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, const std::vector<ModelBone_t>* const bones, const AnimdataFuncType_t funcType)
+void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, const std::vector<ModelBone_t>* const bones, const AnimdataFuncType_t funcType, const uint32_t flagWidth)
 {
 	const int boneCount = static_cast<int>(bones->size());
 
@@ -1103,7 +1103,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 
 			int sectionlength = 0;
 			const uint8_t* const boneFlagArray = reinterpret_cast<const uint8_t* const>((animdesc->*s_AnimdataFuncs_DP[funcType])(&iLocalFrame, &sectionlength));
-			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount)]);
+			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount, flagWidth)]);
 
 			for (int bone = 0; bone < boneCount; bone++)
 			{
@@ -1111,7 +1111,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 				Quaternion q(quats[bone]);
 				Vector scale(scales[bone]);
 
-				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone); // truncate byte offset then shift if needed
+				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth); // truncate byte offset then shift if needed
 				const uint8_t* panimtrack = reinterpret_cast<const uint8_t*>(panim + 1);
 				const float fLocalFrame = static_cast<float>(iLocalFrame) + s;
 
@@ -1185,7 +1185,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 
 			int sectionlength = 0;
 			const uint8_t* const boneFlagArray = reinterpret_cast<const uint8_t* const>((animdesc->*s_AnimdataFuncs_RLE[funcType])(&iLocalFrame, &sectionlength));
-			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount)]);
+			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount, flagWidth)]);
 			UNUSED(sectionlength);
 
 			for (int bone = 0; bone < boneCount; bone++)
@@ -1195,7 +1195,9 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 				Vector scale(scales[bone]);
 				RadianEuler baseRot(rotations[bone]);
 
-				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone); // truncate byte offset then shift if needed
+				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth); // truncate byte offset then shift if needed
+
+				assertm((boneFlags & (r5::RleBoneFlags_t::STUDIO_ANIM_UNK10 | r5::RleBoneFlags_t::STUDIO_ANIM_UNK20)) == 0, "had new flags");
 
 				if (boneFlags & (r5::RleBoneFlags_t::STUDIO_ANIM_DATA)) // check if this bone has data
 				{
@@ -1244,7 +1246,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 	g_BufferManager.RelieveBuffer(buffer);
 }
 
-void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const AnimdataFuncType_t funcType)
+void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const AnimdataFuncType_t funcType, const uint32_t flagWidth)
 {
 	// check flags
 	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_POS) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_POS), "flag mismatch");
@@ -1262,7 +1264,7 @@ void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* co
 			continue;
 		}
 
-		ParseAnimation(seqdesc, animdesc, bones, funcType);
+		ParseAnimation(seqdesc, animdesc, bones, funcType, flagWidth);
 	}
 }
 
@@ -1347,8 +1349,8 @@ void ParseModelSequenceData_Stall_V18(ModelParsedData_t* const parsedData, char*
 	}
 }
 
-extern void ParseAnimSeqDataForSeq(ModelSeq_t* const seqdesc, const size_t boneCount);
-void ParseModelSequenceData_Stall_V19_1(ModelParsedData_t* const parsedData, char* const baseptr)
+extern void ParseAnimSeqDataForSeq(ModelSeq_t* const seqdesc, const size_t boneCount, const uint32_t flagWidth);
+void ParseModelSequenceData_Stall_V19_1(ModelParsedData_t* const parsedData, char* const baseptr, const uint32_t flagWidth)
 {
 	assertm(parsedData->bones.size() > 0, "should have bones");
 
@@ -1364,9 +1366,9 @@ void ParseModelSequenceData_Stall_V19_1(ModelParsedData_t* const parsedData, cha
 	{
 		parsedData->localSequences[i] = ModelSeq_t(reinterpret_cast<r5::mstudioseqdesc_v18_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i, nullptr, 1u);
 
-		ParseAnimSeqDataForSeq(parsedData->localSequences + i, parsedData->bones.size());
+		ParseAnimSeqDataForSeq(parsedData->localSequences + i, parsedData->bones.size(), flagWidth);
 
-		ParseSequence(&parsedData->localSequences[i], &parsedData->bones, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA);
+		ParseSequence(&parsedData->localSequences[i], &parsedData->bones, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA, flagWidth);
 	}
 }
 

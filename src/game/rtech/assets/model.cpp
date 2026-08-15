@@ -263,6 +263,8 @@ static void ParseModelVertexData_v9(CPakAsset* const asset, ModelAsset* const mo
 
     const uint8_t* boneMap = vgHdr->boneStateChangeCount ? vgHdr->pBoneMap() : s_VertexDataBaseBoneMap; // does this model have remapped bones? use default map if not
 
+    const uint8_t vertexWeightParseFlags = (pStudioHdr->flags & STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS) ? VERT_PARSE_EXTRAWEIGHT : 0x0;
+
     for (int lodLevel = 0; lodLevel < vgHdr->lodCount; lodLevel++)
     {
         int lodMeshCount = 0;
@@ -356,7 +358,7 @@ static void ParseModelVertexData_v9(CPakAsset* const asset, ModelAsset* const mo
                     {
                         const char* const vertexData = rawVertexData + (vertIdx * mesh->vertCacheSize);
                         Vector2D* const texcoords = meshData.texcoordCount > 1 ? &meshVertexData->GetTexcoords()[vertIdx * (meshData.texcoordCount - 1)] : nullptr;
-                        Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, false, weightIdx);
+                        Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, vertexWeightParseFlags, weightIdx);
                     }
                     meshData.weightsCount = weightIdx;
                     meshVertexData->AddWeights(nullptr, meshData.weightsCount);
@@ -408,6 +410,8 @@ static void ParseModelVertexData_v12_1(CPakAsset* const asset, ModelAsset* const
     const r5::studiohdr_v12_1_t* const pStudioHdr = reinterpret_cast<r5::studiohdr_v12_1_t*>(modelAsset->data);
 
     const uint8_t* boneMap = pStudioHdr->boneStateCount ? pStudioHdr->pBoneStates() : s_VertexDataBaseBoneMap; // does this model have remapped bones? use default map if not
+
+    const uint8_t vertexWeightParseFlags = (pStudioHdr->flags & STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS) ? VERT_PARSE_EXTRAWEIGHT : 0x0;
 
     parsedData->lods.resize(pStudioHdr->lodCount);
     parsedData->bodyParts.resize(pStudioHdr->numbodyparts);
@@ -529,7 +533,7 @@ static void ParseModelVertexData_v12_1(CPakAsset* const asset, ModelAsset* const
                         {
                             char* const vertexData = rawVertexData + (vertIdx * mesh->vertCacheSize);
                             Vector2D* const texcoords = meshData.texcoordCount > 1 ? &meshVertexData->GetTexcoords()[vertIdx * (meshData.texcoordCount - 1)] : nullptr;
-                            Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, false, weightIdx);
+                            Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, vertexWeightParseFlags, weightIdx);
                         }
                         meshData.weightsCount = weightIdx;
                         meshVertexData->AddWeights(nullptr, meshData.weightsCount);
@@ -585,6 +589,8 @@ static void ParseModelVertexData_v14(CPakAsset* const asset, ModelAsset* const m
     const r5::studiohdr_v14_t* const pStudioHdr = reinterpret_cast<r5::studiohdr_v14_t*>(modelAsset->data);
 
     const uint8_t* boneMap = pStudioHdr->boneStateCount ? pStudioHdr->pBoneStates() : s_VertexDataBaseBoneMap; // does this model have remapped bones? use default map if not
+
+    const uint8_t vertexWeightParseFlags = (pStudioHdr->flags & STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS) ? VERT_PARSE_EXTRAWEIGHT : 0x0;
 
     parsedData->lods.resize(pStudioHdr->lodCount);
     parsedData->bodyParts.resize(pStudioHdr->numbodyparts);
@@ -707,7 +713,7 @@ static void ParseModelVertexData_v14(CPakAsset* const asset, ModelAsset* const m
                         {
                             char* const vertexData = rawVertexData + (vertIdx * mesh->vertCacheSize);
                             Vector2D* const texcoords = meshData.texcoordCount > 1 ? &meshVertexData->GetTexcoords()[vertIdx * (meshData.texcoordCount - 1)] : nullptr;
-                            Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, false, weightIdx);
+                            Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, vertexWeightParseFlags, weightIdx);
                         }
                         meshData.weightsCount = weightIdx;
                         meshVertexData->AddWeights(nullptr, meshData.weightsCount);
@@ -763,6 +769,8 @@ static void ParseModelVertexData_v16(CPakAsset* const asset, ModelAsset* const m
     const r5::studiohdr_v16_t* const pStudioHdr = reinterpret_cast<r5::studiohdr_v16_t*>(modelAsset->data);
 
     const uint8_t* boneMap = pStudioHdr->boneStateCount ? pStudioHdr->pBoneStates() : s_VertexDataBaseBoneMap; // does this model have remapped bones? use default map if not
+
+    const uint8_t vertexWeightParseFlags = (pStudioHdr->flags & STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS) ? VERT_PARSE_EXTRAWEIGHT : 0x0;
 
     parsedData->lods.resize(pStudioHdr->lodCount);
     parsedData->bodyParts.resize(pStudioHdr->numbodyparts);
@@ -912,7 +920,7 @@ static void ParseModelVertexData_v16(CPakAsset* const asset, ModelAsset* const m
                         {
                             char* const vertexData = rawVertexData + (vertIdx * mesh->vertCacheSize);
                             Vector2D* const texcoords = meshData.texcoordCount > 1 ? &meshVertexData->GetTexcoords()[vertIdx * (meshData.texcoordCount - 1)] : nullptr;
-                            Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, false, weightIdx);
+                            Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, vertexWeightParseFlags, weightIdx);
                         }
                         meshData.weightsCount = weightIdx;
                         meshVertexData->AddWeights(nullptr, meshData.weightsCount);
@@ -969,6 +977,8 @@ static void ParseModelVertexData_v19_2(CPakAsset* const asset, ModelAsset* const
     const r5::studiohdr_v19_2_t* const pStudioHdr = reinterpret_cast<r5::studiohdr_v19_2_t*>(modelAsset->data);
 
     const uint16_t* boneMap = pStudioHdr->boneStateCount ? pStudioHdr->pBoneStates() : s_VertexDataBaseBoneMapButWide; // does this model have remapped bones? use default map if not
+
+    const uint8_t vertexWeightParseFlags = ((pStudioHdr->flags & STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS) ? VERT_PARSE_EXTRAWEIGHT : 0x0) | VERT_PARSE_BONES_1024;
 
     parsedData->lods.resize(pStudioHdr->lodCount);
     parsedData->bodyParts.resize(pStudioHdr->numbodyparts);
@@ -1118,12 +1128,7 @@ static void ParseModelVertexData_v19_2(CPakAsset* const asset, ModelAsset* const
                         {
                             char* const vertexData = rawVertexData + (vertIdx * mesh->vertCacheSize);
                             Vector2D* const texcoords = meshData.texcoordCount > 1 ? &meshVertexData->GetTexcoords()[vertIdx * (meshData.texcoordCount - 1)] : nullptr;
-
-                            // 19.2 has big bones
-                            bool b = Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, true, weightIdx);
-                        
-                            if (!b)
-                                Log("huh %s\n", modelAsset->name);
+                            Vertex_t::ParseVertexFromVG(&meshVertexData->GetVertices()[vertIdx], &meshVertexData->GetWeights()[weightIdx], texcoords, &meshData, vertexData, boneMap, weights, vertexWeightParseFlags, weightIdx);
                         }
                         meshData.weightsCount = weightIdx;
                         meshVertexData->AddWeights(nullptr, meshData.weightsCount);

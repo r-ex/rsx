@@ -18,9 +18,184 @@ extern CPreviewDrawData g_currentPreviewDrawData;
 //
 // PARSEDDATA
 //
+
 #define VERT_DATA(t, d, o) reinterpret_cast<const t* const>(d + o)
-#define MAP_BONE(b) bigBones ? reinterpret_cast<const uint16_t* const>(boneMap)[b] : (uint16_t)reinterpret_cast<const uint8_t* const>(boneMap)[b];
-bool Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const weights, Vector2D* const texcoords, ModelMeshData_t* const mesh, const char* const rawVertexData, const void* const boneMap, const vvw::mstudioboneweightextra_t* const weightExtra, bool bigBones, int& weightIdx)
+#define MAP_BONE(a, b) static_cast<a>(reinterpret_cast<const a* const>(boneMap)[b]);
+
+void Vertex_t::ParseWeightFromVG_256(Vertex_t* const vert, VertexWeight_t* const weights, const char* const rawVertexData, const void* const boneMap, const vvw::mstudioboneweightextra_t* const weightExtra, const uint8_t parseFlags, int& weightIdx, int& offset)
+{
+	const vg::BlendWeightsPacked_s* const blendWeights = VERT_DATA(vg::BlendWeightsPacked_s, rawVertexData, offset);
+
+	// Copy blend data into the vert struct
+	memcpy_s(&vert->blendData, sizeof(vert->blendData), blendWeights, sizeof(vert->blendData));
+
+	uint8_t curIdx = 0; // current weight
+	uint16_t remaining = 32767; // 'weight' remaining to assign to the last bone
+
+	// model has more than 3 weights per vertex
+	if (parseFlags & VERT_PARSE_EXTRAWEIGHT)
+	{
+		const vg::BlendWeightIndicesPacked_256_s* const blendIndices = VERT_DATA(vg::BlendWeightIndicesPacked_256_s, rawVertexData, offset + 4);
+
+		assertm(blendIndices->boneCount < 16, "model had more than 16 bones on complex weights");
+
+#ifdef _DEBUG
+			if (blendIndices->boneCount > 1 && weightExtra == nullptr)
+			{
+				assertm(false, "had more than two weights but no extra weight data");
+			}
+#endif // _DEBUG
+
+		weights[curIdx].bone = MAP_BONE(uint8_t, blendIndices->firstBone);
+		weights[curIdx].weight = blendWeights->Weight(0);
+		remaining -= blendWeights->weight[0];
+
+		curIdx++;
+
+		// only hit if we have over 2 bones/weights
+		for (uint8_t i = curIdx; i < blendIndices->boneCount; i++)
+		{
+			auto extraWeight = weightExtra[blendWeights->ExtraWeightsStartIndex() + (curIdx - 1)];
+
+			weights[curIdx].bone = MAP_BONE(uint8_t, extraWeight.bone);
+			weights[curIdx].weight = extraWeight.Weight();
+
+			remaining -= extraWeight.weight;
+
+			curIdx++;
+		}
+
+		// only hit if we have over 1 bone/weight
+		if (blendIndices->boneCount > 0)
+		{
+			weights[curIdx].bone = MAP_BONE(uint8_t, blendIndices->lastBone);
+			weights[curIdx].weight = UNPACKWEIGHT(remaining);
+
+			curIdx++;
+		}
+
+		assert(static_cast<uint8_t>(curIdx) == (blendIndices->boneCount + 1)); // numbones is really 'extra' bones on top of the base weight, verify the count is correct
+	}
+	else
+	{
+		const vg::BlendWeightIndices_s* const blendIndices = VERT_DATA(vg::BlendWeightIndices_s, rawVertexData, offset + 4);
+
+		assertm(blendIndices->boneCount < 3, "model had more than 3 bones on simple weights");
+
+		for (uint8_t i = 0; i < blendIndices->boneCount; i++)
+		{
+			weights[curIdx].bone = MAP_BONE(uint8_t, blendIndices->bone[curIdx]);
+			weights[curIdx].weight = blendWeights->Weight(curIdx);
+
+			remaining -= blendWeights->weight[curIdx];
+
+			curIdx++;
+		}
+
+		weights[curIdx].bone = MAP_BONE(uint8_t, blendIndices->bone[curIdx]);
+		weights[curIdx].weight = UNPACKWEIGHT(remaining);
+
+		curIdx++;
+
+		assert(static_cast<uint8_t>(curIdx) == (blendIndices->boneCount + 1)); // numbones is really 'extra' bones on top of the base weight, verify the count is correct
+	}
+
+	vert->weightCount = curIdx;
+
+	weightIdx += curIdx;
+
+	// adjust data offset
+	offset += 8;
+}
+
+void Vertex_t::ParseWeightFromVG_1024(Vertex_t* const vert, VertexWeight_t* const weights, const char* const rawVertexData, const void* const boneMap, const vvw::mstudioboneweightextra_t* const weightExtra, const uint8_t parseFlags, int& weightIdx, int& offset)
+{
+	const vg::BlendWeightsPacked_s* const blendWeights = VERT_DATA(vg::BlendWeightsPacked_s, rawVertexData, offset);
+
+	// Copy blend data into the vert struct
+	memcpy_s(&vert->blendData, sizeof(vert->blendData), blendWeights, sizeof(vert->blendData));
+
+	uint8_t curIdx = 0; // current weight
+	uint16_t remaining = 32767; // 'weight' remaining to assign to the last bone
+
+	// model has more than 3 weights per vertex
+	if (parseFlags & VERT_PARSE_EXTRAWEIGHT)
+	{
+		const vg::BlendWeightIndicesPacked_1024_s* const blendIndices = VERT_DATA(vg::BlendWeightIndicesPacked_1024_s, rawVertexData, offset + 4);
+
+		assertm(blendIndices->boneCount < 16, "model had more than 16 bones on complex weights");
+
+#ifdef _DEBUG
+		if (blendIndices->boneCount > 1 && weightExtra == nullptr)
+		{
+			assertm(false, "had more than two weights but no extra weight data");
+		}
+#endif // _DEBUG
+
+		weights[curIdx].bone = MAP_BONE(uint16_t, blendIndices->firstBone);
+		weights[curIdx].weight = blendWeights->Weight(0);
+		remaining -= blendWeights->weight[0];
+
+		curIdx++;
+
+		// only hit if we have over 2 bones/weights
+		for (uint8_t i = curIdx; i < blendIndices->boneCount; i++)
+		{
+			auto extraWeight = weightExtra[blendWeights->ExtraWeightsStartIndex() + (curIdx - 1)];
+
+			weights[curIdx].bone = MAP_BONE(uint16_t, extraWeight.bone);
+			weights[curIdx].weight = extraWeight.Weight();
+
+			remaining -= extraWeight.weight;
+
+			curIdx++;
+		}
+
+		// only hit if we have over 1 bone/weight
+		if (blendIndices->boneCount > 0)
+		{
+			weights[curIdx].bone = MAP_BONE(uint16_t, blendIndices->lastBone);
+			weights[curIdx].weight = UNPACKWEIGHT(remaining);
+
+			curIdx++;
+		}
+
+		assert(static_cast<uint8_t>(curIdx) == (blendIndices->boneCount + 1)); // numbones is really 'extra' bones on top of the base weight, verify the count is correct
+	}
+	else
+	{
+		const vg::BlendWeightIndices_s* const blendIndices = VERT_DATA(vg::BlendWeightIndices_s, rawVertexData, offset + 4);
+
+		assertm(blendIndices->boneCount < 3, "model had more than 3 bones on simple weights");
+
+		for (uint8_t i = 0; i < blendIndices->boneCount; i++)
+		{
+			weights[curIdx].bone = MAP_BONE(uint16_t, blendIndices->bone[curIdx]);
+			weights[curIdx].weight = blendWeights->Weight(curIdx);
+
+			remaining -= blendWeights->weight[curIdx];
+
+			curIdx++;
+		}
+
+		weights[curIdx].bone = MAP_BONE(uint16_t, blendIndices->bone[curIdx]);
+		weights[curIdx].weight = UNPACKWEIGHT(remaining);
+
+		curIdx++;
+
+		assert(static_cast<uint8_t>(curIdx) == (blendIndices->boneCount + 1)); // numbones is really 'extra' bones on top of the base weight, verify the count is correct
+	}
+
+	vert->weightCount = curIdx;
+
+	weightIdx += curIdx;
+
+	// adjust data offset
+	offset += 8;
+}
+
+bool Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const weights, Vector2D* const texcoords, ModelMeshData_t* const mesh, const char* const rawVertexData, const void* const boneMap, const vvw::mstudioboneweightextra_t* const weightExtra,
+	const uint8_t parseFlags, int& weightIdx)
 {
 	int offset = 0;
 
@@ -76,83 +251,15 @@ bool Vertex_t::ParseVertexFromVG(Vertex_t* const vert, VertexWeight_t* const wei
 	assertm(!(mesh->rawVertexLayoutFlags & VERT_BLENDWEIGHTS_UNPACKED), "mesh had unpacked weights!");
 	if (mesh->rawVertexLayoutFlags & (VERT_BLENDINDICES | VERT_BLENDWEIGHTS_PACKED))
 	{
-		const vg::BlendWeightsPacked_s* const blendWeights = VERT_DATA(vg::BlendWeightsPacked_s, rawVertexData, offset);
-		const vg::BlendWeightIndices_s* const blendIndices = VERT_DATA(vg::BlendWeightIndices_s, rawVertexData, offset + 4);
-
-		offset += 8;
-
-		// Copy blend data into the vert struct
-		memcpy_s(&vert->blendData, sizeof(vert->blendData), blendWeights, sizeof(vert->blendData));
-
-		uint8_t curIdx = 0; // current weight
-		uint16_t remaining = 32767; // 'weight' remaining to assign to the last bone
-
-		// model has more than 3 weights per vertex
-		if (nullptr != weightExtra)
+		if (parseFlags & VERT_PARSE_BONES_1024)
 		{
-			assertm(blendIndices->boneCount < 16, "model had more than 16 bones on complex weights");
-
-			// first weight, we will always have this
-			const int16_t firstBoneIndex = bigBones ? static_cast<uint16_t>(blendIndices->Packed()->firstBone) : blendIndices->bone[0];
-			weights[curIdx].bone = MAP_BONE(firstBoneIndex);
-			weights[curIdx].weight = blendWeights->Weight(0);
-			remaining -= blendWeights->weight[0];
-
-			curIdx++;
-
-			// only hit if we have over 2 bones/weights
-			for (uint8_t i = curIdx; i < blendIndices->boneCount; i++)
-			{
-				auto extraWeight = weightExtra[blendWeights->ExtraWeightsStartIndex() + (curIdx - 1)];
-
-				weights[curIdx].bone = MAP_BONE(extraWeight.bone);
-				weights[curIdx].weight = extraWeight.Weight();
-
-				remaining -= extraWeight.weight;
-
-				curIdx++;
-			}
-
-			// only hit if we have over 1 bone/weight
-			if (blendIndices->boneCount > 0)
-			{
-				// im just using bigBones as a flag for >=v19.2 lmao
-				const int16_t finalBoneIndex = bigBones ? static_cast<uint16_t>(blendIndices->Packed()->lastBone) : blendIndices->bone[1];
-				weights[curIdx].bone = MAP_BONE(finalBoneIndex);
-				weights[curIdx].weight = UNPACKWEIGHT(remaining);
-
-				curIdx++;
-			}
+			ParseWeightFromVG_1024(vert, weights, rawVertexData, boneMap, weightExtra, parseFlags, weightIdx, offset);
 		}
 		else
 		{
-			assertm(blendIndices->boneCount < 3, "model had more than 3 bones on simple weights");
-
-			// There seems to be a condition here on v19.2, where if the model uses simple weights and this vert has less than two "extra" bones (i.e. boneCount < 2),
-			// the blend indices use the same packed system as the complex weights. If the model uses simple weights and has TWO extra bones, they revert to the old system?
-			//const bool singleExtraBigBone = bigBones && blendIndices->boneCount == 1;
-			for (uint8_t i = 0; i < blendIndices->boneCount; i++)
-			{
-				weights[curIdx].bone = MAP_BONE(blendIndices->bone[curIdx]);
-				weights[curIdx].weight = blendWeights->Weight(curIdx);
-
-				remaining -= blendWeights->weight[curIdx];
-
-				curIdx++;
-			}
-
-			weights[curIdx].bone = MAP_BONE(blendIndices->bone[curIdx]);
-			weights[curIdx].weight = UNPACKWEIGHT(remaining);
-
-			curIdx++;
+			ParseWeightFromVG_256(vert, weights, rawVertexData, boneMap, weightExtra, parseFlags, weightIdx, offset);
 		}
-
-		vert->weightCount = curIdx;
-		assert(static_cast<uint8_t>(vert->weightCount) == (blendIndices->boneCount + 1)); // numbones is really 'extra' bones on top of the base weight, verify the count is correct
-
-		weightIdx += curIdx;
 	}
-
 	// our mesh does not have weight data, use a set of default weights. 
 	// [rika]: this can only happen when a model has one bone
 	else

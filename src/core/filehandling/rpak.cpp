@@ -209,8 +209,10 @@ void HandleExportAllPakAssets(std::vector<CGlobalAssetData::AssetLookup_t>* cons
         &parallelProcessTask,
         PB_FNCLASS_TO_VOID(&CParallelTask::getRemainingTasks)
     );
+#endif
     parallelProcessTask.execute();
     parallelProcessTask.wait();
+#if !defined(BUILD_NOGUI)
     g_pImGuiHandler->FinishProgressBarEvent(exportAllAssetsEvent);
 #endif
 }

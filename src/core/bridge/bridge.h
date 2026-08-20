@@ -218,6 +218,7 @@ struct BridgeGlobalData_s
 
     void PostNotification(const std::string_view& srcName, const std::string_view& msg)
     {
+#if (HAS_BRIDGE)
         BridgePacketHelper helper;
 
         helper.Append(BridgePacketBase_s(BridgePacketType_e::R2C_NOTIFICATION, UINT32_MAX).SetResponse());
@@ -231,6 +232,10 @@ struct BridgeGlobalData_s
                 it = subscribedClients.erase(it);
             else it++;
         }
+#else
+        UNUSED(srcName);
+        UNUSED(msg);
+#endif
     }
 };
 

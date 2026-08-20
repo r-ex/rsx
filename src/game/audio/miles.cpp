@@ -258,6 +258,51 @@ const bool CMilesAudioBank::ParseFromHeader()
 
 		break;
 	}
+	case 49: // Apex Season 30.0   2026_07_29_15_44, released 
+	{
+		this->languageCount = 10;
+		this->languageNames = {
+			"english", "french", "german", "spanish", "italian",
+			"japanese", "polish", "russian", "mandarin", "korean"
+		};
+
+		const MilesBankHeader_v49_t* const header = reinterpret_cast<MilesBankHeader_v49_t*>(m_fileBuf.get());
+
+		this->Construct(header);
+
+		this->DiscoverStreamingFiles();
+
+		const MilesSource_v48_t* const sourceArray = reinterpret_cast<MilesSource_v48_t*>(this->audioSources);
+
+		Log("MBNK: Parsing sources...\n");
+		for (uint32_t i = 0; i < this->sourceCount; ++i)
+		{
+			const MilesSource_v48_t* const source = &sourceArray[i];
+			MilesSource_t* const sourceAssetData = new MilesSource_t(source);
+
+			if (!IsValidSource(sourceAssetData))
+			{
+				delete sourceAssetData;
+				continue;
+			}
+
+			// Thank you Mr Miles for restoring sane offsets!
+			const char* const sourceName = this->GetString(source->nameOffset);
+
+			CMilesAudioAsset* sourceAsset = new CMilesAudioAsset(sourceName, sourceAssetData, this);
+			sourceAsset->SetAssetType((uint32_t)AssetType_t::ASRC); // asrc - audio source
+			sourceAsset->SetAssetGUID(RTech::StringToGuid(sourceName));
+			sourceAsset->SetAssetVersion({ m_version });
+
+			sourceAsset->SetContainerName(GetStreamingFileNameForSource(sourceAssetData));
+
+			g_assetData.v_assets.push_back({ sourceAsset->GetAssetGUID(), sourceAsset });
+		}
+
+		break;
+
+		break;
+	}
 	default:
 		return false;
 	}

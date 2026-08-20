@@ -144,6 +144,7 @@ struct MilesSource_v39_t
 static_assert(offsetof(MilesSource_v39_t, streamDataOffset) == 48);
 static_assert(sizeof(MilesSource_v39_t) == 72);
 
+// v48, v49
 struct MilesSource_v48_t
 {
 	uint64_t nameOffset; // relative to Something
@@ -395,6 +396,44 @@ struct MilesBankHeader_v45_t
 static_assert(offsetof(MilesBankHeader_v45_t, unk_offset_38) == 0x38);
 
 
+struct MilesBankHeader_v49_t
+{
+	int magic;
+	int version;
+	uint32_t fileSize;
+
+	int bankMagic;
+	uint32_t buildTag;
+	uint32_t bankHash;
+
+	char gap_18[4];
+
+	uint32_t eventCount;
+		
+	char gap_20[20];
+
+	uint32_t sourceOffset;
+
+	uint32_t sourceCount; // unlocalised
+	uint32_t localisedSourceCount;
+
+	char gap_40[12];
+
+	OffsetPtr_t someSourcePtr;
+	OffsetPtr_t someOtherSourcePtr;
+
+	char gap_60[16];
+
+	OffsetPtr_t strings;
+
+	char gap_78[32];
+
+	void* reserved_memoryBank; // memory bank lmao (pointer to the memory instance that wraps around this file's data)
+};
+
+static_assert(offsetof(MilesBankHeader_v49_t, reserved_memoryBank) == 0x98);
+static_assert(sizeof(MilesBankHeader_v49_t) == 0xA0);
+
 class CMilesAudioBank : public CAssetContainer
 {
 public:
@@ -512,6 +551,22 @@ private:
 		this->audioSources = m_fileBuf.get() + header->sourceOffset.offset;
 		this->audioEvents = m_fileBuf.get() + header->eventOffset.offset;
 		this->stringTable = m_fileBuf.get() + header->stringTableOffset.offset;
+	}
+
+	void Construct(const MilesBankHeader_v49_t* const header)
+	{
+		this->buildTag = header->buildTag;
+		this->bankHash = header->bankHash;
+
+		// total source count including all languages
+		this->sourceCount = header->sourceCount + (header->localisedSourceCount * (this->languageCount - 1));
+		this->eventCount = header->eventCount;
+
+		this->localisedSourceCount = header->localisedSourceCount;
+
+		this->audioSources = m_fileBuf.get() + header->sourceOffset;
+		//this->audioEvents = m_fileBuf.get() + header->eventOffset.offset;
+		this->stringTable = m_fileBuf.get() + header->strings.offset;
 	}
 };
 

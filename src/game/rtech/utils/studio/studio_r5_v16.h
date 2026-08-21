@@ -1305,8 +1305,7 @@ namespace r5
 		uint16_t boneStateOffset;
 		uint16_t boneStateCount;
 		inline const uint16_t* pBoneStates() const { return boneStateCount > 0 ? reinterpret_cast<uint16_t*>((char*)this + offsetof(studiohdr_v19_2_t, boneStateOffset) + FIX_OFFSET(boneStateOffset)) : nullptr; }
-
-		char unk[16]; // idk if the gap actually goes here but this seems to make the floats below line up
+		uint16_t boneStatePerLOD[MAX_NUM_LODS]; // number of bones, size of bonesates, per lod
 
 		// sets of lods
 		uint16_t groupHeaderOffset;

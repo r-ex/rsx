@@ -75,13 +75,61 @@ void CMilesAudioBank::DiscoverStreamingFiles()
 	Log("MBNK: Finished discovering streams.\n");
 }
 
+template<typename T>
+static void MilesBank_ParseSources(CMilesAudioBank* bank)
+{
+	const T* const sourceArray = reinterpret_cast<const T*>(bank->GetSourceData());
+
+	// This is only used for v48, but it saves on code complexity to just define this on all versions of this func
+	const size_t sourceNameOffsetDifference = sourceArray[0].nameOffset;
+
+	Log("MBNK: Parsing sources...\n");
+	for (uint32_t i = 0; i < bank->GetSourceCount(); ++i)
+	{
+		const T* const srcData = &sourceArray[i];
+		MilesSource_t* const sourceAssetData = new MilesSource_t(srcData);
+
+		const uint32_t markerOffset = srcData->markerOffset;
+		const uint8_t markerCount = srcData->markerCount;
+
+		for (uint32_t j = 0; j < markerCount; ++j)
+		{
+			const MilesAudioMarker_t* marker = bank->GetMarkers() + ((markerOffset / sizeof(MilesAudioMarker_t)) + j);
+
+			sourceAssetData->audioMarkers.emplace_back(bank->GetString(marker->nameOffset), marker->framePosition);
+		}
+
+		const char* sourceName = nullptr;
+		
+		// Source names are quite weird on v48, so we have to do this ugly special case for it
+		if (typeid(T) == typeid(MilesSource_v48_t))
+		{
+			const char* sourceNameStringTable = reinterpret_cast<const char*>(sourceArray) + (sizeof(T) * bank->GetSourceCount());
+
+			sourceName = sourceNameStringTable + (srcData->nameOffset - sourceNameOffsetDifference);
+		}
+		else
+			// Thank you Mr Miles for restoring sane offsets in v49!
+			sourceName = bank->GetString(srcData->nameOffset);
+
+		CMilesAudioAsset* sourceAsset = new CMilesAudioAsset(sourceName, sourceAssetData, bank);
+		sourceAsset->SetAssetType((uint32_t)AssetType_t::ASRC); // asrc - audio source
+		sourceAsset->SetAssetGUID(RTech::StringToGuid(sourceName));
+		sourceAsset->SetAssetVersion({ bank->GetVersion() });
+
+		sourceAsset->SetContainerName(bank->GetStreamingFileNameForSource(sourceAssetData));
+
+		if (sourceAsset != nullptr)
+			g_assetData.v_assets.push_back({ sourceAsset->GetAssetGUID(), sourceAsset });
+	}
+}
+
 const bool CMilesAudioBank::ParseFromHeader()
 {
 	switch (this->m_version)
 	{
 	case 13:
 	{
-		this->languageCount = 11;
 		this->languageNames = {
 			"english", "french", "german", "spanish", "italian",
 			"japanese", "polish", "portuguese", "russian", "tchinese",
@@ -93,29 +141,7 @@ const bool CMilesAudioBank::ParseFromHeader()
 		this->Construct(header);
 		this->DiscoverStreamingFiles();
 
-		Log("MBNK: Parsing sources...\n");
-		for (uint32_t i = 0; i < this->sourceCount; ++i)
-		{
-			const MilesSource_v13_t* const source = reinterpret_cast<MilesSource_v13_t*>(reinterpret_cast<char*>(this->audioSources) + (i * sizeof(MilesSource_v13_t)));
-			MilesSource_t* const sourceAssetData = new MilesSource_t(source);
-
-			if (!IsValidSource(sourceAssetData))
-			{
-				delete sourceAssetData;
-				continue;
-			}
-
-			const char* const sourceName = this->GetString(sourceAssetData->nameOffset);
-
-			CMilesAudioAsset* sourceAsset = new CMilesAudioAsset(sourceName, sourceAssetData, this);
-			sourceAsset->SetAssetType((uint32_t)AssetType_t::ASRC); // asrc - audio source
-			sourceAsset->SetAssetGUID(RTech::StringToGuid(sourceName));
-			sourceAsset->SetAssetVersion({ m_version });
-
-			sourceAsset->SetContainerName(GetStreamingFileNameForSource(sourceAssetData));
-
-			g_assetData.v_assets.push_back({ sourceAsset->GetAssetGUID(), sourceAsset });
-		}
+		MilesBank_ParseSources<MilesSource_v13_t>(this);
 
 		break;
 	}
@@ -129,7 +155,6 @@ const bool CMilesAudioBank::ParseFromHeader()
 	case 36:
 	case 38:
 	{
-		this->languageCount = 9;
 		this->languageNames = {
 			"english", "french", "german", "spanish", "italian",
 			"japanese", "polish", "russian", "mandarin"
@@ -141,29 +166,8 @@ const bool CMilesAudioBank::ParseFromHeader()
 
 		this->DiscoverStreamingFiles();
 
-		Log("MBNK: Parsing sources...\n");
-		for (uint32_t i = 0; i < this->sourceCount; ++i)
-		{
-			const MilesSource_v28_t* const source = reinterpret_cast<MilesSource_v28_t*>(reinterpret_cast<char*>(this->audioSources) + (i * sizeof(MilesSource_v28_t)));
-			MilesSource_t* const sourceAssetData = new MilesSource_t(source);
+		MilesBank_ParseSources<MilesSource_v28_t>(this);
 
-			if (!IsValidSource(sourceAssetData))
-			{
-				delete sourceAssetData;
-				continue;
-			}
-
-			const char* const sourceName = this->GetString(sourceAssetData->nameOffset);
-
-			CMilesAudioAsset* sourceAsset = new CMilesAudioAsset(sourceName, sourceAssetData, this);
-			sourceAsset->SetAssetType((uint32_t)AssetType_t::ASRC); // asrc - audio source
-			sourceAsset->SetAssetGUID(RTech::StringToGuid(sourceName));
-			sourceAsset->SetAssetVersion({ m_version });
-
-			sourceAsset->SetContainerName(GetStreamingFileNameForSource(sourceAssetData));
-
-			g_assetData.v_assets.push_back({ sourceAsset->GetAssetGUID(), sourceAsset });
-		}
 		break;
 	}
 	case 39:
@@ -174,7 +178,6 @@ const bool CMilesAudioBank::ParseFromHeader()
 	case 45:
 	case 46:
 	{
-		this->languageCount = 10;
 		this->languageNames = {
 			"english", "french", "german", "spanish", "italian",
 			"japanese", "polish", "russian", "mandarin", "korean"
@@ -186,35 +189,12 @@ const bool CMilesAudioBank::ParseFromHeader()
 
 		this->DiscoverStreamingFiles();
 
-		Log("MBNK: Parsing sources...\n");
-		for (uint32_t i = 0; i < this->sourceCount; ++i)
-		{
-			const MilesSource_v39_t* const source = reinterpret_cast<MilesSource_v39_t*>(reinterpret_cast<char*>(this->audioSources) + (i * sizeof(MilesSource_v39_t)));
-			MilesSource_t* const sourceAssetData = new MilesSource_t(source);
-
-			if (!IsValidSource(sourceAssetData))
-			{
-				delete sourceAssetData;
-				continue;
-			}
-
-			const char* const sourceName = this->GetString(sourceAssetData->nameOffset);
-
-			CMilesAudioAsset* sourceAsset = new CMilesAudioAsset(sourceName, sourceAssetData, this);
-			sourceAsset->SetAssetType((uint32_t)AssetType_t::ASRC); // asrc - audio source
-			sourceAsset->SetAssetGUID(RTech::StringToGuid(sourceName));
-			sourceAsset->SetAssetVersion({ m_version });
-
-			sourceAsset->SetContainerName(GetStreamingFileNameForSource(sourceAssetData));
-
-			g_assetData.v_assets.push_back({ sourceAsset->GetAssetGUID(), sourceAsset });
-		}
+		MilesBank_ParseSources<MilesSource_v39_t>(this);
 
 		break;
 	}
 	case 48: // Apex Season 27.1.x 2025_12_05_16_29, released 06/01/2026
 	{
-		this->languageCount = 10;
 		this->languageNames = {
 			"english", "french", "german", "spanish", "italian",
 			"japanese", "polish", "russian", "mandarin", "korean"
@@ -226,41 +206,12 @@ const bool CMilesAudioBank::ParseFromHeader()
 
 		this->DiscoverStreamingFiles();
 
-		const MilesSource_v48_t* const sourceArray = reinterpret_cast<MilesSource_v48_t*>(this->audioSources);
-
-		const size_t sourceNameOffsetDifference = sourceArray[0].nameOffset; // this assumes that the first source's name is always at offset 0. This is Not Good.
-
-		Log("MBNK: Parsing sources...\n");
-		for (uint32_t i = 0; i < this->sourceCount; ++i)
-		{
-			const MilesSource_v48_t* const source = &sourceArray[i];
-			MilesSource_t* const sourceAssetData = new MilesSource_t(source);
-
-			if (!IsValidSource(sourceAssetData))
-			{
-				delete sourceAssetData;
-				continue;
-			}
-
-			const char* sourceNameStringTable = reinterpret_cast<char*>(this->audioSources) + (sizeof(MilesSource_v48_t) * this->sourceCount);
-
-			const char* const sourceName = sourceNameStringTable + (source->nameOffset - sourceNameOffsetDifference);
-
-			CMilesAudioAsset* sourceAsset = new CMilesAudioAsset(sourceName, sourceAssetData, this);
-			sourceAsset->SetAssetType((uint32_t)AssetType_t::ASRC); // asrc - audio source
-			sourceAsset->SetAssetGUID(RTech::StringToGuid(sourceName));
-			sourceAsset->SetAssetVersion({ m_version });
-
-			sourceAsset->SetContainerName(GetStreamingFileNameForSource(sourceAssetData));
-
-			g_assetData.v_assets.push_back({ sourceAsset->GetAssetGUID(), sourceAsset });
-		}
+		MilesBank_ParseSources<MilesSource_v48_t>(this);
 
 		break;
 	}
 	case 49: // Apex Season 30.0   2026_07_29_15_44, released 
 	{
-		this->languageCount = 10;
 		this->languageNames = {
 			"english", "french", "german", "spanish", "italian",
 			"japanese", "polish", "russian", "mandarin", "korean"
@@ -272,34 +223,7 @@ const bool CMilesAudioBank::ParseFromHeader()
 
 		this->DiscoverStreamingFiles();
 
-		const MilesSource_v48_t* const sourceArray = reinterpret_cast<MilesSource_v48_t*>(this->audioSources);
-
-		Log("MBNK: Parsing sources...\n");
-		for (uint32_t i = 0; i < this->sourceCount; ++i)
-		{
-			const MilesSource_v48_t* const source = &sourceArray[i];
-			MilesSource_t* const sourceAssetData = new MilesSource_t(source);
-
-			if (!IsValidSource(sourceAssetData))
-			{
-				delete sourceAssetData;
-				continue;
-			}
-
-			// Thank you Mr Miles for restoring sane offsets!
-			const char* const sourceName = this->GetString(source->nameOffset);
-
-			CMilesAudioAsset* sourceAsset = new CMilesAudioAsset(sourceName, sourceAssetData, this);
-			sourceAsset->SetAssetType((uint32_t)AssetType_t::ASRC); // asrc - audio source
-			sourceAsset->SetAssetGUID(RTech::StringToGuid(sourceName));
-			sourceAsset->SetAssetVersion({ m_version });
-
-			sourceAsset->SetContainerName(GetStreamingFileNameForSource(sourceAssetData));
-
-			g_assetData.v_assets.push_back({ sourceAsset->GetAssetGUID(), sourceAsset });
-		}
-
-		break;
+		MilesBank_ParseSources<MilesSource_v49_t>(this);
 
 		break;
 	}
@@ -730,6 +654,11 @@ void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 		ImGui::Text("BPM: %u", source->bpm);
 
 	ImGui::Text("Sample Rate: %u", source->sampleRate);
+
+	for (auto& marker : source->audioMarkers)
+	{
+		ImGui::Text("%.3f %s", marker.framePosition / static_cast<float>(source->sampleRate), marker.name.c_str());
+	}
 
 	return nullptr;
 }

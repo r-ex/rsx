@@ -732,9 +732,9 @@ void ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, siz
     if (!ItemAdd(bb, 0))
         return;
 
-    bool hovered;
+    bool timelineHovered;
     bool held;
-    ButtonBehavior(bb, id, &hovered, &held);
+    ButtonBehavior(bb, id, &timelineHovered, &held);
 
     // Render
     RenderFrame(bb.Min, bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
@@ -745,33 +745,62 @@ void ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, siz
 
     if (endFrame != 0)
     {
+        constexpr float markerLineThickness = 1.5f;
+        constexpr float markerArrowSize = 5.f;
+
+        size_t hoveredMarker = UINT64_MAX;
+        float shortestDistanceToMarker = 5.f; // max distance to a marker is 5px
+
+        if (timelineHovered)
+        {
+            const float mouseX = g.IO.MousePos.x;
+
+            size_t i = 0;
+
+            // Precalculate which marker is hovered
+            for (auto& marker : markers)
+            {
+                const float markerFrac = static_cast<float>(marker.framePosition) / endFrame;
+                const float markerX = ImLerp(bb.Min.x, bb.Max.x, ImSaturate(markerFrac));
+                const float distance = ImFabs(mouseX - (markerX + (markerLineThickness/2.f)));
+
+                if (distance < shortestDistanceToMarker)
+                {
+                    hoveredMarker = i;
+                    shortestDistanceToMarker = distance;
+                }
+
+                i++;
+            }
+        }
+        
+        size_t i = 0;
+
         window->DrawList->PushClipRect(bb.Min, bb.Max, true);
         for (auto& marker : markers)
         {
-            constexpr float lineThickness = 1.5f;
-            constexpr float markerArrowSize = 5.f;
-
             const float markerFrac = static_cast<float>(marker.framePosition) / endFrame;
 
             // lerping or larping
             const float markerX = ImLerp(bb.Min.x, bb.Max.x, ImSaturate(markerFrac));
 
-            const ImU32 markerColour =  GetColorU32(ImGuiCol_PlotLines);
+            const ImU32 markerColour = hoveredMarker == i ? GetColorU32(ImGuiCol_PlotLinesHovered) : GetColorU32(ImGuiCol_PlotLines);
 
             // Adjust the marker colour based on if we have passed this marker or not
             const ImU32 adjustedColour = fraction > markerFrac ? (markerColour & 0xFFFFFF) | 0x4f000000 : markerColour;
 
             // Line
-            window->DrawList->AddLine(ImVec2(markerX, bb.Min.y), ImVec2(markerX, bb.Max.y), adjustedColour, lineThickness);
+            window->DrawList->AddLine(ImVec2(markerX, bb.Min.y), ImVec2(markerX, bb.Max.y), adjustedColour, markerLineThickness);
         
             // Arrow
             window->DrawList->AddTriangleFilled(
                 ImVec2(markerX - (markerArrowSize / 2.f), bb.Min.y),
-                ImVec2(markerX + (markerArrowSize / 2.f) + (lineThickness / 2.f), bb.Min.y),
-                ImVec2(markerX + (lineThickness / 2.f), bb.Min.y + markerArrowSize),
+                ImVec2(markerX + (markerArrowSize / 2.f) + (markerLineThickness / 2.f), bb.Min.y),
+                ImVec2(markerX + (markerLineThickness / 2.f), bb.Min.y + markerArrowSize),
                 adjustedColour
             );
         
+            i++;
         }
         window->DrawList->PopClipRect();
     }

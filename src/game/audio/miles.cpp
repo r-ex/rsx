@@ -588,6 +588,39 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 	return true;
 }
 
+static bool AudioSource_DoInitialSetup(CAsset* const asset)
+{
+	if (g_audioPlayer.IsInitialised())
+		return false;
+
+	CMilesAudioAsset* audioAsset = static_cast<CMilesAudioAsset*>(asset);
+	CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
+	MilesSource_t* source = reinterpret_cast<MilesSource_t*>(audioAsset->GetAssetData());
+
+	const std::filesystem::path asrcPath(audioAsset->GetAssetName());
+
+
+	// get the bank's path and replace the filename
+	// with the stream file name that we've just put together
+	std::filesystem::path streamPath(audioBank->GetFilePath());
+	streamPath.replace_filename(audioAsset->GetContainerFileName());
+
+	DecodedAudioMetadata_t metadata;
+	auto decodedDataOpt = DecodeAudioDataForSource(streamPath, source, &metadata);
+
+	if (!decodedDataOpt.has_value())
+	{
+		Log("Failed to decode audio source.\n");
+		return false;
+	}
+
+	g_audioPlayer.Setup(decodedDataOpt.value(),
+		metadata.sampleCount, metadata.sampleRate, static_cast<uint8_t>(metadata.channelCount),
+		metadata.decodeFormat & DECODE_FORMAT_F32 ? sizeof(float) : sizeof(uint16_t));
+
+	return true;
+}
+
 void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 {
 	if (firstFrameForAsset && g_audioPlayer.IsInitialised())
@@ -619,28 +652,8 @@ void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 	{
 		if (ImGui::Button(ICON_CI_DEBUG_START))
 		{
-			CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
-
-			const std::filesystem::path asrcPath(audioAsset->GetAssetName());
-
-
-			// get the bank's path and replace the filename
-			// with the stream file name that we've just put together
-			std::filesystem::path streamPath(audioBank->GetFilePath());
-			streamPath.replace_filename(audioAsset->GetContainerFileName());
-
-			DecodedAudioMetadata_t metadata;
-			auto decodedDataOpt = DecodeAudioDataForSource(streamPath, source, &metadata);
-
-			if (!decodedDataOpt.has_value())
-			{
-				Log("Failed to decode audio source.\n");
+			if (!AudioSource_DoInitialSetup(asset))
 				return nullptr;
-			}
-
-			g_audioPlayer.Setup(decodedDataOpt.value(),
-				metadata.sampleCount, metadata.sampleRate, static_cast<uint8_t>(metadata.channelCount),
-				metadata.decodeFormat & DECODE_FORMAT_F32 ? sizeof(float) : sizeof(uint16_t));
 		}
 	}
 
@@ -655,9 +668,27 @@ void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 
 	ImGui::Text("Sample Rate: %u", source->sampleRate);
 
+	size_t i = 0;
 	for (auto& marker : source->audioMarkers)
 	{
 		ImGui::Text("%.3f %s", marker.framePosition / static_cast<float>(source->sampleRate), marker.name.c_str());
+		ImGui::SameLine();
+
+		ImGui::PushID(static_cast<int>(i));
+		if (ImGui::Button("Seek"))
+		{
+			const bool isAlreadyPlaying = g_audioPlayer.IsPlaying();
+
+			AudioSource_DoInitialSetup(asset);
+
+			if (!isAlreadyPlaying)
+				g_audioPlayer.Pause();
+
+			g_audioPlayer.SeekToFrame(marker.framePosition);
+		}
+		ImGui::PopID();
+
+		i++;
 	}
 
 	return nullptr;

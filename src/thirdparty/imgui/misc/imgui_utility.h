@@ -315,7 +315,15 @@ static std::string _labelPrefix(const char* const label, int inputRelPosX)
 
 // ImGui extensions and helper functions
 namespace ImGuiExt {
+
+    struct AudioMarker_s
+    {
+        std::string name;
+        uint32_t framePosition;
+    };
+
     void ProgressBarCentered(float fraction, const ImVec2& size_arg, const char* overlay, ProgressBarEvent_t* event);
+    void Timeline(const char* strId, float currentTime, float endTime, size_t endFrame, const std::vector<AudioMarker_s>& markers, const ImVec2& size_arg);
     void HelpMarker(const char* const desc);
     void Tooltip(const char* const text);
 

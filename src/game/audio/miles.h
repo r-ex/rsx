@@ -1,5 +1,6 @@
 #pragma once
 #include <game/asset.h>
+#include <misc/imgui_utility.h>
 
 constexpr int MILES_DECODER_BINKA = 2;
 constexpr int MILES_DECODER_RADA = 6;
@@ -50,12 +51,6 @@ typedef size_t(*ASI_decode_block_f)(void*, const char*, size_t, void*, size_t, u
 typedef void(*ASI_get_block_size_f)(void*, const char*, size_t, uint32_t*, uint32_t*, uint32_t*);
 
 typedef void(*ASI_dealloc_f)(void*);
-
-struct AudioMarker_s
-{
-	std::string name;
-	uint32_t framePosition;
-};
 
 struct MilesAudioMarker_t
 {
@@ -244,7 +239,7 @@ struct MilesSource_t
 	uint16_t bpm;
 	uint16_t sampleRate;
 
-	std::vector<AudioMarker_s> audioMarkers;
+	std::vector<ImGuiExt::AudioMarker_s> audioMarkers;
 
 	float duration() const
 	{

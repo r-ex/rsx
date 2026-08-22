@@ -662,7 +662,8 @@ void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 
 	ImGui::SameLine();
 
-	ImGuiExt::ProgressBarCentered(progressTime / soundLengthTime, ImVec2(200.f, 25.f), progress.c_str(), nullptr);
+	ImGuiExt::Timeline("AudioPreview", progressTime, soundLengthTime, source->sampleCount, source->audioMarkers, ImVec2(0, 25.f));
+
 	ImGui::SameLine();
 	ImGui::Text("%.3f", soundLengthTime);
 

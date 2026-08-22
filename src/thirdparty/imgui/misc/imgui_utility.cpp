@@ -709,6 +709,74 @@ void ImGuiExt::ProgressBarCentered(float fraction, const ImVec2& size_arg, const
     }
 }
 
+void ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, size_t endFrame, const std::vector<AudioMarker_s>& markers, const ImVec2& size_arg)
+{
+    if (g_pImGuiHandler->NoImGui())
+        return;
+
+    using namespace ImGui;
+
+    ImGuiWindow* window = GetCurrentWindow();
+    if (window->SkipItems)
+        return;
+
+    ImGuiContext& g = *GImGui;
+    const ImGuiStyle& style = g.Style;
+
+    const ImGuiID id = window->GetID(strId);
+
+    const ImVec2 pos = window->DC.CursorPos;
+    const ImVec2 size = CalcItemSize(size_arg, CalcItemWidth(), g.FontSize + style.FramePadding.y * 2.0f);
+    ImRect bb(pos, pos + size);
+    ItemSize(size, style.FramePadding.y);
+    if (!ItemAdd(bb, 0))
+        return;
+
+    bool hovered;
+    bool held;
+    ButtonBehavior(bb, id, &hovered, &held);
+
+    // Render
+    RenderFrame(bb.Min, bb.Max, GetColorU32(ImGuiCol_FrameBg), true, style.FrameRounding);
+    bb.Expand(ImVec2(-style.FrameBorderSize, -style.FrameBorderSize));
+
+    const float fraction = endTime != 0.f ? ImSaturate(currentTime / endTime) : 0.f;
+    RenderRectFilledRangeH(window->DrawList, bb, GetColorU32(ImGuiCol_PlotHistogram), 0.0f, fraction, style.FrameRounding);
+
+    if (endFrame != 0)
+    {
+        window->DrawList->PushClipRect(bb.Min, bb.Max, true);
+        for (auto& marker : markers)
+        {
+            constexpr float lineThickness = 1.5f;
+            constexpr float markerArrowSize = 5.f;
+
+            const float markerFrac = static_cast<float>(marker.framePosition) / endFrame;
+
+            // lerping or larping
+            const float markerX = ImLerp(bb.Min.x, bb.Max.x, ImSaturate(markerFrac));
+
+            const ImU32 markerColour =  GetColorU32(ImGuiCol_PlotLines);
+
+            // Adjust the marker colour based on if we have passed this marker or not
+            const ImU32 adjustedColour = fraction > markerFrac ? (markerColour & 0xFFFFFF) | 0x4f000000 : markerColour;
+
+            // Line
+            window->DrawList->AddLine(ImVec2(markerX, bb.Min.y), ImVec2(markerX, bb.Max.y), adjustedColour, lineThickness);
+        
+            // Arrow
+            window->DrawList->AddTriangleFilled(
+                ImVec2(markerX - (markerArrowSize / 2.f), bb.Min.y),
+                ImVec2(markerX + (markerArrowSize / 2.f) + (lineThickness / 2.f), bb.Min.y),
+                ImVec2(markerX + (lineThickness / 2.f), bb.Min.y + markerArrowSize),
+                adjustedColour
+            );
+        
+        }
+        window->DrawList->PopClipRect();
+    }
+}
+
 ImGuiHandler::ImGuiHandler()
 {
     const uint32_t totalThreadCount = CThread::GetConCurrentThreads();

@@ -87,7 +87,14 @@ static void MilesBank_ParseSources(CMilesAudioBank* bank)
 	for (uint32_t i = 0; i < bank->GetSourceCount(); ++i)
 	{
 		const T* const srcData = &sourceArray[i];
+
 		MilesSource_t* const sourceAssetData = new MilesSource_t(srcData);
+
+		if (!bank->IsValidSource(sourceAssetData))
+		{
+			delete sourceAssetData;
+			continue;
+		}
 
 		const uint32_t markerOffset = srcData->markerOffset;
 		const uint8_t markerCount = srcData->markerCount;

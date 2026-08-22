@@ -92,11 +92,14 @@ static void MilesBank_ParseSources(CMilesAudioBank* bank)
 		const uint32_t markerOffset = srcData->markerOffset;
 		const uint8_t markerCount = srcData->markerCount;
 
-		for (uint32_t j = 0; j < markerCount; ++j)
+		if (bank->GetMarkers() != nullptr) // only try and get markers if there is actually a marker pointer
 		{
-			const MilesAudioMarker_t* marker = bank->GetMarkers() + ((markerOffset / sizeof(MilesAudioMarker_t)) + j);
+			for (uint32_t j = 0; j < markerCount; ++j)
+			{
+				const MilesAudioMarker_t* marker = bank->GetMarkers() + ((markerOffset / sizeof(MilesAudioMarker_t)) + j);
 
-			sourceAssetData->audioMarkers.emplace_back(bank->GetString(marker->nameOffset), marker->framePosition);
+				sourceAssetData->audioMarkers.emplace_back(bank->GetString(marker->nameOffset), marker->framePosition);
+			}
 		}
 
 		const char* sourceName = nullptr;

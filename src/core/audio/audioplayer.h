@@ -71,7 +71,7 @@ public:
         Play();
     }
 
-    bool IsAudioFinished() const { return audioCursor == _numSamples * _sampleSize; };
+    bool IsAudioFinished() const { return _audioData.empty() || audioCursor >= _audioData.size(); };
 
     bool IsPlaying() const { return isPlaying; }
     size_t GetCursor() const { return audioCursor; };

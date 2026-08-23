@@ -709,16 +709,16 @@ void ImGuiExt::ProgressBarCentered(float fraction, const ImVec2& size_arg, const
     }
 }
 
-void ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, size_t endFrame, const std::vector<AudioMarker_s>& markers, const ImVec2& size_arg)
+bool ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, size_t endFrame, const std::vector<AudioMarker_s>& markers, const ImVec2& size_arg, size_t* o_seekFrame)
 {
     if (g_pImGuiHandler->NoImGui())
-        return;
+        return false;
 
     using namespace ImGui;
 
     ImGuiWindow* window = GetCurrentWindow();
     if (window->SkipItems)
-        return;
+        return false;
 
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
@@ -730,7 +730,7 @@ void ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, siz
     ImRect bb(pos, pos + size);
     ItemSize(size, style.FramePadding.y);
     if (!ItemAdd(bb, 0))
-        return;
+        return false;
 
     bool timelineHovered;
     bool held;
@@ -743,14 +743,14 @@ void ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, siz
     const float fraction = endTime != 0.f ? ImSaturate(currentTime / endTime) : 0.f;
     RenderRectFilledRangeH(window->DrawList, bb, GetColorU32(ImGuiCol_PlotHistogram), 0.0f, fraction, style.FrameRounding);
 
+    constexpr float markerLineThickness = 1.5f;
+    constexpr float markerArrowSize = 5.f;
+
+    size_t hoveredMarker = UINT64_MAX;
+    float shortestDistanceToMarker = 5.f; // max distance to a marker is 5px
+
     if (endFrame != 0)
     {
-        constexpr float markerLineThickness = 1.5f;
-        constexpr float markerArrowSize = 5.f;
-
-        size_t hoveredMarker = UINT64_MAX;
-        float shortestDistanceToMarker = 5.f; // max distance to a marker is 5px
-
         if (timelineHovered)
         {
             const float mouseX = g.IO.MousePos.x;
@@ -804,6 +804,27 @@ void ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, siz
         }
         window->DrawList->PopClipRect();
     }
+
+    if (held)
+    {
+        size_t seekFrame = 0;
+        if (hoveredMarker != UINT64_MAX)
+            seekFrame = markers.at(hoveredMarker).framePosition;
+        else
+        {
+            const float mouseX = g.IO.MousePos.x;
+            const float distance = mouseX - bb.Min.x;
+
+            const float seekFraction = distance / size.x;
+
+            seekFrame = static_cast<size_t>(seekFraction * endFrame);
+        }
+
+        *o_seekFrame = seekFrame;
+    }
+
+
+    return held;
 }
 
 ImGuiHandler::ImGuiHandler()

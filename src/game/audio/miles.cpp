@@ -669,7 +669,13 @@ void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 
 	ImGui::SameLine();
 
-	ImGuiExt::Timeline("AudioPreview", progressTime, soundLengthTime, source->sampleCount, source->audioMarkers, ImVec2(0, 25.f));
+	size_t seekFrame = 0;
+	if (ImGuiExt::Timeline("AudioPreview", progressTime, soundLengthTime, source->sampleCount, source->audioMarkers, ImVec2(0, 25.f), &seekFrame))
+	{
+		AudioSource_DoInitialSetup(asset);
+
+		g_audioPlayer.SeekToFrame(seekFrame);
+	}
 
 	ImGui::SameLine();
 	ImGui::Text("%.3f", soundLengthTime);

@@ -323,7 +323,7 @@ namespace ImGuiExt {
     };
 
     void ProgressBarCentered(float fraction, const ImVec2& size_arg, const char* overlay, ProgressBarEvent_t* event);
-    void Timeline(const char* strId, float currentTime, float endTime, size_t endFrame, const std::vector<AudioMarker_s>& markers, const ImVec2& size_arg);
+    bool Timeline(const char* strId, float currentTime, float endTime, size_t endFrame, const std::vector<AudioMarker_s>& markers, const ImVec2& size_arg, size_t* o_seekTime);
     void HelpMarker(const char* const desc);
     void Tooltip(const char* const text);
 

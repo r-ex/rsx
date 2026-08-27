@@ -976,6 +976,8 @@ void HandleRenderFrame()
                         // so that they know the asset will not work correctly
                         if(knownAssetType && !typeBinding->second._loadAssetType)
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 0.f, 0.f, 1.f));
+                        else if(asset->GetExportedStatus())
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.f, 1.f, 1.f, 1.f));
 
                         if (ImGui::Selectable(asset->GetAssetName().c_str(), isSelected, ImGuiSelectableFlags_AllowDoubleClick))
                         {
@@ -992,8 +994,9 @@ void HandleRenderFrame()
                                 s_selectedAssets.clear();
                             }
                         }
-                        if (knownAssetType && !typeBinding->second._loadAssetType)
+                        if ((knownAssetType && !typeBinding->second._loadAssetType) || asset->GetExportedStatus())
                             ImGui::PopStyleColor();
+
 
                         // Context menu (right-click)
                         if (ImGui::BeginPopupContextItem())

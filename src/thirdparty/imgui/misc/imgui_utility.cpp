@@ -805,6 +805,7 @@ bool ImGuiExt::Timeline(const char* strId, float currentTime, float endTime, siz
         window->DrawList->PopClipRect();
     }
 
+    // If the timeline is clicked, jump to the frame at the position that was clicked
     if (held)
     {
         size_t seekFrame = 0;

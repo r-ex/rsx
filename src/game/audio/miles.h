@@ -72,180 +72,12 @@ struct MilesStreamHeader_t
 	uint32_t buildTag; // must match with the associated MBNK file
 };
 
-// r2
-struct MilesSource_v13_t
+struct EventName_s
 {
-	char gap0[16];
 	uint32_t nameOffset;
-
-	uint16_t sampleRate;
-	uint16_t bitRate;
-
-	// unverified offsets
-	uint8_t channelCount;
-
-	char gap_19[2];
-	uint8_t markerCount;
-	char gap_1C[19];
-
-	uint32_t streamHeaderSize;
-	uint32_t sampleCount;
-	uint64_t streamHeaderOffset;
-	uint64_t streamDataOffset;
-
-	uint32_t markerOffset;
-	uint32_t unk_4C;
-	short languageIdx;
-	short patchIdx;
-	char gap_54[4];
+	uint32_t dataOffset; // relative to event actions data
 };
-static_assert(offsetof(MilesSource_v13_t, nameOffset) == 0x10);
-static_assert(offsetof(MilesSource_v13_t, sampleRate) == 0x14);
-static_assert(offsetof(MilesSource_v13_t, languageIdx) == 0x50);
-//static_assert(offsetof(MilesSource_v13_t, gap_48) == 0x48);
-static_assert(sizeof(MilesSource_v13_t) == 0x58);
 
-// s0
-struct MilesSource_v28_t
-{
-	char gap0[12];
-	uint16_t languageIdx; // sound language ID
-	uint16_t patchIdx; // index of the patch file that contains this sound
-	uint32_t nameOffset; // relative to string table
-	uint16_t sampleRate;
-	uint16_t bitRate;
-
-	char unk;
-	uint8_t markerCount;
-
-	uint8_t channelCount;
-	char gap_1B[21];
-
-	uint32_t streamHeaderSize;
-	uint32_t sampleCount;
-	uint64_t streamHeaderOffset;
-	uint64_t streamDataOffset;
-	uint32_t markerOffset;
-	uint32_t unkMinusOne;
-
-	char gap_end[8];
-};
-static_assert(offsetof(MilesSource_v28_t, channelCount) == 26);
-static_assert(offsetof(MilesSource_v28_t, streamHeaderSize) == 48);
-static_assert(sizeof(MilesSource_v28_t) == 0x58);
-
-// s22
-struct MilesSource_v39_t
-{
-	uint32_t nameOffset; // relative to string table
-	uint16_t languageIdx; // sound language ID
-	uint16_t patchIdx; // index of the patch file that contains this sound
-	uint32_t unk8;
-	uint16_t sampleRate;
-	uint16_t bitRate;
-
-	char unk;
-	uint8_t markerCount;
-
-	char gap[8];
-
-	uint16_t bpm;
-	char gap_20[4];
-
-	uint32_t streamHeaderSize;
-	uint32_t sampleCount;
-	uint64_t streamHeaderOffset;
-	uint64_t streamDataOffset;
-	uint32_t markerOffset;
-	uint32_t unkMinusOne;
-	char gap8[8];
-};
-static_assert(offsetof(MilesSource_v39_t, streamDataOffset) == 48);
-static_assert(sizeof(MilesSource_v39_t) == 72);
-
-// v48, v49
-struct MilesSource_v48_t
-{
-	uint64_t nameOffset; // relative to Something
-	uint16_t languageIdx; // sound language ID
-	uint16_t patchIdx; // index of the patch file that contains this sound
-	uint32_t unk8;
-	uint16_t sampleRate;
-	uint16_t bitRate;
-
-	char unk;
-	uint8_t markerCount;
-
-	char gap[8];
-
-	uint16_t bpm;
-	char gap_20[4];
-
-	uint32_t streamHeaderSize;
-	uint64_t sampleCount;
-	uint64_t streamHeaderOffset;
-	uint64_t streamDataOffset;
-	uint32_t markerOffset;
-	uint32_t unkMinusOne;
-	char gap8[8];
-};
-static_assert(sizeof(MilesSource_v48_t) == 80);
-
-struct MilesSource_v49_t : public MilesSource_v48_t { };
-
-struct MilesSource_t
-{
-	MilesSource_t(const MilesSource_v13_t* const a) :
-		streamDataOffset(a->streamDataOffset), streamHeaderOffset(a->streamHeaderOffset),
-		sampleCount(a->sampleCount), streamHeaderSize(a->streamHeaderSize),
-		nameOffset(a->nameOffset),
-		languageIdx(a->languageIdx), patchIdx(a->patchIdx), bpm(0), sampleRate(a->sampleRate)
-	{
-	};
-
-	MilesSource_t(const MilesSource_v28_t* const a) :
-		streamDataOffset(a->streamDataOffset), streamHeaderOffset(a->streamHeaderOffset),
-		sampleCount(a->sampleCount), streamHeaderSize(a->streamHeaderSize),
-		nameOffset(a->nameOffset),
-		languageIdx(a->languageIdx), patchIdx(a->patchIdx), bpm(0), sampleRate(a->sampleRate)
-	{
-	};
-
-	MilesSource_t(const MilesSource_v39_t* const a) :
-		streamDataOffset(a->streamDataOffset), streamHeaderOffset(a->streamHeaderOffset),
-		sampleCount(a->sampleCount), streamHeaderSize(a->streamHeaderSize),
-		nameOffset(a->nameOffset),
-		languageIdx(a->languageIdx), patchIdx(a->patchIdx), bpm(a->bpm), sampleRate(a->sampleRate)
-	{
-	};
-
-	MilesSource_t(const MilesSource_v48_t* const a) :
-		streamDataOffset(a->streamDataOffset), streamHeaderOffset(a->streamHeaderOffset),
-		sampleCount(a->sampleCount), streamHeaderSize(a->streamHeaderSize),
-		nameOffset(a->nameOffset),
-		languageIdx(a->languageIdx), patchIdx(a->patchIdx), bpm(a->bpm), sampleRate(a->sampleRate)
-	{
-	};
-
-	uint64_t nameOffset;
-	uint64_t streamDataOffset;
-	uint64_t streamHeaderOffset;
-	uint64_t sampleCount;
-	uint32_t streamHeaderSize;
-
-	uint16_t languageIdx;
-	uint16_t patchIdx;
-
-	uint16_t bpm;
-	uint16_t sampleRate;
-
-	std::vector<ImGuiExt::AudioMarker_s> audioMarkers;
-
-	float duration() const
-	{
-		return sampleCount / (float)sampleRate;
-	}
-};
 
 /*
 MBNK Versions:
@@ -286,8 +118,10 @@ struct MilesBankHeader_v13_t
 
 	OffsetPtr_t sourceOffset;
 	OffsetPtr_t localisedSourceOffset;
+	OffsetPtr_t markers;
 
-	char gap1[0x18];
+	OffsetPtr_t eventNames;
+	OffsetPtr_t eventDataOffset;
 	OffsetPtr_t stringTableOffset;
 
 	char gap2[0x24];
@@ -301,10 +135,10 @@ struct MilesBankHeader_v13_t
 };
 
 static_assert(offsetof(MilesBankHeader_v13_t, sourceOffset) == 0x48);
+static_assert(offsetof(MilesBankHeader_v13_t, markers) == 0x58);
 static_assert(offsetof(MilesBankHeader_v13_t, stringTableOffset) == 0x70);
 static_assert(offsetof(MilesBankHeader_v13_t, sourceCount) == 0xA0);
 static_assert(offsetof(MilesBankHeader_v13_t, buildTag) == 0xBC);
-
 
 struct MilesBankHeader_v28_t
 {
@@ -325,7 +159,7 @@ struct MilesBankHeader_v28_t
 	OffsetPtr_t sourceOffset;
 	OffsetPtr_t localisedSourceOffset; // reserved
 	OffsetPtr_t unk_offset_58;
-	OffsetPtr_t eventOffset;
+	OffsetPtr_t eventNames;
 	OffsetPtr_t unk_offset_68;
 	OffsetPtr_t stringTableOffset;
 	OffsetPtr_t unk_offset_78;
@@ -391,7 +225,7 @@ struct MilesBankHeader_v45_t
 	OffsetPtr_t sourceOffset; // SourceEntryOffset
 	OffsetPtr_t localisedSourceOffset; // reserved. null on disk
 	OffsetPtr_t unk_offset_60;
-	OffsetPtr_t eventOffset;
+	OffsetPtr_t eventNames;
 	OffsetPtr_t unk_offset_70;
 	OffsetPtr_t unk_offset_78;
 	OffsetPtr_t stringTableOffset;
@@ -468,6 +302,7 @@ struct MilesBankHeader_v49_t
 static_assert(offsetof(MilesBankHeader_v49_t, reserved_memoryBank) == 0x98);
 static_assert(sizeof(MilesBankHeader_v49_t) == 0xA0);
 
+struct MilesSource_t;
 class CMilesAudioBank : public CAssetContainer
 {
 public:
@@ -502,11 +337,22 @@ public:
 		return reinterpret_cast<const T*>(m_fileBuf.get() + offset);
 	}
 
-
 	template <typename T>
 	T* GetPtr(uint64_t offset)
 	{
 		return reinterpret_cast<T*>(m_fileBuf.get() + offset);
+	}
+
+	template <typename T>
+	const T* GetPtr(const OffsetPtr_t& ptr) const
+	{
+		return reinterpret_cast<const T*>(m_fileBuf.get() + ptr.offset);
+	}
+
+	template <typename T>
+	T* GetPtr(const OffsetPtr_t& ptr)
+	{
+		return reinterpret_cast<T*>(m_fileBuf.get() + ptr.offset);
 	}
 
 	const MilesAudioMarker_t* GetMarkers() const
@@ -519,22 +365,17 @@ public:
 		return audioSources;
 	}
 
-	std::string GetStreamingFileNameForSource(const MilesSource_t* source) const
+	const EventName_s* GetEventNamesData() const
 	{
-		std::string sourceStreamFileName = GetBankStem();
-
-		if (source->languageIdx != 0xFFFF)
-			sourceStreamFileName += std::format("_{}", GetLanguageNames()[source->languageIdx]);
-		else
-			sourceStreamFileName += "_stream";
-
-		if (source->patchIdx)
-			sourceStreamFileName += std::format("_patch_{}.mstr", source->patchIdx);
-		else
-			sourceStreamFileName += ".mstr";
-
-		return sourceStreamFileName;
+		return audioEventNames;
 	}
+
+	const void* GetEventActionsData() const
+	{
+		return audioEventData;
+	}
+
+	std::string GetStreamingFileNameForSource(const MilesSource_t* source) const;
 
 	bool IsValidSource(const MilesSource_t* source) const;
 private:
@@ -561,7 +402,7 @@ private:
 	uint32_t localisedSourceCount;
 
 	void* audioSources;
-	void* audioEventNames;
+	EventName_s* audioEventNames;
 	void* audioEventData;
 	MilesAudioMarker_t* audioMarkers;
 	const char* stringTable;
@@ -580,10 +421,10 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
-		this->audioSources = m_fileBuf.get() + header->sourceOffset.offset;
-		//this->audioEvents = m_fileBuf.get() + header->eventOffset.offset; // this isn't even used anyway. i'll finish the struct when it's needed
+		this->audioSources = GetPtr<void>(header->sourceOffset);
+		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
 		
-		this->stringTable = m_fileBuf.get() + header->stringTableOffset.offset;
+		this->stringTable = GetPtr<char>(header->stringTableOffset);
 	}
 
 	void Construct(const MilesBankHeader_v28_t* const header)
@@ -597,9 +438,9 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
-		this->audioSources = m_fileBuf.get() + header->sourceOffset.offset;
-		this->audioEventNames = m_fileBuf.get() + header->eventOffset.offset;
-		this->stringTable = m_fileBuf.get() + header->stringTableOffset.offset;
+		this->audioSources = GetPtr<void>(header->sourceOffset);
+		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
+		this->stringTable = GetPtr<char>(header->stringTableOffset);
 	}
 
 	void Construct(const MilesBankHeader_v45_t* const header)
@@ -613,9 +454,9 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
-		this->audioSources = m_fileBuf.get() + header->sourceOffset.offset;
-		this->audioEventNames = m_fileBuf.get() + header->eventOffset.offset;
-		this->stringTable = m_fileBuf.get() + header->stringTableOffset.offset;
+		this->audioSources = GetPtr<void>(header->sourceOffset);
+		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
+		this->stringTable = GetPtr<char>(header->stringTableOffset);
 	}
 
 	void Construct(const MilesBankHeader_v49_t* const header)
@@ -630,10 +471,10 @@ private:
 		this->localisedSourceCount = header->localisedSourceCount;
 
 		this->audioSources = GetPtr<void>(header->sourceOffset);
-		this->audioEventNames = GetPtr<void>(header->eventNames.offset);
+		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
 		this->audioEventData = GetPtr<void>(header->eventDataOffset);
-		this->audioMarkers = GetPtr<MilesAudioMarker_t>(header->audioMarkers.offset);
-		this->stringTable = GetPtr<const char>(header->strings.offset);
+		this->audioMarkers = GetPtr<MilesAudioMarker_t>(header->audioMarkers);
+		this->stringTable = GetPtr<char>(header->strings);
 	}
 };
 
@@ -651,10 +492,7 @@ public:
 		SetContainerFile(bank);
 	}
 
-	~CMilesAudioAsset()
-	{
-		delete (MilesSource_t*)m_assetData;
-	};
+	~CMilesAudioAsset();
 
 	void SetContainerName(const std::string& containerName)
 	{

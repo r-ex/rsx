@@ -100,6 +100,7 @@ static void RegisterAssetTypeBindings(const CCommandLine* const cli)
     
     // audio
     extern void InitAudioSourceAssetType();
+    extern void InitAudioEventAssetType();
 
     // bluepoint
     extern void InitBluepointWrappedFileAssetType();
@@ -171,6 +172,7 @@ static void RegisterAssetTypeBindings(const CCommandLine* const cli)
 
     // audio
     InitAudioSourceAssetType();
+    InitAudioEventAssetType();
 
     // bluepoint
     InitBluepointWrappedFileAssetType();

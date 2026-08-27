@@ -116,13 +116,13 @@ struct MilesBankHeader_v13_t
 
 	char gap[0x38];
 
-	OffsetPtr_t sourceOffset;
-	OffsetPtr_t localisedSourceOffset;
+	OffsetPtr_t sources;
+	OffsetPtr_t localisedSources;
 	OffsetPtr_t markers;
 
 	OffsetPtr_t eventNames;
-	OffsetPtr_t eventDataOffset;
-	OffsetPtr_t stringTableOffset;
+	OffsetPtr_t eventData;
+	OffsetPtr_t strings;
 
 	char gap2[0x24];
 	uint32_t localisedSourceCount;
@@ -134,9 +134,9 @@ struct MilesBankHeader_v13_t
 	uint32_t buildTag;
 };
 
-static_assert(offsetof(MilesBankHeader_v13_t, sourceOffset) == 0x48);
+static_assert(offsetof(MilesBankHeader_v13_t, sources) == 0x48);
 static_assert(offsetof(MilesBankHeader_v13_t, markers) == 0x58);
-static_assert(offsetof(MilesBankHeader_v13_t, stringTableOffset) == 0x70);
+static_assert(offsetof(MilesBankHeader_v13_t, strings) == 0x70);
 static_assert(offsetof(MilesBankHeader_v13_t, sourceCount) == 0xA0);
 static_assert(offsetof(MilesBankHeader_v13_t, buildTag) == 0xBC);
 
@@ -156,12 +156,12 @@ struct MilesBankHeader_v28_t
 	OffsetPtr_t unk_offset_30;
 	OffsetPtr_t unk_offset_38;
 	OffsetPtr_t unk_offset_40;
-	OffsetPtr_t sourceOffset;
+	OffsetPtr_t sources;
 	OffsetPtr_t localisedSourceOffset; // reserved
 	OffsetPtr_t unk_offset_58;
 	OffsetPtr_t eventNames;
-	OffsetPtr_t unk_offset_68;
-	OffsetPtr_t stringTableOffset;
+	OffsetPtr_t eventData;
+	OffsetPtr_t strings;
 	OffsetPtr_t unk_offset_78;
 	OffsetPtr_t unk_offset_80;
 	OffsetPtr_t unk_offset_88;
@@ -222,13 +222,13 @@ struct MilesBankHeader_v45_t
 	OffsetPtr_t unk_offset_38;
 	OffsetPtr_t unk_offset_40;
 	OffsetPtr_t unk_offset_48; // SourceTableOffset
-	OffsetPtr_t sourceOffset; // SourceEntryOffset
+	OffsetPtr_t sources; // SourceEntryOffset
 	OffsetPtr_t localisedSourceOffset; // reserved. null on disk
 	OffsetPtr_t unk_offset_60;
 	OffsetPtr_t eventNames;
-	OffsetPtr_t unk_offset_70;
+	OffsetPtr_t eventData;
 	OffsetPtr_t unk_offset_78;
-	OffsetPtr_t stringTableOffset;
+	OffsetPtr_t strings;
 	OffsetPtr_t unk_offset_88;
 	OffsetPtr_t unk_offset_90;
 	OffsetPtr_t unk_offset_98;
@@ -276,7 +276,7 @@ struct MilesBankHeader_v49_t
 	uint32_t eventDataOffset; // compressed event data
 	uint32_t unkOffset;
 
-	uint32_t sourceOffset;
+	uint32_t sources;
 
 	uint32_t sourceCount; // unlocalised
 	uint32_t localisedSourceCount;
@@ -421,10 +421,9 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
-		this->audioSources = GetPtr<void>(header->sourceOffset);
+		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
-		
-		this->stringTable = GetPtr<char>(header->stringTableOffset);
+		this->stringTable = GetPtr<char>(header->strings);
 	}
 
 	void Construct(const MilesBankHeader_v28_t* const header)
@@ -438,9 +437,9 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
-		this->audioSources = GetPtr<void>(header->sourceOffset);
+		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
-		this->stringTable = GetPtr<char>(header->stringTableOffset);
+		this->stringTable = GetPtr<char>(header->strings);
 	}
 
 	void Construct(const MilesBankHeader_v45_t* const header)
@@ -454,9 +453,10 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
-		this->audioSources = GetPtr<void>(header->sourceOffset);
+		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
-		this->stringTable = GetPtr<char>(header->stringTableOffset);
+		this->audioEventData = GetPtr<void>(header->eventData);
+		this->stringTable = GetPtr<char>(header->strings);
 	}
 
 	void Construct(const MilesBankHeader_v49_t* const header)
@@ -470,7 +470,7 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
-		this->audioSources = GetPtr<void>(header->sourceOffset);
+		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
 		this->audioEventData = GetPtr<void>(header->eventDataOffset);
 		this->audioMarkers = GetPtr<MilesAudioMarker_t>(header->audioMarkers);

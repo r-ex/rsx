@@ -34,6 +34,7 @@ These arguments do not take a value. Including them in the arguments provided to
 | --qcminor       | (16-bit integer)                               | When exporting models as [SMD](./assets/rpak/Model.md#smd), sets the minor version of the QC file                |
 | --exportdir     | (string, directory path)                       | Sets the directory that all assets are exported to                                                               |
 | --exporttypes   | (string, [asset type](./AssetTypes.md))        | If the `-export` flag is specified, Sets a list of types that should be exported                                 |
+| --loadwhitelist | (string, [asset type](./AssetTypes.md))        | nogui only: parse/load only these types (comma-separated). If omitted, all types stay enabled                    |
 | --exportthreads | (integer, min: `1`, default: `1`)              | Sets the number of threads to use for exporting. Clamped to the number of threads supported by the processor     |
 | --parsethreads  | (integer, min: `1`, default: `0.5*maxThreads`) | Sets the number of threads to use for loading files. Clamped to the number of threads supported by the processor |
 | --list | (string, file path) | Sets the file path that the loaded asset list will be saved as |

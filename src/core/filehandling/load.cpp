@@ -37,7 +37,19 @@ static void CLI_HandleAssetTypeWhitelist(const CCommandLine* const cli)
     if (!IS_NOGUI(cli))
         return;
 
+    // Omitted --loadwhitelist must keep the default (_loadAssetType = true).
+    // Treating a missing flag as an empty set disabled every type, so nogui
+    // -export skipped loadFunc/exportFunc and wrote no files with no error.
+    const char* const typeString = cli->GetParamValue("--loadwhitelist");
+    if (!typeString)
+        return;
+
     const std::unordered_set<uint32_t> filterTypes = CLI_GetCommaSeparatedAssetTypes(cli, "--loadwhitelist");
+
+    printf("LOAD: Applying --loadwhitelist \"%s\" (%lld valid type%s)\n",
+        typeString,
+        static_cast<long long>(filterTypes.size()),
+        filterTypes.size() == 1 ? "" : "s");
 
     for (auto& [fourCC, binding] : g_assetData.m_assetTypeBindings)
     {

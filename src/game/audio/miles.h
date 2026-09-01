@@ -503,6 +503,7 @@ private:
 		this->graphData = GetPtr<void>(header->graphData);
 		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
+		this->audioEventData = GetPtr<void>(header->eventData);
 		this->stringTable = GetPtr<char>(header->strings);
 	}
 

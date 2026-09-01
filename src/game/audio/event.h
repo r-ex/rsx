@@ -28,7 +28,7 @@ struct EventActionBase_s
 };
 
 // vars using this union type can either be a static float value (flValue), or they can point to a graph curve to calculate the value
-// this is determined using a bit flag on action::flags_80
+// this is determined using a bit flag on action::graphFlags
 union GraphValue_u
 {
 	float flValue;
@@ -60,7 +60,7 @@ struct EventAction_0_s : public EventActionBase_s
 	uint16_t unkDwordOffset_7A;
 	uint16_t unkDwordOffset_7C;
 	uint16_t unkDwordOffset_7E;
-	uint32_t controllerFlags;
+	uint32_t graphFlags;
 	char gap_84[24];
 };
 static_assert(offsetof(EventAction_0_s, unkGraphVal_4C) == 0x4C);

@@ -503,6 +503,12 @@
     <ClInclude Include="game\audio\event.h">
       <Filter>game\audio</Filter>
     </ClInclude>
+    <ClInclude Include="thirdparty\imgui\misc\imcurve_editor.hpp">
+      <Filter>thirdparty\imgui\misc</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\imgui\misc\imcurve.hpp">
+      <Filter>thirdparty\imgui\misc</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">

@@ -4,6 +4,7 @@
 #include "miles.h"
 
 #include <thirdparty/rad_lzb_simple/rad_lzb_simple.h>
+#include <imgui/misc/imcurve_editor.hpp>
 
 bool MilesEvent_s::ParseActions()
 {
@@ -43,23 +44,70 @@ bool MilesEvent_s::ParseActions()
 	return true;
 }
 
+static ImCurveEditor<float> pitchGraph;
+static ImCurveEditor<float> volumeGraph;
+
 void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 {
 	CMilesAudioAsset* audioAsset = reinterpret_cast<CMilesAudioAsset*>(asset);
 	MilesEvent_s* event = reinterpret_cast<MilesEvent_s*>(audioAsset->GetAssetData());
 	CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
 
-	if (firstFrameForAsset && !event->parsedActions)
+	if (firstFrameForAsset)
 	{
-		if (!event->ParseActions())
-			printf("Failed to parse!\n");
+		pitchGraph = {};
+
+		if (!event->parsedActions)
+		{
+			if (!event->ParseActions())
+				printf("Failed to parse!\n");
+		}
+
+		for (auto& action : event->actions)
+		{
+			if (action->actionType == 0)
+			{
+				EventAction_0_s* act = reinterpret_cast<EventAction_0_s*>(action);
+
+				if (act->graphFlags & 4)
+				{
+					ImCurve<float> pitchCurve;
+
+					MilesValueGraph_s* graph = reinterpret_cast<MilesValueGraph_s*>((char*)audioBank->GetGraphData() + act->pitch.graphOffset);
+
+					pitchCurve.Points.resize(graph->numValues);
+					for (int i = 0; i < graph->numValues; ++i)
+					{
+						pitchCurve.Points[i].Points[ImCurvePointType_Start] = { graph->XValues()[i], graph->Segments()[i].start };
+					}
+
+					for(int i = 0; i < graph->numValues; ++i)
+					{
+						auto& segment = graph->Segments()[i];
+						auto& point = pitchCurve.Points[i];
+
+						switch (segment.mode)
+						{
+						case 0:
+							point.SetInterpolationType(ImCurveInterpolationType_Linear);
+							break;
+						case 2:
+							point.SetInterpolationType(ImCurveInterpolationType_Square);
+							break;
+						case 3:
+							assert(i != graph->numValues - 1);
+							point.SetInterpolationType(ImCurveInterpolationType_Quadratic, pitchCurve.Points[i+1]);
+							break;
+						}
+
+					}
+					pitchGraph = ImCurveEditor<float>(pitchCurve);
+				}
+			}
+		}
 	}
 
-	for (auto& action : event->actions)
-	{
-
-	}
-
+	pitchGraph.Draw("Pitch Graph");
 
 	return nullptr;
 }

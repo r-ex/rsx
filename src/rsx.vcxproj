@@ -142,7 +142,9 @@
     <ClInclude Include="thirdparty\imgui\imstb_textedit.h" />
     <ClInclude Include="thirdparty\imgui\imstb_truetype.h" />
     <ClInclude Include="thirdparty\imgui\misc\cpp\imgui_stdlib.h" />
+    <ClInclude Include="thirdparty\imgui\misc\imcurve.hpp" />
     <ClInclude Include="thirdparty\imgui\misc\ImGuiNotify.hpp" />
+    <ClInclude Include="thirdparty\imgui\misc\imcurve_editor.hpp" />
     <ClInclude Include="thirdparty\imgui\misc\imgui_editor.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>

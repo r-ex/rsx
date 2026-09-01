@@ -215,6 +215,7 @@
     <ClCompile Include="core\window.cpp" />
     <ClCompile Include="game\asset.cpp" />
     <ClCompile Include="game\audio\event.cpp" />
+    <ClCompile Include="game\audio\event_action.cpp" />
     <ClCompile Include="game\audio\miles.cpp" />
     <ClCompile Include="game\audio\miles_bcf.cpp" />
     <ClCompile Include="game\audio\miles_rada.cpp" />

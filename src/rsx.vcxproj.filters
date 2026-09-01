@@ -849,6 +849,9 @@
     <ClCompile Include="game\audio\event.cpp">
       <Filter>game\audio</Filter>
     </ClCompile>
+    <ClCompile Include="game\audio\event_action.cpp">
+      <Filter>game\audio</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />

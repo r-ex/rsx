@@ -79,6 +79,39 @@ struct EventName_s
 };
 
 
+// valid in r2 and r5
+struct MilesGraphSegment_s
+{
+	float start; // LHS
+	float end; // RHS (the start value of the next segment, or == start if this is the final segment)
+
+	float startParam;
+	float endParam;
+	char mode;
+	char startMode;
+	char endMode;
+};
+static_assert(sizeof(MilesGraphSegment_s) == 20);
+
+struct MilesValueGraph_s
+{
+	char numValues;
+	char unk_1;
+	uint16_t unk_2;
+	uint32_t baseControllerNameOffset;
+
+	// x-axis values for each point on the graph
+	const float* XValues() const
+	{
+		return reinterpret_cast<const float*>(&this[1]);
+	}
+
+	const MilesGraphSegment_s* Segments() const
+	{
+		return reinterpret_cast<const MilesGraphSegment_s*>(XValues() + numValues);
+	}
+};
+
 /*
 MBNK Versions:
 
@@ -106,6 +139,7 @@ struct MilesBankHeaderShort_t
 	uint32_t fileSize;
 };
 
+// largely taken from RoyalBlue's Kilometer
 struct MilesBankHeader_v13_t
 {
 	int magic;
@@ -113,8 +147,17 @@ struct MilesBankHeader_v13_t
 	uint32_t fileSize;
 
 	int bankMagic;
+	
+	OffsetPtr_t bankName;
 
-	char gap[0x38];
+	uint64_t nextBank;
+
+	uint64_t sharedState;
+	uint64_t bankLoader;
+
+	OffsetPtr_t loadedStreamFiles; // runtime only?
+	OffsetPtr_t loadedLanguageStreamFiles; // runtime only?
+	OffsetPtr_t sourceNames;
 
 	OffsetPtr_t sources;
 	OffsetPtr_t localisedSources;
@@ -123,21 +166,31 @@ struct MilesBankHeader_v13_t
 	OffsetPtr_t eventNames;
 	OffsetPtr_t eventData;
 	OffsetPtr_t strings;
+	OffsetPtr_t graphData;
+	OffsetPtr_t sourceSelectors;
+	OffsetPtr_t filters;
+	OffsetPtr_t unk_90;
 
-	char gap2[0x24];
+	uint32_t unk_98;
+
 	uint32_t localisedSourceCount;
 	uint32_t sourceCount;
 	uint32_t patchCount;
 	uint32_t eventCount;
-
-	char gap3[16];
+	uint32_t stringsSize;
+	uint32_t dword_B0;
+	uint32_t graphDataSize;
+	uint32_t unkSize;
 	uint32_t buildTag;
 };
 
 static_assert(offsetof(MilesBankHeader_v13_t, sources) == 0x48);
 static_assert(offsetof(MilesBankHeader_v13_t, markers) == 0x58);
+static_assert(offsetof(MilesBankHeader_v13_t, eventData) == 0x68);
 static_assert(offsetof(MilesBankHeader_v13_t, strings) == 0x70);
+static_assert(offsetof(MilesBankHeader_v13_t, unk_90) == 0x90);
 static_assert(offsetof(MilesBankHeader_v13_t, sourceCount) == 0xA0);
+static_assert(offsetof(MilesBankHeader_v13_t, dword_B0) == 0xB0);
 static_assert(offsetof(MilesBankHeader_v13_t, buildTag) == 0xBC);
 
 struct MilesBankHeader_v28_t
@@ -162,7 +215,7 @@ struct MilesBankHeader_v28_t
 	OffsetPtr_t eventNames;
 	OffsetPtr_t eventData;
 	OffsetPtr_t strings;
-	OffsetPtr_t unk_offset_78;
+	OffsetPtr_t graphData;
 	OffsetPtr_t unk_offset_80;
 	OffsetPtr_t unk_offset_88;
 
@@ -229,7 +282,7 @@ struct MilesBankHeader_v45_t
 	OffsetPtr_t eventData;
 	OffsetPtr_t unk_offset_78;
 	OffsetPtr_t strings;
-	OffsetPtr_t unk_offset_88;
+	OffsetPtr_t graphData;
 	OffsetPtr_t unk_offset_90;
 	OffsetPtr_t unk_offset_98;
 
@@ -293,13 +346,15 @@ struct MilesBankHeader_v49_t
 	OffsetPtr_t eventNames; // just the names and offset into event data
 
 	OffsetPtr_t strings;
+	OffsetPtr_t graphData;
 
-	char gap_78[32];
+	char gap_80[24];
 
 	void* reserved_memoryBank; // memory bank lmao (pointer to the memory instance that wraps around this file's data)
 };
 
 static_assert(offsetof(MilesBankHeader_v49_t, reserved_memoryBank) == 0x98);
+static_assert(offsetof(MilesBankHeader_v49_t, graphData) == 0x78);
 static_assert(sizeof(MilesBankHeader_v49_t) == 0xA0);
 
 struct MilesSource_t;
@@ -375,6 +430,11 @@ public:
 		return audioEventData;
 	}
 
+	const void* GetGraphData() const
+	{
+		return graphData;
+	}
+
 	std::string GetStreamingFileNameForSource(const MilesSource_t* source) const;
 
 	bool IsValidSource(const MilesSource_t* source) const;
@@ -401,6 +461,7 @@ private:
 
 	uint32_t localisedSourceCount;
 
+	void* graphData;
 	void* audioSources;
 	EventName_s* audioEventNames;
 	void* audioEventData;
@@ -421,8 +482,10 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
+		this->graphData = GetPtr<void>(header->graphData);
 		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
+		this->audioEventData = GetPtr<void>(header->eventData);
 		this->stringTable = GetPtr<char>(header->strings);
 	}
 
@@ -437,6 +500,7 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
+		this->graphData = GetPtr<void>(header->graphData);
 		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
 		this->stringTable = GetPtr<char>(header->strings);
@@ -453,6 +517,7 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
+		this->graphData = GetPtr<void>(header->graphData);
 		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
 		this->audioEventData = GetPtr<void>(header->eventData);
@@ -470,6 +535,7 @@ private:
 
 		this->localisedSourceCount = header->localisedSourceCount;
 
+		this->graphData = GetPtr<void>(header->graphData);
 		this->audioSources = GetPtr<void>(header->sources);
 		this->audioEventNames = GetPtr<EventName_s>(header->eventNames);
 		this->audioEventData = GetPtr<void>(header->eventDataOffset);

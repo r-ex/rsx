@@ -190,6 +190,14 @@ public:
         writer.write(data, len);
     }
 
+    void write(const std::string& str)
+    {
+        if (!checkWritabilityStatus())
+            return;
+
+        writer.write(str.c_str(), str.size());
+    }
+
     void writeString(std::string str)
     {
         if (!checkWritabilityStatus())

@@ -238,7 +238,6 @@ bool ExportAudioEventAsset(CAsset* const asset, int type)
 		if (!shouldWrite && types.contains(action->actionType))
 			shouldWrite = true;
 
-		MilesEvent_WriteActionToRSONStream(rson, audioAsset, it);
 		MilesEvent_WriteActionToRSONStream(rson, audioAsset, action);
 	}
 

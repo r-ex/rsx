@@ -4,7 +4,7 @@
 #include "miles.h"
 
 #include <thirdparty/rad_lzb_simple/rad_lzb_simple.h>
-#include <imgui/misc/imcurve_editor.hpp>
+#include <implot/implot.h>
 
 bool MilesEvent_s::ParseActions()
 {
@@ -31,7 +31,7 @@ bool MilesEvent_s::ParseActions()
 
 		memcpy_s(actionData, actionSize, base, actionSize);
 
-		this->actions.push_back(reinterpret_cast<EventActionBase_s*>(actionData));
+		this->actions.push_back({ reinterpret_cast<EventActionBase_s*>(actionData), nullptr });
 
 		cursor += actionSize;
 
@@ -44,8 +44,16 @@ bool MilesEvent_s::ParseActions()
 	return true;
 }
 
-static ImCurveEditor<float> pitchGraph;
-static ImCurveEditor<float> volumeGraph;
+struct ActionPreviewData_0_s
+{
+	MilesValueGraph_s* pitchGraph;
+	Vector2D pitchMins;
+	Vector2D pitchMaxs;
+
+	MilesValueGraph_s* volumeGraph;
+	Vector2D volumeMins;
+	Vector2D volumeMaxs;
+};
 
 void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 {
@@ -53,61 +61,132 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 	MilesEvent_s* event = reinterpret_cast<MilesEvent_s*>(audioAsset->GetAssetData());
 	CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
 
+	const ImVec2 avail = ImGui::GetContentRegionAvail();
+
 	if (firstFrameForAsset)
 	{
-		pitchGraph = {};
-
 		if (!event->parsedActions)
 		{
 			if (!event->ParseActions())
 				printf("Failed to parse!\n");
 		}
 
-		for (auto& action : event->actions)
+		for (auto& [action, previewData] : event->actions)
 		{
 			if (action->actionType == 0)
 			{
 				EventAction_0_s* act = reinterpret_cast<EventAction_0_s*>(action);
 
-				if (act->graphFlags & 4)
+				if (previewData) delete previewData;
+
+				ActionPreviewData_0_s* pd = new ActionPreviewData_0_s();
+				previewData = pd;
+
+				if (act->graphFlags & ACT_GRAPHFLAG_PITCH)
 				{
-					ImCurve<float> pitchCurve;
+					pd->pitchGraph = reinterpret_cast<MilesValueGraph_s*>((char*)audioBank->GetGraphData() + act->pitch.graphOffset);
 
-					MilesValueGraph_s* graph = reinterpret_cast<MilesValueGraph_s*>((char*)audioBank->GetGraphData() + act->pitch.graphOffset);
+					const std::pair<Vector2D, Vector2D> minsMaxs = pd->pitchGraph->MinsMaxs();
 
-					pitchCurve.Points.resize(graph->numValues);
-					for (int i = 0; i < graph->numValues; ++i)
-					{
-						pitchCurve.Points[i].Points[ImCurvePointType_Start] = { graph->XValues()[i], graph->Segments()[i].start };
-					}
-
-					for(int i = 0; i < graph->numValues; ++i)
-					{
-						auto& segment = graph->Segments()[i];
-						auto& point = pitchCurve.Points[i];
-
-						switch (segment.mode)
-						{
-						case 0:
-							point.SetInterpolationType(ImCurveInterpolationType_Linear);
-							break;
-						case 2:
-							point.SetInterpolationType(ImCurveInterpolationType_Square);
-							break;
-						case 3:
-							assert(i != graph->numValues - 1);
-							point.SetInterpolationType(ImCurveInterpolationType_Quadratic, pitchCurve.Points[i+1]);
-							break;
-						}
-
-					}
-					pitchGraph = ImCurveEditor<float>(pitchCurve);
+					pd->pitchMins = minsMaxs.first;
+					pd->pitchMaxs = minsMaxs.second;
 				}
+
+				if (act->graphFlags & ACT_GRAPHFLAG_VOLUME)
+				{
+					pd->volumeGraph = reinterpret_cast<MilesValueGraph_s*>((char*)audioBank->GetGraphData() + act->volume.graphOffset);
+
+					const std::pair<Vector2D, Vector2D> minsMaxs = pd->volumeGraph->MinsMaxs();
+
+					pd->volumeMins = minsMaxs.first;
+					pd->volumeMaxs = minsMaxs.second;
+				}
+
 			}
 		}
 	}
 
-	pitchGraph.Draw("Pitch Graph");
+	size_t i = 0;
+	for (auto& [action, previewData] : event->actions)
+	{
+		if (action->actionType == 0)
+		{
+			ActionPreviewData_0_s* pd = reinterpret_cast<ActionPreviewData_0_s*>(previewData);
+
+			const bool hasAnyGraphs = (pd->pitchGraph != nullptr && pd->pitchGraph->numPoints != 0) || (pd->volumeGraph != nullptr && pd->volumeGraph->numPoints != 0);
+
+			auto lambda = [](int idx, void* data) {
+				MilesValueGraph_s* graph = reinterpret_cast<MilesValueGraph_s*>(data);
+
+				const float startX = graph->XValues()[0];
+				const float endX = graph->XValues()[graph->numPoints - 1];
+
+				const uint32_t totalSamples = std::max(((graph->numPoints) * 10) - 1, 1);
+
+				const float thisX = std::lerp(startX, endX, (idx) / (float)totalSamples);
+
+				int chosenPoint = graph->numPoints-1;
+				float minX = -1, maxX = -1;
+
+				for (int i = 0; i < graph->numPoints; ++i)
+				{
+					maxX = graph->XValues()[i];
+
+					// when we get the first point's X that is larger than this sample's X
+					// get the index of the previous point since its segment will contain this sample
+					if (maxX > thisX)
+					{
+						chosenPoint = i-1;
+
+						minX = graph->XValues()[chosenPoint];
+						break;
+					}
+				}
+
+				const MilesGraphSegment_s* segment = &graph->Segments()[chosenPoint];
+
+
+				return ImPlotPoint(thisX, segment->Sample(thisX, minX, maxX));
+			};
+
+			auto scatterLambda = [](int idx, void* data) {
+				MilesValueGraph_s* graph = reinterpret_cast<MilesValueGraph_s*>(data);
+
+				const float startX = graph->XValues()[idx];
+				
+				const MilesGraphSegment_s* segment = &graph->Segments()[idx];
+
+				return ImPlotPoint(startX, segment->start);
+				};
+
+			ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, ImVec2(0.1f, 0.1f));
+
+			if (hasAnyGraphs && ImPlot::BeginSubplots(std::format("Action {} Controller Graphs", i).c_str(), 1, 2, avail))
+			{
+				if (pd->pitchGraph && pd->pitchGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Pitch##Action{}", i).c_str())) {
+					ImPlot::SetupAxes(pd->pitchGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->pitchGraph->baseControllerNameOffset) : "n/a", "Pitch (st)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+
+					ImPlot::PlotScatterG("##pitchScatter", scatterLambda, pd->pitchGraph, pd->pitchGraph->numPoints);
+					ImPlot::PlotLineG("##pitchLine", lambda, pd->pitchGraph, std::max((pd->pitchGraph->numPoints) * 10, 1));
+					ImPlot::EndPlot();
+				}
+
+				if (pd->volumeGraph && pd->volumeGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Volume##Action{}", i).c_str())) {
+					ImPlot::SetupAxes(pd->volumeGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->volumeGraph->baseControllerNameOffset) : "n/a", "Volume (dB)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+
+					ImPlot::PlotScatterG("##volScatter", scatterLambda, pd->volumeGraph, pd->volumeGraph->numPoints);
+					ImPlot::PlotLineG("##volLine", lambda, pd->volumeGraph, std::max((pd->volumeGraph->numPoints) * 10, 1), {});
+					ImPlot::EndPlot();
+				}
+
+				ImPlot::EndSubplots();
+			}
+			ImPlot::PopStyleVar();
+
+		}
+		i++;
+	}
+
 
 	return nullptr;
 }
@@ -125,7 +204,7 @@ bool ExportAudioEventAsset(CAsset* const asset, int type)
 		printf("Failed to parse!\n");
 		return false;
 	}
-	//CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
+	CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
 
 	// Create exported path + asset path.
 	std::filesystem::path exportPath = g_rsxSettings.GetExportDirectory();
@@ -154,12 +233,13 @@ bool ExportAudioEventAsset(CAsset* const asset, int type)
 	const std::unordered_set<uint8_t> types = { 13 };
 	bool shouldWrite = false;
 
-	for (auto& it : event->actions)
+	for (auto& [action, previewData] : event->actions)
 	{
-		if (!shouldWrite && types.contains(it->actionType))
+		if (!shouldWrite && types.contains(action->actionType))
 			shouldWrite = true;
 
 		MilesEvent_WriteActionToRSONStream(rson, audioAsset, it);
+		MilesEvent_WriteActionToRSONStream(rson, audioAsset, action);
 	}
 
 	rson << "]\n";

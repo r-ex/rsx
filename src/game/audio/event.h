@@ -35,6 +35,20 @@ union GraphValue_u
 	int graphOffset; // offset within the bank's graph data
 };
 
+struct GraphValues_s
+{
+	float* xValues;
+	float* yValues;
+
+	uint32_t numValues;
+};
+
+constexpr int ACT_GRAPHFLAG_VOLUME = 1 << 0;
+constexpr int ACT_GRAPHFLAG_PITCH = 1 << 2;
+constexpr int ACT_GRAPHFLAG_4C = 1 << 9;
+constexpr int ACT_GRAPHFLAG_50 = 1 << 10;
+
+
 struct EventAction_0_s : public EventActionBase_s
 {
 	char unk_0[28];
@@ -119,9 +133,10 @@ struct MilesEvent_s
 {
 	~MilesEvent_s()
 	{
-		for (auto& action : actions)
+		for (auto& [action, previewData] : actions)
 		{
 			if (action) delete[] (char*)action;
+			if (previewData) delete previewData;
 		}
 
 		actions.clear();
@@ -130,7 +145,7 @@ struct MilesEvent_s
 	const void* originalData;
 	std::shared_ptr<char[]> decompressedData;
 
-	std::vector<EventActionBase_s*> actions;
+	std::vector<std::pair<EventActionBase_s*, void*>> actions;
 
 	const uint16_t decompressedSize;
 	const uint16_t compressedSize;

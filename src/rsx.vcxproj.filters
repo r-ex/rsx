@@ -109,6 +109,9 @@
     <Filter Include="game\vpk">
       <UniqueIdentifier>{20e17b08-8fd9-421f-8a16-9e0992bf2f76}</UniqueIdentifier>
     </Filter>
+    <Filter Include="thirdparty\imgui\implot">
+      <UniqueIdentifier>{08453191-7974-4350-970f-8bf25cf445bf}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -503,11 +506,11 @@
     <ClInclude Include="game\audio\event.h">
       <Filter>game\audio</Filter>
     </ClInclude>
-    <ClInclude Include="thirdparty\imgui\misc\imcurve_editor.hpp">
-      <Filter>thirdparty\imgui\misc</Filter>
+    <ClInclude Include="thirdparty\imgui\implot\implot_internal.h">
+      <Filter>thirdparty\imgui\implot</Filter>
     </ClInclude>
-    <ClInclude Include="thirdparty\imgui\misc\imcurve.hpp">
-      <Filter>thirdparty\imgui\misc</Filter>
+    <ClInclude Include="thirdparty\imgui\implot\implot.h">
+      <Filter>thirdparty\imgui\implot</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -857,6 +860,15 @@
     </ClCompile>
     <ClCompile Include="game\audio\event_action.cpp">
       <Filter>game\audio</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\implot\implot.cpp">
+      <Filter>thirdparty\imgui\implot</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\implot\implot_items.cpp">
+      <Filter>thirdparty\imgui\implot</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\imgui\implot\implot_demo.cpp">
+      <Filter>thirdparty\imgui\implot</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

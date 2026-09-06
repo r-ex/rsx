@@ -78,24 +78,176 @@ struct EventName_s
 	uint32_t dataOffset; // relative to event actions data
 };
 
+inline float MilesLinearToDb(float value)
+{
+	if (value <= 0.f || value <= 0.000099999997)
+		return -96.f;
+	
+	return log(value) * 14.4764827301f;
+}
 
+inline float MilesLevelToDb(float value)
+{
+	if (value <= 0.f || value <= 0.000099999997)
+		return -96.0;
+
+	return log10(value) * 20.f;
+}
+
+inline float ConvertGraphRange(bool invert, uint8_t type, float fraction)
+{
+	if (invert) fraction = 1.f - fraction;
+
+	switch (type)
+	{
+	case 3: // sqr
+	{
+		fraction = fraction * fraction;
+		break;
+	}
+	case 4: // dB
+	{
+		fraction = (MilesLinearToDb(fraction) + 96.f) / 96.f;
+		break;
+	}
+	case 5:
+	{
+		fraction = (MilesLevelToDb(sqrtf(fraction)) + 96.f) / 96.f;
+		break;
+	}
+	case 6:
+	{
+		fraction = fraction * fraction * fraction;
+		break;
+	}
+	}
+
+	if (fraction < 0.0000023841858)
+		fraction = 0.f;
+
+	fraction = fminf(1.f, fraction);
+
+	return invert ? (1 - fraction) : fraction;
+}
+
+/*
+	Graph Data
+
+	At the graphData pointer in a MBNK file, there is the following structure:
+
+	u8 numValues;
+	u8 unk;
+	u16 unk;
+	u32 unkStrOffset;
+*/
 // valid in r2 and r5
 struct MilesGraphSegment_s
 {
 	float start; // LHS
 	float end; // RHS (the start value of the next segment, or == start if this is the final segment)
 
-	float startParam;
-	float endParam;
-	char mode;
-	char startMode;
-	char endMode;
+	float paramA;
+	float paramB;
+	char type;
+
+	char pad[3]; // can't find what (if anything) these do
+
+	float Sample(float x, float min, float max) const
+	{
+		if (type == 2)
+			return start;
+
+		const float range = max - min;
+
+		if (range < 0.0000023841858f)
+			return start;
+
+		const float delta = x - min;
+
+		float frac = delta / range;
+
+		if (frac < 0.0000023841858f)
+			return start;
+
+		if (frac >= 1.f)
+			return end;
+
+		// linear
+		switch (type)
+		{
+		case 0:
+			return std::lerp(start, end, frac);
+		case 1:
+		{
+			// paramA/B are angles for the start/end control handles
+			const float sinA = sinf(paramA);
+			const float cosA = cosf(paramA);
+
+			const float sinB = sinf(paramB);
+			const float cosB = cosf(paramB);
+
+			const float segmentRange = end - start;
+
+			float v17 = ((sinA / 3.f) + start) - start;
+			float v19 = v17 / (((cosA / 3.f) + min) - min);
+			float v21 = end - (end - (sinB / 3.f));
+
+			return (float)((float)((float)((float)((float)((float)((float)((float)((float)((float)(segmentRange + segmentRange)
+				+ segmentRange)
+				- (float)(v19 * range))
+				- (float)(v19 * range))
+				- (float)((float)(v21
+					/ (float)(max
+						- (float)(max - (float)(cosB / 3.0))))
+					* range))
+				* (float)(1.0 / (float)(range * range)))
+				+ (float)((float)((float)((float)((float)((float)((float)((float)(v21 / (float)(max - (float)(max - (float)(cosB / 3.0))))
+					* range)
+					+ (float)(v19 * range))
+					- segmentRange)
+					- segmentRange)
+					* (float)(1.0 / (float)(range * range)))
+					/ range)
+					* delta))
+				* delta)
+				+ v19)
+				* delta)
+				+ start;
+
+			break;
+		}
+		case 3:
+		case 4:
+		case 5:
+		case 6:
+		{
+			// start/end override?
+			if (paramA != 0.f || paramB != 0.f)
+				frac = std::lerp(paramA, paramB, frac);
+
+			float adjustedFraction = ConvertGraphRange(type & 0x10, type & 0xF, frac);
+
+			if (paramA != 0.f || paramB != 0.f)
+			{
+				float a = ConvertGraphRange(type & 0x10, type & 0xF, paramA);
+				float b = ConvertGraphRange(type & 0x10, type & 0xF, paramB);
+
+				adjustedFraction = (a - adjustedFraction) / (a - b);
+			}
+
+			return ((end - start) * adjustedFraction) + start;
+		}
+		default:
+			return start;
+		}
+	}
+
 };
 static_assert(sizeof(MilesGraphSegment_s) == 20);
 
 struct MilesValueGraph_s
 {
-	char numValues;
+	char numPoints;
 	char unk_1;
 	uint16_t unk_2;
 	uint32_t baseControllerNameOffset;
@@ -108,7 +260,31 @@ struct MilesValueGraph_s
 
 	const MilesGraphSegment_s* Segments() const
 	{
-		return reinterpret_cast<const MilesGraphSegment_s*>(XValues() + numValues);
+		return reinterpret_cast<const MilesGraphSegment_s*>(XValues() + numPoints);
+	}
+
+	const size_t Size() const
+	{
+		return sizeof(MilesValueGraph_s) + (numPoints * sizeof(float)) + (numPoints * sizeof(MilesGraphSegment_s));
+	}
+
+	const std::pair<Vector2D, Vector2D> MinsMaxs() const
+	{
+		Vector2D min(FLT_MAX, FLT_MAX);
+		Vector2D max(FLT_MIN, FLT_MIN);
+		for (int i = 0; i < numPoints; ++i)
+		{
+			float x = XValues()[i];
+			float y = Segments()[i].start;
+
+			if (x < min.x) min.x = x;
+			if (y < min.y) min.y = y;
+
+			if (x > max.x) max.x = x;
+			if (y > max.y) max.y = y;
+		}
+
+		return { min, max };
 	}
 };
 

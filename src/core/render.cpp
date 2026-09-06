@@ -25,6 +25,7 @@
 
 #include <core/utils/gamefinder.h>
 #include <misc/ImGuiNotify.hpp>
+#include <imgui/implot/implot.h>
 
 extern CDXParentHandler* g_dxHandler;
 extern std::atomic<uint32_t> g_maxConcurrentThreadCount;
@@ -866,6 +867,7 @@ void HandleRenderFrame()
 
 #if defined(DEBUG_IMGUI_DEMO)
     ImGui::ShowDemoWindow();
+    ImPlot::ShowDemoWindow(nullptr);
 #endif
 
     MainWnd_MenuBar();

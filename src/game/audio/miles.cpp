@@ -25,6 +25,14 @@ void CMilesAudioBank::ContainerPreviewUI() const
 	ImGui::PopStyleColor();
 
 	ImGui::Text("%u sources (%u valid, %u invalid)\n%u events", sourceCount, sourceCount - invalidSourceCount, invalidSourceCount, eventCount);
+
+	// Almost all of the data that we want to show actually belongs to the project, so return early if we can't use it
+	if (!project)
+		return;
+
+	ImGui::SeparatorText("Project");
+	project->DrawFileInfoWindow();
+
 }
 
 CMilesAudioAsset::~CMilesAudioAsset()

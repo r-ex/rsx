@@ -49,11 +49,15 @@ struct MilesController_s
 struct MilesBus_v46_s
 {
 	uint32_t nameOffset;
-	char gap_4[24];
+	uint8_t channelCount;
+	char gap_5[3];
+	void* reserved_bus;
+	char gap_10[12];
 	float reserved_pitchScalar;
 	float reserved_volumeLevel;
 	char gap_24[16];
 	int appliedDuckingIdx;
+
 	__int16 weirdBusIdx_38; // this is used to walk thru a load of different buses until it reaches one with gap_4[1] set
 	__int16 busIdx_3A;
 	__int16 busIdx_3C;
@@ -62,6 +66,7 @@ struct MilesBus_v46_s
 	__int16 busIdx_42;
 	__int16 busIdx_44;
 	__int16 busIdx_46;
+
 	float outputGainVolumeDb;
 	char gap_4C[28];
 	float volumeDb;
@@ -91,6 +96,7 @@ struct MilesBus_s
 	__int16 busIdx_46;
 
 	bool isExported;
+	uint8_t channelCount;
 };
 
 struct MilesProjectHeader_Short_s

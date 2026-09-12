@@ -25,6 +25,12 @@ struct EventActionBase_s
 	uint8_t unk_1; // @ 1
 
 	uint16_t dataSizeDwords; // @ 2 - number of dwords used for this action's data
+
+	template<typename T>
+	T* Offset(size_t offset)
+	{
+		return reinterpret_cast<T*>((char*)this + offset);
+	}
 };
 
 // vars using this union type can either be a static float value (flValue), or they can point to a graph curve to calculate the value
@@ -48,6 +54,75 @@ constexpr int ACT_GRAPHFLAG_PITCH = 1 << 2;
 constexpr int ACT_GRAPHFLAG_4C = 1 << 9;
 constexpr int ACT_GRAPHFLAG_50 = 1 << 10;
 
+
+struct PlayActionState
+{
+	int nameOffset; // "NewState", "State 1", "State 2", "State 3"
+	char unkCount_4;
+	char pad_5;
+	unsigned __int8 unsigned___int86;
+	char pad_7;
+	unsigned __int8 unsigned___int88;
+	unsigned __int8 unsigned___int89;
+	char gapA[4];
+	uint16_t wordE;
+	char gap10[2];
+	uint16_t word12;
+	char gap14[44];
+	int dword40;
+	int dword44;
+
+	char gap_58[8];
+};
+static_assert(offsetof(PlayActionState, unsigned___int88) == 8);
+static_assert(offsetof(PlayActionState, unsigned___int89) == 9);
+static_assert(offsetof(PlayActionState, dword44) == 0x44);
+static_assert(sizeof(PlayActionState) == 80);
+
+struct struct_v1
+{
+	int unkOffset;
+	char gap_4[0x20];
+};
+static_assert(sizeof(struct_v1) == 36);
+
+struct SourceSelector_s
+{
+	uint8_t type : 3;
+	uint8_t unk_0 : 4;
+	uint8_t weight;
+	uint16_t childCount;
+	int unk_4;
+
+	uint16_t* ChildOffsets()
+	{
+		return reinterpret_cast<uint16_t*>((char*)this + 0xC);
+	}
+
+};
+class CMilesAudioBank;
+
+struct ParsedSourceSelector
+{
+	void Construct(CMilesAudioBank* bank, SourceSelector_s* sel, char* base);
+	std::vector<ParsedSourceSelector> children;
+
+	std::string name;
+
+	uint8_t weight;
+
+	bool isList;
+
+	void Draw();
+};
+
+struct ParsedSourceState
+{
+	std::string name;
+	std::vector<ParsedSourceSelector> selectors;
+
+	void Draw();
+};
 
 struct EventAction_0_s : public EventActionBase_s
 {
@@ -76,6 +151,9 @@ struct EventAction_0_s : public EventActionBase_s
 	uint16_t unkDwordOffset_7E;
 	uint32_t graphFlags;
 	char gap_84[24];
+
+	std::vector<ParsedSourceState> GetSourceStates(CMilesAudioBank* bank);
+
 };
 static_assert(offsetof(EventAction_0_s, unkGraphVal_4C) == 0x4C);
 static_assert(offsetof(EventAction_0_s, gap_84) == 0x84);
@@ -124,9 +202,17 @@ struct EventAction_13_s : public EventActionBase_s
 static const std::unordered_map<EventActionType_e, const char*> s_eventExportTypes =
 {
 	{ EventActionType_e::ACTION_0, "play" },
-	{ EventActionType_e::ACTION_8, "executeEvents" },
+	{ EventActionType_e::ACTION_8, "playEvents" },
 	{ EventActionType_e::ACTION_9, "setControllerValue" },
-	{ EventActionType_e::ACTION_B, "unkControllers" },
+	{ EventActionType_e::ACTION_B, "referencedControllers" },
+};
+
+static const std::unordered_map<EventActionType_e, const char*> s_eventPreviewNames =
+{
+	{ EventActionType_e::ACTION_0, "Play" },
+	{ EventActionType_e::ACTION_8, "Play Events" },
+	{ EventActionType_e::ACTION_9, "Set Controller Value" },
+	{ EventActionType_e::ACTION_B, "Referenced Controllers (meta)" },
 };
 
 struct MilesEvent_s
@@ -156,4 +242,20 @@ struct MilesEvent_s
 
 	//
 	FORCEINLINE bool IsCompressed() const { return decompressedSize != compressedSize; };
+};
+
+struct MilesValueGraph_s;
+
+// Action Preview Data
+struct ActionPreviewData_0_s
+{
+	MilesValueGraph_s* pitchGraph;
+	Vector2D pitchMins;
+	Vector2D pitchMaxs;
+
+	MilesValueGraph_s* volumeGraph;
+	Vector2D volumeMins;
+	Vector2D volumeMaxs;
+
+	std::vector<ParsedSourceState> states;
 };

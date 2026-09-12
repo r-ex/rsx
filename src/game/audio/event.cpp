@@ -6,6 +6,53 @@
 #include <thirdparty/rad_lzb_simple/rad_lzb_simple.h>
 #include <implot/implot.h>
 
+static ImPlotPoint MilesGraphPlot_Scatter(int idx, void* data)
+{
+	MilesValueGraph_s* graph = reinterpret_cast<MilesValueGraph_s*>(data);
+
+	const float startX = graph->XValues()[idx];
+
+	const MilesGraphSegment_s* segment = &graph->Segments()[idx];
+
+	return ImPlotPoint(startX, segment->start);
+}
+
+static ImPlotPoint MilesGraphPlot_Line(int idx, void* data)
+{
+	MilesValueGraph_s* graph = reinterpret_cast<MilesValueGraph_s*>(data);
+
+	const float startX = graph->XValues()[0];
+	const float endX = graph->XValues()[graph->numPoints - 1];
+
+	const uint32_t totalSamples = std::max(((graph->numPoints) * 10) - 1, 1);
+
+	const float thisX = std::lerp(startX, endX, (idx) / (float)totalSamples);
+
+	int chosenPoint = graph->numPoints - 1;
+	float minX = -1, maxX = -1;
+
+	for (int i = 0; i < graph->numPoints; ++i)
+	{
+		maxX = graph->XValues()[i];
+
+		// when we get the first point's X that is larger than this sample's X
+		// get the index of the previous point since its segment will contain this sample
+		if (maxX > thisX)
+		{
+			chosenPoint = i - 1;
+
+			minX = graph->XValues()[chosenPoint];
+			break;
+		}
+	}
+
+	const MilesGraphSegment_s* segment = &graph->Segments()[chosenPoint];
+
+
+	return ImPlotPoint(thisX, segment->Sample(thisX, minX, maxX));
+
+}
+
 bool MilesEvent_s::ParseActions()
 {
 	decompressedData = std::make_shared<char[]>(decompressedSize);
@@ -44,16 +91,129 @@ bool MilesEvent_s::ParseActions()
 	return true;
 }
 
-struct ActionPreviewData_0_s
+void ParsedSourceSelector::Construct(CMilesAudioBank* bank, SourceSelector_s* sel, char* base)
 {
-	MilesValueGraph_s* pitchGraph;
-	Vector2D pitchMins;
-	Vector2D pitchMaxs;
+	isList = sel->type != 0;
+	weight = sel->weight;
 
-	MilesValueGraph_s* volumeGraph;
-	Vector2D volumeMins;
-	Vector2D volumeMaxs;
-};
+	if (!isList)
+	{
+		if (sel->unk_4 != -1)
+			name = bank->GetSourceName(static_cast<uint32_t>(sel->unk_4));
+		else
+			name = "no string";
+	}
+	else
+	{
+		for (uint16_t i = 0; i < sel->childCount; ++i)
+		{
+			SourceSelector_s* v16 = reinterpret_cast<SourceSelector_s*>(
+				base + (sizeof(uint32_t) * sel->ChildOffsets()[i]));
+
+			ParsedSourceSelector pss;
+			pss.Construct(bank, v16, base);
+
+			children.emplace_back(pss);
+		}
+	}
+}
+
+ParsedSourceSelector __fastcall sub_14137C560(CMilesAudioBank* bank, char* a3)
+{
+	SourceSelector_s* v8 = (SourceSelector_s*)a3;
+	ParsedSourceSelector parsed;
+	parsed.Construct(bank, v8, a3);
+
+	return parsed;
+}
+
+void ParsedSourceSelector::Draw()
+{
+	if (!isList)
+	{
+		if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf))
+		{
+			if (ImGui::TreeNodeEx(std::format("Weight: {}", weight).c_str(), ImGuiTreeNodeFlags_Leaf)) ImGui::TreePop();
+			ImGui::TreePop();
+		}
+	}
+	else
+	{
+		for (auto& child : children)
+		{
+			child.Draw();
+		}
+	}
+}
+
+void ParsedSourceState::Draw()
+{
+	if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		for (auto& sel : selectors)
+		{
+			sel.Draw();
+		}
+
+		ImGui::TreePop();
+	}
+}
+
+std::vector<ParsedSourceState> EventAction_0_s::GetSourceStates(CMilesAudioBank* bank)
+{
+	PlayActionState* actionState = Offset<PlayActionState>(unkDwordOffset_76 * sizeof(uint32_t));
+
+	std::vector<ParsedSourceState> states;
+	for(uint32_t i = 0; i < unk_1; ++i)
+	{
+		ParsedSourceState state;
+
+		if (actionState->wordE & 1)
+			break;
+
+		const short v32 = actionState->word12;
+
+		if ((v32 & 0x20) != 0 || !actionState->dword44)
+			break;
+
+		if (actionState->unkCount_4)
+		{
+			state.name = bank->GetString(actionState->nameOffset);
+
+			if ((v32 & 0x10) != 0)
+				break;
+
+			if (!actionState->dword40)
+				break;
+				
+			int v35 = 0;
+			struct_v1* v1 = Offset<struct_v1>(sizeof(DWORD) * (unkDwordOffset_78 + actionState->unsigned___int86));
+			do
+			{
+				if (v1->unkOffset != -1)
+				{
+					char* v2 = Offset<char>(sizeof(DWORD) * (unkDwordOffset_7A + v1->unkOffset));
+					ParsedSourceSelector sel = sub_14137C560(bank, v2);
+
+					state.selectors.push_back(sel);
+				}
+
+				v35++;
+				v1++;
+			} while (v35 < actionState->unkCount_4);
+		}
+
+		states.push_back(state);
+
+		const uint32_t baseStructSize = (actionState->wordE & 0x100) ? 104u : sizeof(PlayActionState);
+
+		const size_t nextStateOffset = baseStructSize + (36ull * (actionState->unsigned___int88 + actionState->unsigned___int89));
+
+		actionState = (PlayActionState*)((uintptr_t)actionState + nextStateOffset);
+	}
+
+	return states;
+}
 
 void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 {
@@ -61,7 +221,6 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 	MilesEvent_s* event = reinterpret_cast<MilesEvent_s*>(audioAsset->GetAssetData());
 	CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
 
-	const ImVec2 avail = ImGui::GetContentRegionAvail();
 
 	if (firstFrameForAsset)
 	{
@@ -81,6 +240,8 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 
 				ActionPreviewData_0_s* pd = new ActionPreviewData_0_s();
 				previewData = pd;
+
+				pd->states = act->GetSourceStates(audioBank);
 
 				if (act->graphFlags & ACT_GRAPHFLAG_PITCH)
 				{
@@ -108,80 +269,101 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 	size_t i = 0;
 	for (auto& [action, previewData] : event->actions)
 	{
-		if (action->actionType == 0)
+		const std::string title = std::format(
+			"Action #{}{}", i + 1,
+			s_eventPreviewNames.contains((EventActionType_e)action->actionType)
+				? ": " + std::string(s_eventPreviewNames.at((EventActionType_e)action->actionType))
+				: ": Type " + std::to_string(action->actionType)
+		);
+
+		ImGui::TextUnformatted(title.c_str());
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.f, 10.f));
+
+		if(ImGui::BeginChild(title.c_str(), ImVec2(0, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY))
 		{
-			ActionPreviewData_0_s* pd = reinterpret_cast<ActionPreviewData_0_s*>(previewData);
+			const ImVec2 avail = ImGui::GetContentRegionAvail();
 
-			const bool hasAnyGraphs = (pd->pitchGraph != nullptr && pd->pitchGraph->numPoints != 0) || (pd->volumeGraph != nullptr && pd->volumeGraph->numPoints != 0);
-
-			auto lambda = [](int idx, void* data) {
-				MilesValueGraph_s* graph = reinterpret_cast<MilesValueGraph_s*>(data);
-
-				const float startX = graph->XValues()[0];
-				const float endX = graph->XValues()[graph->numPoints - 1];
-
-				const uint32_t totalSamples = std::max(((graph->numPoints) * 10) - 1, 1);
-
-				const float thisX = std::lerp(startX, endX, (idx) / (float)totalSamples);
-
-				int chosenPoint = graph->numPoints-1;
-				float minX = -1, maxX = -1;
-
-				for (int i = 0; i < graph->numPoints; ++i)
-				{
-					maxX = graph->XValues()[i];
-
-					// when we get the first point's X that is larger than this sample's X
-					// get the index of the previous point since its segment will contain this sample
-					if (maxX > thisX)
-					{
-						chosenPoint = i-1;
-
-						minX = graph->XValues()[chosenPoint];
-						break;
-					}
-				}
-
-				const MilesGraphSegment_s* segment = &graph->Segments()[chosenPoint];
-
-
-				return ImPlotPoint(thisX, segment->Sample(thisX, minX, maxX));
-			};
-
-			auto scatterLambda = [](int idx, void* data) {
-				MilesValueGraph_s* graph = reinterpret_cast<MilesValueGraph_s*>(data);
-
-				const float startX = graph->XValues()[idx];
-				
-				const MilesGraphSegment_s* segment = &graph->Segments()[idx];
-
-				return ImPlotPoint(startX, segment->start);
-				};
-
-			ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, ImVec2(0.1f, 0.1f));
-
-			if (hasAnyGraphs && ImPlot::BeginSubplots(std::format("Action {} Controller Graphs", i).c_str(), 1, 2, avail))
+			switch (action->actionType)
 			{
-				if (pd->pitchGraph && pd->pitchGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Pitch##Action{}", i).c_str())) {
-					ImPlot::SetupAxes(pd->pitchGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->pitchGraph->baseControllerNameOffset) : "n/a", "Pitch (st)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+			case 0:
+			{
+				ActionPreviewData_0_s* pd = reinterpret_cast<ActionPreviewData_0_s*>(previewData);
 
-					ImPlot::PlotScatterG("##pitchScatter", scatterLambda, pd->pitchGraph, pd->pitchGraph->numPoints);
-					ImPlot::PlotLineG("##pitchLine", lambda, pd->pitchGraph, std::max((pd->pitchGraph->numPoints) * 10, 1));
-					ImPlot::EndPlot();
+				ImGui::SeparatorText("Audio Sources");
+				for (auto& state : pd->states)
+				{
+					state.Draw();
 				}
 
-				if (pd->volumeGraph && pd->volumeGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Volume##Action{}", i).c_str())) {
-					ImPlot::SetupAxes(pd->volumeGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->volumeGraph->baseControllerNameOffset) : "n/a", "Volume (dB)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+				const bool hasAnyGraphs = (pd->pitchGraph != nullptr && pd->pitchGraph->numPoints != 0) || (pd->volumeGraph != nullptr && pd->volumeGraph->numPoints != 0);
 
-					ImPlot::PlotScatterG("##volScatter", scatterLambda, pd->volumeGraph, pd->volumeGraph->numPoints);
-					ImPlot::PlotLineG("##volLine", lambda, pd->volumeGraph, std::max((pd->volumeGraph->numPoints) * 10, 1), {});
-					ImPlot::EndPlot();
+				if (hasAnyGraphs)
+				{
+					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.f);
+					ImGui::SeparatorText("Controller Graphs");
+					ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+					ImGui::TextWrapped("These graphs show how the event properties on the Y axis (e.g., pitch or volume) are changed based on the dynamic value of a controller");
+					ImGui::PopStyleColor();
+
+					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.f);
 				}
 
-				ImPlot::EndSubplots();
+				ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, ImVec2(0.1f, 0.1f));
+
+				if (hasAnyGraphs)
+				{
+					if (pd->pitchGraph && pd->pitchGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Pitch##Action{}", i).c_str(), ImVec2(avail.x / 2, avail.x / 2))) {
+						ImPlot::SetupAxes(pd->pitchGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->pitchGraph->baseControllerNameOffset) : "n/a", "Pitch (st)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+
+						ImPlot::PlotScatterG("##pitchScatter", MilesGraphPlot_Scatter, pd->pitchGraph, pd->pitchGraph->numPoints);
+						ImPlot::PlotLineG("##pitchLine", MilesGraphPlot_Line, pd->pitchGraph, std::max((pd->pitchGraph->numPoints) * 10, 1));
+						ImPlot::EndPlot();
+						ImGui::SameLine();
+					}
+
+					if (pd->volumeGraph && pd->volumeGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Volume##Action{}", i).c_str(), ImVec2(avail.x / 2, avail.x / 2))) {
+						ImPlot::SetupAxes(pd->volumeGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->volumeGraph->baseControllerNameOffset) : "n/a", "Volume (dB)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+
+						ImPlot::PlotScatterG("##volScatter", MilesGraphPlot_Scatter, pd->volumeGraph, pd->volumeGraph->numPoints);
+						ImPlot::PlotLineG("##volLine", MilesGraphPlot_Line, pd->volumeGraph, std::max((pd->volumeGraph->numPoints) * 10, 1), {});
+						ImPlot::EndPlot();
+					}
+
+				}
+				ImPlot::PopStyleVar();
+
+				break;
 			}
-			ImPlot::PopStyleVar();
+			case 8:
+			{
+				ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+				ImGui::TextWrapped("This event action causes the following additional events to be played:");
+				ImGui::PopStyleColor();
+				EventAction_8_s* act = reinterpret_cast<EventAction_8_s*>(action);
+
+				for (uint32_t j = 0; j < act->eventCount; ++j)
+				{
+					ImGui::BulletText(audioBank->GetString(act->eventNameOffset[j]));
+				}
+
+				break;
+			}
+			case 11:
+			{
+				EventAction_11_s* act = reinterpret_cast<EventAction_11_s*>(action);
+				for (uint32_t j = 0; j < act->unk_1; ++j)
+				{
+					ImGui::Text("%s", audioBank->GetString(act->controllerNameOffset[j]));
+				}
+				break;
+			}
+			}
 		}
+		ImGui::EndChild();
+
+		ImGui::PopStyleVar();
+
+
 		i++;
 	}
 

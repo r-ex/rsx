@@ -619,6 +619,9 @@ public:
 	bool IsValidSource(const MilesSource_t* source) const;
 
 	void TrackInvalidSource() { invalidSourceCount++; };
+	void AddSourceName(const std::string_view& str) { sourceNames.emplace_back(str); };
+
+	const std::string& GetSourceName(size_t idx) const { return sourceNames.at(idx); };
 private:
 
 	void DiscoverStreamingFiles();
@@ -635,6 +638,7 @@ private:
 	std::shared_ptr<char[]> m_fileBuf;
 
 	std::vector<std::string> languageNames;
+	std::vector<std::string> sourceNames;
 
 	uint32_t buildTag;
 	uint32_t bankHash;

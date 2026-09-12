@@ -181,6 +181,8 @@ static void MilesBank_ParseSources(CMilesAudioBank* bank)
 
 		sourceAsset->SetContainerName(bank->GetStreamingFileNameForSource(sourceAssetData));
 
+		bank->AddSourceName(sourceName);
+
 		if (sourceAsset != nullptr)
 			g_assetData.v_assets.push_back({ sourceAsset->GetAssetGUID(), sourceAsset });
 	}

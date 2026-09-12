@@ -19,7 +19,8 @@ MilesController_s::MilesController_s(const char* stringTable, const MilesControl
 
 // MPRJ Buses
 MilesBus_s::MilesBus_s(const char* stringTable, const MilesBus_v46_s& a)
-	: volumeDb(a.volumeDb), outputGainVolumeDb(a.outputGainVolumeDb), pitchSt(a.pitchSt), isExported(false), busIdx_3A(a.busIdx_3A),
+	: channelCount(a.channelCount), volumeDb(a.volumeDb), outputGainVolumeDb(a.outputGainVolumeDb), pitchSt(a.pitchSt),
+	isExported(false), busIdx_3A(a.busIdx_3A),
 	busIdx_3C(a.busIdx_3C), busIdx_3E(a.busIdx_3E), busIdx_40(a.busIdx_40), busIdx_42(a.busIdx_42),
 	busIdx_46(a.busIdx_46)
 {

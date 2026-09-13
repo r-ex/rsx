@@ -110,11 +110,23 @@ struct ParsedSourceSelector
 	std::string name;
 
 	uint8_t weight;
+	uint8_t type; // 0 = source, 1 = list
 
 	bool isList;
 
-	void Draw();
+	void DrawSelectorChances(const uint32_t siblingWeightTotal) const;
+
+	void Draw(const uint32_t siblingWeightTotal) const;
 };
+
+inline uint32_t GetSelectorsWeightTotal(const std::vector<ParsedSourceSelector>& selectors)
+{
+	uint32_t total = 0;
+	for (const auto& sel : selectors)
+		total += sel.weight;
+
+	return total;
+}
 
 struct ParsedSourceState
 {
@@ -144,9 +156,9 @@ struct EventAction_0_s : public EventActionBase_s
 	char unk_70[2];
 	uint16_t unkDwordOffset_72;
 	uint16_t unkDwordOffset_74;
-	uint16_t unkDwordOffset_76;
+	uint16_t sourceStatesOffset;
 	uint16_t unkDwordOffset_78;
-	uint16_t unkDwordOffset_7A;
+	uint16_t sourceSelectorsOffset;
 	uint16_t unkDwordOffset_7C;
 	uint16_t unkDwordOffset_7E;
 	uint32_t graphFlags;

@@ -93,6 +93,7 @@ bool MilesEvent_s::ParseActions()
 
 void ParsedSourceSelector::Construct(CMilesAudioBank* bank, SourceSelector_s* sel, char* base)
 {
+	type = sel->type;
 	isList = sel->type != 0;
 	weight = sel->weight;
 
@@ -101,7 +102,7 @@ void ParsedSourceSelector::Construct(CMilesAudioBank* bank, SourceSelector_s* se
 		if (sel->unk_4 != -1)
 			name = bank->GetSourceName(static_cast<uint32_t>(sel->unk_4));
 		else
-			name = "no string";
+			name = "(no source)";
 	}
 	else
 	{
@@ -118,7 +119,7 @@ void ParsedSourceSelector::Construct(CMilesAudioBank* bank, SourceSelector_s* se
 	}
 }
 
-ParsedSourceSelector __fastcall sub_14137C560(CMilesAudioBank* bank, char* a3)
+static ParsedSourceSelector __fastcall ParseRootSelector(CMilesAudioBank* bank, char* a3)
 {
 	SourceSelector_s* v8 = (SourceSelector_s*)a3;
 	ParsedSourceSelector parsed;
@@ -127,22 +128,44 @@ ParsedSourceSelector __fastcall sub_14137C560(CMilesAudioBank* bank, char* a3)
 	return parsed;
 }
 
-void ParsedSourceSelector::Draw()
+void ParsedSourceSelector::DrawSelectorChances(const uint32_t siblingWeightTotal) const
+{
+	if (siblingWeightTotal == 0)
+		return;
+
+	ImGui::SameLine();
+	ImGui::TextDisabled(std::format("({}%%)", (100.f * weight) / siblingWeightTotal).c_str());
+}
+
+void ParsedSourceSelector::Draw(const uint32_t siblingWeightTotal) const
 {
 	if (!isList)
 	{
-		if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf))
-		{
-			if (ImGui::TreeNodeEx(std::format("Weight: {}", weight).c_str(), ImGuiTreeNodeFlags_Leaf)) ImGui::TreePop();
-			ImGui::TreePop();
-		}
+		ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen);
+		DrawSelectorChances(siblingWeightTotal);
 	}
 	else
 	{
-		for (auto& child : children)
+		const bool isOpen = ImGui::TreeNodeEx(std::format("List (type {})", type).c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+
+		// always draw weights even if the node is closed
+		DrawSelectorChances(siblingWeightTotal);
+
+		if (!isOpen)
+			return;
+
+		// precalculate total of all children so that each child can know their worth >:)
+		const uint32_t childWeightTotal = GetSelectorsWeightTotal(children);
+
+		size_t childIdx = 0;
+		for (const auto& child : children)
 		{
-			child.Draw();
+			ImGui::PushID(static_cast<int>(childIdx++));
+			child.Draw(childWeightTotal);
+			ImGui::PopID();
 		}
+
+		ImGui::TreePop();
 	}
 }
 
@@ -150,9 +173,14 @@ void ParsedSourceState::Draw()
 {
 	if (ImGui::TreeNodeEx(name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 	{
-		for (auto& sel : selectors)
+		const uint32_t weightTotal = GetSelectorsWeightTotal(selectors);
+
+		size_t selIdx = 0;
+		for (const auto& sel : selectors)
 		{
-			sel.Draw();
+			ImGui::PushID(static_cast<int>(selIdx++));
+			sel.Draw(weightTotal);
+			ImGui::PopID();
 		}
 
 		ImGui::TreePop();
@@ -161,7 +189,7 @@ void ParsedSourceState::Draw()
 
 std::vector<ParsedSourceState> EventAction_0_s::GetSourceStates(CMilesAudioBank* bank)
 {
-	PlayActionState* actionState = Offset<PlayActionState>(unkDwordOffset_76 * sizeof(uint32_t));
+	PlayActionState* actionState = Offset<PlayActionState>(sourceStatesOffset * sizeof(uint32_t));
 
 	std::vector<ParsedSourceState> states;
 	for(uint32_t i = 0; i < unk_1; ++i)
@@ -192,8 +220,8 @@ std::vector<ParsedSourceState> EventAction_0_s::GetSourceStates(CMilesAudioBank*
 			{
 				if (v1->unkOffset != -1)
 				{
-					char* v2 = Offset<char>(sizeof(DWORD) * (unkDwordOffset_7A + v1->unkOffset));
-					ParsedSourceSelector sel = sub_14137C560(bank, v2);
+					char* v2 = Offset<char>(sizeof(DWORD) * (sourceSelectorsOffset + v1->unkOffset));
+					ParsedSourceSelector sel = ParseRootSelector(bank, v2);
 
 					state.selectors.push_back(sel);
 				}
@@ -303,7 +331,10 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 					state.Draw();
 				}
 
-				const bool hasAnyGraphs = (pd->pitchGraph != nullptr && pd->pitchGraph->numPoints != 0) || (pd->volumeGraph != nullptr && pd->volumeGraph->numPoints != 0);
+				const bool hasAnyGraphs = (
+					(pd->pitchGraph != nullptr && pd->pitchGraph->numPoints != 0) ||
+					(pd->volumeGraph != nullptr && pd->volumeGraph->numPoints != 0)
+				);
 
 				if (hasAnyGraphs)
 				{
@@ -314,12 +345,8 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 					ImGui::PopStyleColor();
 
 					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.f);
-				}
 
-				ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, ImVec2(0.1f, 0.1f));
-
-				if (hasAnyGraphs)
-				{
+					ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, ImVec2(0.1f, 0.1f));
 					if (pd->pitchGraph && pd->pitchGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Pitch##Action{}", i).c_str(), ImVec2(avail.x / 2, avail.x / 2))) {
 						ImPlot::SetupAxes(pd->pitchGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->pitchGraph->baseControllerNameOffset) : "n/a", "Pitch (st)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
 
@@ -336,9 +363,8 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 						ImPlot::PlotLineG("##volLine", MilesGraphPlot_Line, pd->volumeGraph, std::max((pd->volumeGraph->numPoints) * 10, 1), {});
 						ImPlot::EndPlot();
 					}
-
+					ImPlot::PopStyleVar();
 				}
-				ImPlot::PopStyleVar();
 
 				break;
 			}

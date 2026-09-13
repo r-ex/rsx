@@ -276,7 +276,15 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 				: ": Type " + std::to_string(action->actionType)
 		);
 
-		ImGui::TextUnformatted(title.c_str());
+		if (firstFrameForAsset)
+			ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+
+		if (!ImGui::CollapsingHeader(title.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			i++;
+			continue;
+		}
+
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(15.f, 10.f));
 
 		if(ImGui::BeginChild(title.c_str(), ImVec2(0, 0), ImGuiChildFlags_Borders | ImGuiChildFlags_AutoResizeY))
@@ -355,6 +363,11 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 				{
 					ImGui::Text("%s", audioBank->GetString(act->controllerNameOffset[j]));
 				}
+				break;
+			}
+			default:
+			{
+				ImGui::TextDisabled("No preview is available for this action type.");
 				break;
 			}
 			}

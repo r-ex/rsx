@@ -37,12 +37,23 @@ static void CLI_HandleAssetTypeWhitelist(const CCommandLine* const cli)
     if (!IS_NOGUI(cli))
         return;
 
-    const std::unordered_set<uint32_t> filterTypes = CLI_GetCommaSeparatedAssetTypes(cli, "--loadwhitelist");
-
-    for (auto& [fourCC, binding] : g_assetData.m_assetTypeBindings)
+    if(cli->HasParam("--loadwhitelist"))
     {
-        binding._loadAssetType = filterTypes.contains(fourCC);
+        for (auto& [fourCC, binding] : g_assetData.m_assetTypeBindings)
+        {
+            binding._loadAssetType = true;
+        }
     }
+    else
+    {
+        const std::unordered_set<uint32_t> filterTypes = CLI_GetCommaSeparatedAssetTypes(cli, "--loadwhitelist");
+
+        for (auto& [fourCC, binding] : g_assetData.m_assetTypeBindings)
+        {
+            binding._loadAssetType = filterTypes.contains(fourCC);
+        }
+    }
+
 }
 
 static void HandleFileLoad(std::vector<std::string> filePaths, HandleFileLoadCallback_t cb = nullptr, const CCommandLine* const cli = nullptr)

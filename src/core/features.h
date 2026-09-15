@@ -8,6 +8,7 @@
 #define HAS_ODL_ASSET true
 #define HAS_QC true
 #define HAS_BSP_SUPPORT false
+#define HAS_MILES_EVENTS false
 
 // [GENERAL FEATURES]
 #define ADVANCED_MODEL_PREVIEW false

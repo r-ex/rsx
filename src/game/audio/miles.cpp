@@ -188,7 +188,7 @@ static void MilesBank_ParseSources(CMilesAudioBank* bank)
 	}
 }
 
-
+#if HAS_MILES_EVENTS
 static void MilesBank_ParseEvents(CMilesAudioBank* bank)
 {
 	const EventName_s* const evNameArray = bank->GetEventNamesData();
@@ -224,6 +224,7 @@ static void MilesBank_ParseEvents(CMilesAudioBank* bank)
 			g_assetData.v_assets.push_back({ eventAsset->GetAssetGUID(), eventAsset });
 	}
 }
+#endif
 
 const bool CMilesAudioBank::ParseFromHeader()
 {
@@ -325,7 +326,10 @@ const bool CMilesAudioBank::ParseFromHeader()
 		this->DiscoverStreamingFiles();
 
 		MilesBank_ParseSources<MilesSource_v49_t>(this);
+
+#if HAS_MILES_EVENTS
 		MilesBank_ParseEvents(this);
+#endif
 
 		break;
 	}

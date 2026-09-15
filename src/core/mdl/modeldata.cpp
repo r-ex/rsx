@@ -35,7 +35,7 @@ void Vertex_t::ParseWeightFromVG_256(Vertex_t* const vert, VertexWeight_t* const
 	// model has more than 3 weights per vertex
 	if (parseFlags & VERT_PARSE_EXTRAWEIGHT)
 	{
-		const vg::BlendWeightIndicesPacked_256_s* const blendIndices = VERT_DATA(vg::BlendWeightIndicesPacked_256_s, rawVertexData, offset + 4);
+		const vg::BlendWeightExtraIndices_256_s* const blendIndices = VERT_DATA(vg::BlendWeightExtraIndices_256_s, rawVertexData, offset + 4);
 
 		assertm(blendIndices->boneCount < 16, "model had more than 16 bones on complex weights");
 
@@ -121,7 +121,7 @@ void Vertex_t::ParseWeightFromVG_1024(Vertex_t* const vert, VertexWeight_t* cons
 	// model has more than 3 weights per vertex
 	if (parseFlags & VERT_PARSE_EXTRAWEIGHT)
 	{
-		const vg::BlendWeightIndicesPacked_1024_s* const blendIndices = VERT_DATA(vg::BlendWeightIndicesPacked_1024_s, rawVertexData, offset + 4);
+		const vg::BlendWeightExtraIndices_1024_s* const blendIndices = VERT_DATA(vg::BlendWeightExtraIndices_1024_s, rawVertexData, offset + 4);
 
 		assertm(blendIndices->boneCount < 16, "model had more than 16 bones on complex weights");
 

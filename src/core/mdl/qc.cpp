@@ -2930,7 +2930,7 @@ namespace qc
 			for (int i = 0; i < seqData->numBlends; i += seqData->GetWidth())
 			{
 				options[optionsIndex].Init(&s_CommandSequence_Option_Blends);
-				
+
 				if (seqData->GetWidth() == 1)
 				{
 					options[optionsIndex].SetPtr(seqData->blends[i], seqData->GetWidth());
@@ -3717,7 +3717,7 @@ namespace qc
 		return numSorted;
 	}
 
-	inline const bool CommadSortModel_UnsortedCMD(const CommandList_t cmd)
+	inline const bool CommandSortModel_UnsortedCMD(const CommandList_t cmd)
 	{
 		return (cmd == CommandList_t::QC_BODY || cmd == CommandList_t::QC_BODYGROUP || cmd == CommandList_t::QC_MODEL);
 	}
@@ -3734,7 +3734,7 @@ namespace qc
 			if (command->GetType() != type)
 				continue;
 
-			if (!CommadSortModel_UnsortedCMD(command->GetCmd()))
+			if (!CommandSortModel_UnsortedCMD(command->GetCmd()))
 			{
 				numGeneralSorted++;
 			}
@@ -3754,7 +3754,7 @@ namespace qc
 		{
 			const Command_t* const command = temp[i];
 
-			if (!CommadSortModel_UnsortedCMD(command->GetCmd()))
+			if (!CommandSortModel_UnsortedCMD(command->GetCmd()))
 			{
 				assertm(sortIdx < numSorted, "invalid index");
 
@@ -3774,9 +3774,15 @@ namespace qc
 		return numSorted;
 	}
 
+	inline const bool CommandSortLOD_UnsortedCMD(const CommandList_t cmd)
+	{
+		return (cmd == CommandList_t::QC_ALLOWROOTLODS || cmd == CommandList_t::QC_MINLOD);
+	}
+
 	const uint32_t CommandSortLOD(const Command_t* const commands, const Command_t** const sorted, const size_t numCommands, const CommandType_t type)
 	{
 		uint32_t numSorted = 0u;
+		uint32_t numSpecialSort = 0u;
 
 		for (size_t i = 0ull; i < numCommands; i++)
 		{
@@ -3787,13 +3793,39 @@ namespace qc
 
 			sorted[numSorted] = command;
 			numSorted++;
+
+			if (CommandSortLOD_UnsortedCMD(command->GetCmd()))
+			{
+				numSpecialSort++;
+			}
 		}
 
-		// we want to preserve order, and don't need to parse through again if $maxverts is not present
 		if (numSorted == 0)
 			return numSorted;
 
-		qsort(sorted, numSorted, sizeof(intptr_t), CompareCommandLOD);
+		if (numSpecialSort)
+		{
+			const Command_t** const temp = sorted + numSorted;
+			for (uint32_t i = 0u, spec = 0u, norm = 0u; i < numSorted; i++)
+			{
+				const Command_t* const command = sorted[i];
+
+				if (CommandSortLOD_UnsortedCMD(command->GetCmd()))
+				{
+					temp[spec] = command;
+					spec++;
+					continue;
+				}
+
+				temp[numSpecialSort + norm] = command;
+				norm++;
+			}
+
+			const size_t sortedSize = sizeof(intptr_t) * numSorted;
+			memcpy_s(sorted, sortedSize, temp, sortedSize);
+		}
+
+		qsort(sorted + numSpecialSort, numSorted - numSpecialSort, sizeof(intptr_t), CompareCommandLOD);
 
 		return numSorted;
 	}

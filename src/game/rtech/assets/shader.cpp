@@ -75,6 +75,7 @@ void LoadShaderAsset(CAssetContainer* pak, CAsset* asset)
 		break;
 	}
 	case 19: // man idfk
+	case 21:
 	{
 		// [rika]: there's some where shaders in newer versions that don't have cpu data, and point to places that don't really have a shader header
 		ShaderAssetHeader_v14_t* hdr = reinterpret_cast<ShaderAssetHeader_v14_t*>(pakAsset->header());

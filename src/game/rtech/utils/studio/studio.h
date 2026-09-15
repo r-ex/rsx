@@ -335,23 +335,6 @@ namespace vg
 		inline const uint16_t ExtraWeightsStartIndex() const { return weight[1]; }
 	};
 
-	struct BlendWeightIndicesPacked_256_s
-	{
-		uint32_t firstBone : 8;
-		uint32_t lastBone : 8;
-		uint32_t unk : 8;
-		uint32_t boneCount : 8;
-	};
-
-	struct BlendWeightIndicesPacked_1024_s
-	{
-		// (1 << 10) bones! (1024)
-		uint32_t firstBone : 10;
-		uint32_t lastBone : 10;
-		uint32_t unk : 4;
-		uint32_t boneCount : 8;
-	};
-
 	// Templated to the number of bits for each complex bone index
 	struct BlendWeightIndices_s
 	{
@@ -364,6 +347,23 @@ namespace vg
 
 			return reinterpret_cast<uint8_t*>(this)[i];
 		}
+	};
+
+	struct BlendWeightExtraIndices_256_s
+	{
+		uint32_t firstBone : 8;
+		uint32_t lastBone : 8;
+		uint32_t unk : 8;
+		uint32_t boneCount : 8;
+	};
+
+	struct BlendWeightExtraIndices_1024_s
+	{
+		// (1 << 10) bones! (1024)
+		uint32_t firstBone : 10;
+		uint32_t lastBone : 10;
+		uint32_t unk : 4;
+		uint32_t boneCount : 8;
 	};
 
 	struct Vertex_t
@@ -1223,6 +1223,24 @@ inline const char* StudioContentFlagString(const int contents)
 	case CONTENTS_WATER:
 	{
 		return "water";
+	}
+	case CONTENTS_PLAYERCLIP:
+	{
+		// models/levels_terrain\mp_relic\mp_relic_ship_engine_collision.mdl (r1)
+		// how do I even know what the proper text for this would be?
+		return "playerclip";
+	}
+	case CONTENTS_TITANCLIP:
+	{
+		// models/levels_terrain\mp_relic\mp_relic_ship_engine_collision.mdl (r1)
+		// how do I even know what the proper text for this would be?
+		return "titanclip";
+	}
+	case CONTENTS_BULLETCLIP:
+	{
+		// models/imc_base\chain_link_imc_01.mdl (r1)
+		// how do I even know what the proper text for this would be?
+		return "bulletclip";
 	}
 	case CONTENTS_MONSTER:
 	{

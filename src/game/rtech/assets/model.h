@@ -188,6 +188,7 @@ enum class eMDLVersion : int
 	VERSION_19_1,
 	VERSION_19_2,
 	VERSION_19_3,
+	VERSION_20,
 
 	// bleh
 	VERSION_52,
@@ -208,6 +209,7 @@ static const std::map<int, eMDLVersion> s_mdlVersionMap
 	{ 17, eMDLVersion::VERSION_17 },
 	{ 18, eMDLVersion::VERSION_18 },
 	{ 19, eMDLVersion::VERSION_19 },
+	{ 20, eMDLVersion::VERSION_20 },
 };
 
 constexpr uint64_t s_MdlTimeStamp_V19_1 = 0x01DC1DF805C28000; // 09/05/2025 00:00:00
@@ -421,6 +423,7 @@ public:
 		}
 		case eMDLVersion::VERSION_19_2:
 		case eMDLVersion::VERSION_19_3:
+		case eMDLVersion::VERSION_20:
 		{
 			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v19_2_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel);
 			break;

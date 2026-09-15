@@ -1354,6 +1354,7 @@ void LoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
     }
     case eMDLVersion::VERSION_19_2:
     case eMDLVersion::VERSION_19_3:
+    case eMDLVersion::VERSION_20:
     {
         ModelAssetHeader_v16_t* hdr = reinterpret_cast<ModelAssetHeader_v16_t*>(pakAsset->header());
         ModelAssetCPU_v16_t* cpu = reinterpret_cast<ModelAssetCPU_v16_t*>(pakAsset->cpu());
@@ -1536,6 +1537,7 @@ void PostLoadModelAsset(CAssetContainer* const pak, CAsset* const asset)
         break;
     }
     case eMDLVersion::VERSION_19_3:
+    case eMDLVersion::VERSION_20:
     {
         ParseModelSequenceData_Stall_V19_1(modelAsset->GetParsedData(), reinterpret_cast<char* const>(modelAsset->data), ANIM_BONEFLAG_BITS_6);
         break;
@@ -1732,6 +1734,7 @@ static bool ExportModelStreamedData(const ModelAsset* const modelAsset, std::fil
     case eMDLVersion::VERSION_19_1:
     case eMDLVersion::VERSION_19_2:
     case eMDLVersion::VERSION_19_3:
+    case eMDLVersion::VERSION_20:
     {
         // special case because of compression
         exportPath.replace_extension(extension);

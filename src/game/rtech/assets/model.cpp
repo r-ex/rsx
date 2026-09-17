@@ -1689,10 +1689,8 @@ void* PreviewModelAsset(CAsset* const asset, const bool firstFrameForAsset)
 
     void* const drawData = PreviewParsedData(&previewInfo, parsedData, modelAsset->name, asset->GetAssetGUID(), firstFrameForAsset);
 
-#if defined(HAS_BONED_MODELS)
     if (drawData && Preview_SequencesSection(&previewInfo, parsedData, reinterpret_cast<CDXDrawData*>(drawData)))
         ModelPreview_DiscoverSequences(modelAsset, previewInfo);
-#endif
 
     return drawData;
 }

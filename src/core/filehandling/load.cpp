@@ -37,7 +37,7 @@ static void CLI_HandleAssetTypeWhitelist(const CCommandLine* const cli)
     if (!IS_NOGUI(cli))
         return;
 
-    if(cli->HasParam("--loadwhitelist"))
+    if(!cli->HasParam("--loadwhitelist"))
     {
         for (auto& [fourCC, binding] : g_assetData.m_assetTypeBindings)
         {

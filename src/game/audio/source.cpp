@@ -1,14 +1,18 @@
 #include <pch.h>
 #include "miles.h"
+#include "source.h"
+
 #include <game/audio/wavefile.h>
 #include <game/rtech/utils/utils.h>
-#include <imgui.h>
 #include <miniaudio/miniaudio.h>
 
 #include <core/audio/audioplayer.h>
 #include <core/fonts/codicons.h>
 #include <misc/imgui_utility.h>
-#include "source.h"
+#include <imgui.h>
+
+#include <lame.h>
+
 
 constexpr const char* PATH_PREFIX_ASRC = "audio";
 
@@ -258,77 +262,6 @@ std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem:
 	return std::move(interleavedBuffer);
 }
 
-bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
-{
-	UNUSED(setting);
-
-	CMilesAudioAsset* audioAsset = static_cast<CMilesAudioAsset*>(asset);
-	CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
-
-	// Create exported path + asset path.
-	std::filesystem::path exportPath = g_rsxSettings.GetExportDirectory();
-	const std::filesystem::path asrcPath(audioAsset->GetAssetName());
-
-	// truncate paths?
-	if (g_rsxSettings.exportPathsFull)
-		exportPath.append(asrcPath.parent_path().string());
-	else
-		exportPath.append(PATH_PREFIX_ASRC);
-
-	if (!CreateDirectories(exportPath))
-	{
-		assertm(false, "Failed to create asset type directory.");
-		return false;
-	}
-
-	exportPath.append(asrcPath.filename().string());
-	exportPath.replace_extension("wav");
-
-	MilesSource_t* source = reinterpret_cast<MilesSource_t*>(audioAsset->GetAssetData());
-
-	// get the bank's path and replace the filename
-	// with the stream file name that we've just put together
-	std::filesystem::path streamPath(audioBank->GetFilePath());
-	streamPath.replace_filename(audioAsset->GetContainerFileName());
-
-	DecodedAudioMetadata_t metadata;
-	auto decodedDataOpt = DecodeAudioDataForSource(streamPath, source, &metadata);
-
-	if (!decodedDataOpt.has_value())
-	{
-		Log("Failed to decode audio source.\n");
-		return false;
-	}
-
-	const std::vector<char>& decodedData = decodedDataOpt.value();
-	const uint64_t DataSize = decodedData.size();
-
-	StreamIO outFile(exportPath, eStreamIOMode::Write);
-
-	WAVEHEADER hdr;
-
-	outFile.write(hdr);
-	outFile.write(decodedData.data(), decodedData.size());
-
-	hdr.size = static_cast<long>(DataSize + 36);
-
-	hdr.fmt.formatTag = metadata.decodeFormat & DECODE_FORMAT_F32 ? 3 : WAVE_FORMAT_PCM;
-	hdr.fmt.channels = metadata.channelCount;
-	hdr.fmt.sampleRate = metadata.sampleRate;
-	hdr.fmt.blockAlign = static_cast<uint16_t>(DataSize / metadata.sampleCount);
-	hdr.fmt.bitsPerSample = static_cast<uint16_t>(((DataSize * 8) / metadata.sampleCount) / metadata.channelCount);
-
-	hdr.data.chunkSize = static_cast<long>(DataSize);
-
-	hdr.fmt.avgBytesPerSecond = hdr.fmt.blockAlign * metadata.sampleRate;
-
-	outFile.seek(0);
-	outFile.write(hdr);
-	outFile.close();
-
-
-	return true;
-}
 
 static bool AudioSource_DoInitialSetup(CAsset* const asset)
 {
@@ -440,6 +373,93 @@ void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 	return nullptr;
 }
 
+void lame_log(const char* fmt, va_list ap) { std::vfprintf(stdout, fmt, ap); };
+void lame_quiet(const char*, va_list) {};
+
+bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
+{
+	UNUSED(setting);
+
+	CMilesAudioAsset* audioAsset = static_cast<CMilesAudioAsset*>(asset);
+	CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
+
+	// Create exported path + asset path.
+	std::filesystem::path exportPath = g_rsxSettings.GetExportDirectory();
+	const std::filesystem::path asrcPath(audioAsset->GetAssetName());
+
+	// truncate paths?
+	if (g_rsxSettings.exportPathsFull)
+		exportPath.append(asrcPath.parent_path().string());
+	else
+		exportPath.append(PATH_PREFIX_ASRC);
+
+	if (!CreateDirectories(exportPath))
+	{
+		assertm(false, "Failed to create asset type directory.");
+		return false;
+	}
+
+	exportPath.append(asrcPath.filename().string());
+
+	MilesSource_t* source = reinterpret_cast<MilesSource_t*>(audioAsset->GetAssetData());
+
+	// get the bank's path and replace the filename
+	// with the stream file name that we've just put together
+	std::filesystem::path streamPath(audioBank->GetFilePath());
+	streamPath.replace_filename(audioAsset->GetContainerFileName());
+
+	DecodedAudioMetadata_t metadata;
+	auto decodedDataOpt = DecodeAudioDataForSource(streamPath, source, &metadata);
+
+	if (!decodedDataOpt.has_value())
+	{
+		Log("Failed to decode audio source.\n");
+		return false;
+	}
+
+	const std::vector<char>& decodedData = decodedDataOpt.value();
+	const uint64_t DataSize = decodedData.size();
+
+	if (setting == SOURCE_WAV)
+		exportPath.replace_extension("wav");
+	else if (setting == SOURCE_MP3)
+		exportPath.replace_extension("mp3");
+
+	StreamIO outFile(exportPath, eStreamIOMode::Write);
+
+	if (setting == SOURCE_WAV)
+	{
+		WAVEHEADER hdr;
+
+		outFile.write(hdr);
+		outFile.write(decodedData.data(), decodedData.size());
+
+		hdr.size = static_cast<long>(DataSize + 36);
+
+		hdr.fmt.formatTag = metadata.decodeFormat & DECODE_FORMAT_F32 ? 3 : WAVE_FORMAT_PCM;
+		hdr.fmt.channels = metadata.channelCount;
+		hdr.fmt.sampleRate = metadata.sampleRate;
+		hdr.fmt.blockAlign = static_cast<uint16_t>(DataSize / metadata.sampleCount);
+		hdr.fmt.bitsPerSample = static_cast<uint16_t>(((DataSize * 8) / metadata.sampleCount) / metadata.channelCount);
+
+		hdr.data.chunkSize = static_cast<long>(DataSize);
+
+		hdr.fmt.avgBytesPerSecond = hdr.fmt.blockAlign * metadata.sampleRate;
+
+		outFile.seek(0);
+		outFile.write(hdr);
+		outFile.close();
+	}
+	else
+	{
+
+		g_assetData.Log_Error(audioBank, "MP3 exporting is currently not supported!");
+
+	}
+
+	return true;
+}
+
 void InitAudioSourceAssetType()
 {
 	AssetTypeBinding_t type =
@@ -450,7 +470,7 @@ void InitAudioSourceAssetType()
 		.loadFunc = nullptr,
 		.postLoadFunc = nullptr,
 		.previewFunc = AudioSource_Preview,
-		.e = { ExportAudioSourceAsset, 0, nullptr, 0ull },
+		.e = { ExportAudioSourceAsset, 0, s_AudioExportSettingNames, ARRSIZE(s_AudioExportSettingNames) },
 	};
 
 	REGISTER_TYPE(type);

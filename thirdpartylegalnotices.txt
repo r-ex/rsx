@@ -211,3 +211,6 @@ This project makes use of data structures and code from Kilometer by RoyalBlue1,
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
+
+=== LAME (Lame Ain't an MP3 Encoder) ====
+This project makes use of LAME, which is licensed under the GPLv2 license. Full license text is available in RSX/src/thirdparty/lame/LICENSE

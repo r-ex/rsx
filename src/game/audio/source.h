@@ -1,5 +1,16 @@
 #pragma once
 
+enum AudioExportSetting_e : int
+{
+	SOURCE_WAV,
+	SOURCE_MP3
+};
+
+static const char* s_AudioExportSettingNames[] =
+{
+	"WAVE",
+	"MP3"
+};
 
 // r2
 struct MilesSource_v13_t

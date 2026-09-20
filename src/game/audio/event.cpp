@@ -55,35 +55,72 @@ static ImPlotPoint MilesGraphPlot_Line(int idx, void* data)
 
 bool MilesEvent_s::ParseActions()
 {
-	decompressedData = std::make_shared<char[]>(decompressedSize);
+	// v13 has no compression
+	if (version == 13)
+	{
+		const char* cursor = reinterpret_cast<const char*>(originalData);
 
-	// If not compressed, the original data ptr has the full decompressed data of the event's actions playlist
-	if (!IsCompressed())
-		memcpy_s(decompressedData.get(), decompressedSize, originalData, decompressedSize);
+		while (true)
+		{
+			const EventActionBase_v13_s* base = reinterpret_cast<const EventActionBase_v13_s*>(cursor);
+			const size_t actionSize = base->dataSizeDwords * sizeof(DWORD);
+
+			char* actionData = new char[actionSize + 2]; // + 2 is to upgrade from v13 to new (generic) action header
+			// The version can still be identified by the version field in both the audio bank and MilesEvent_s struct
+
+			// This data offset is so that the actual data is in the right place in the buffer so that the
+			// base header can be replaced with the generic one
+			memcpy_s(actionData+2, actionSize, base, actionSize);
+
+			// Upgrade v13 struct to generic
+			EventActionBase_s* newBase = reinterpret_cast<EventActionBase_s*>(actionData);
+			newBase->actionType = base->actionType;
+			newBase->isLastAction = base->isLastAction;
+			newBase->dataSizeDwords = base->dataSizeDwords;
+			newBase->unk_1 = 0;
+			newBase->pad = 0;
+
+			this->actions.push_back({ newBase, nullptr });
+
+			cursor += actionSize;
+
+			if (base->isLastAction)
+				break;
+		}
+	}
 	else
 	{
-		const SINTa consumed = rr_lzb_simple_decode(originalData, compressedSize, decompressedData.get(), decompressedSize);
+		decompressedData = std::make_shared<char[]>(decompressedSize);
 
-		if (consumed != compressedSize)
-			return false;
-	}
+		// If not compressed, the original data ptr has the full decompressed data of the event's actions playlist
+		if (!IsCompressed())
+			memcpy_s(decompressedData.get(), decompressedSize, originalData, decompressedSize);
+		else
+		{
+			const SINTa consumed = rr_lzb_simple_decode(originalData, compressedSize, decompressedData.get(), decompressedSize);
 
-	const char* cursor = decompressedData.get();
-	while (true)
-	{
-		const EventActionBase_s* base = reinterpret_cast<const EventActionBase_s*>(cursor);
-		const size_t actionSize = base->dataSizeDwords * sizeof(DWORD);
+			if (consumed != compressedSize)
+				return false;
+		}
 
-		char* actionData = new char[actionSize];
+		const char* cursor = decompressedData.get();
 
-		memcpy_s(actionData, actionSize, base, actionSize);
+		while (true)
+		{
+			const EventActionBase_s* base = reinterpret_cast<const EventActionBase_s*>(cursor);
+			const size_t actionSize = base->dataSizeDwords * sizeof(DWORD);
 
-		this->actions.push_back({ reinterpret_cast<EventActionBase_s*>(actionData), nullptr });
+			char* actionData = new char[actionSize];
 
-		cursor += actionSize;
+			memcpy_s(actionData, actionSize, base, actionSize);
 
-		if (base->isLastAction)
-			break;
+			this->actions.push_back({ reinterpret_cast<EventActionBase_s*>(actionData), nullptr });
+
+			cursor += actionSize;
+
+			if (base->isLastAction)
+				break;
+		}
 	}
 
 	parsedActions = true;
@@ -220,7 +257,7 @@ std::vector<ParsedSourceState> EventAction_0_s::GetSourceStates(CMilesAudioBank*
 			{
 				if (v1->unkOffset != -1)
 				{
-					char* v2 = Offset<char>(sizeof(DWORD) * (sourceSelectorsOffset + v1->unkOffset));
+					char* v2 = Offset<char>(sizeof(DWORD) * (sourceSelectorOffset + v1->unkOffset));
 					ParsedSourceSelector sel = ParseRootSelector(bank, v2);
 
 					state.selectors.push_back(sel);
@@ -243,12 +280,13 @@ std::vector<ParsedSourceState> EventAction_0_s::GetSourceStates(CMilesAudioBank*
 	return states;
 }
 
+extern MilesEventActionParseResult_e ActionPlay_Parse(CMilesAudioAsset* asset, void* actionData, void** out_previewData);
+
 void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 {
 	CMilesAudioAsset* audioAsset = reinterpret_cast<CMilesAudioAsset*>(asset);
 	MilesEvent_s* event = reinterpret_cast<MilesEvent_s*>(audioAsset->GetAssetData());
 	CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
-
 
 	if (firstFrameForAsset)
 	{
@@ -260,36 +298,31 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 
 		for (auto& [action, previewData] : event->actions)
 		{
-			if (action->actionType == 0)
+			MilesEventActionParseResult_e res = MilesEventActionParseResult_e::RESULT_UNSUPPORTED;
+			
+			switch (action->actionType)
 			{
-				EventAction_0_s* act = reinterpret_cast<EventAction_0_s*>(action);
+			case 0:
+			{
+				res = ActionPlay_Parse(audioAsset, action, &previewData);
 
-				if (previewData) delete previewData;
+				break;
+			}
+			}
 
-				ActionPreviewData_0_s* pd = new ActionPreviewData_0_s();
-				previewData = pd;
+			if (previewData)
+			{
+				ActionPreviewData_s* pd = reinterpret_cast<ActionPreviewData_s*>(previewData);
 
-				pd->states = act->GetSourceStates(audioBank);
+				pd->parseResult = res;
+			}
+			else
+			{
+				ActionPreviewData_s* pd = new ActionPreviewData_s;
 
-				if (act->graphFlags & ACT_GRAPHFLAG_PITCH)
-				{
-					pd->pitchGraph = reinterpret_cast<MilesValueGraph_s*>((char*)audioBank->GetGraphData() + act->pitch.graphOffset);
+				pd->parseResult = res;
 
-					const std::pair<Vector2D, Vector2D> minsMaxs = pd->pitchGraph->MinsMaxs();
-
-					pd->pitchMins = minsMaxs.first;
-					pd->pitchMaxs = minsMaxs.second;
-				}
-
-				if (act->graphFlags & ACT_GRAPHFLAG_VOLUME)
-				{
-					pd->volumeGraph = reinterpret_cast<MilesValueGraph_s*>((char*)audioBank->GetGraphData() + act->volume.graphOffset);
-
-					const std::pair<Vector2D, Vector2D> minsMaxs = pd->volumeGraph->MinsMaxs();
-
-					pd->volumeMins = minsMaxs.first;
-					pd->volumeMaxs = minsMaxs.second;
-				}
+				previewData = pd;				
 			}
 		}
 	}
@@ -297,6 +330,8 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 	size_t i = 0;
 	for (auto& [action, previewData] : event->actions)
 	{
+		ActionPreviewData_s* basePreviewData = reinterpret_cast<ActionPreviewData_s*>(previewData);
+
 		const std::string title = std::format(
 			"Action #{}{}", i + 1,
 			s_eventPreviewNames.contains((EventActionType_e)action->actionType)
@@ -319,83 +354,92 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 		{
 			const ImVec2 avail = ImGui::GetContentRegionAvail();
 
-			switch (action->actionType)
+			// If the action's preview data has not been parsed successfully, display the error message.
+			// This will likely always be due to unsupported types or versions
+			if (basePreviewData->parseResult != MilesEventActionParseResult_e::RESULT_SUCCESS)
 			{
-			case 0:
+				ImGui::TextDisabled("Unable to preview: %s", s_parseResultMessages.at(basePreviewData->parseResult));
+			}
+			else
 			{
-				ActionPreviewData_0_s* pd = reinterpret_cast<ActionPreviewData_0_s*>(previewData);
-
-				ImGui::SeparatorText("Audio Sources");
-				for (auto& state : pd->states)
+				switch (action->actionType)
 				{
-					state.Draw();
+				case 0:
+				{
+					ActionPreviewData_0_s* pd = reinterpret_cast<ActionPreviewData_0_s*>(previewData);
+
+					ImGui::SeparatorText("Audio Sources");
+					for (auto& state : pd->states)
+					{
+						state.Draw();
+					}
+
+					const bool hasAnyGraphs = (
+						(pd->pitchGraph != nullptr && pd->pitchGraph->numPoints != 0) ||
+						(pd->volumeGraph != nullptr && pd->volumeGraph->numPoints != 0)
+						);
+
+					if (hasAnyGraphs)
+					{
+						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.f);
+						ImGui::SeparatorText("Controller Graphs");
+						ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
+						ImGui::TextWrapped("These graphs show how the event properties on the Y axis (e.g., pitch or volume) are changed based on the dynamic value of a controller");
+						ImGui::PopStyleColor();
+
+						ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.f);
+
+						ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, ImVec2(0.1f, 0.1f));
+						if (pd->pitchGraph && pd->pitchGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Pitch##Action{}", i).c_str(), ImVec2(avail.x / 2, avail.x / 2))) {
+							ImPlot::SetupAxes(pd->pitchGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->pitchGraph->baseControllerNameOffset) : "n/a", "Pitch (st)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+
+							ImPlot::PlotScatterG("##pitchScatter", MilesGraphPlot_Scatter, pd->pitchGraph, pd->pitchGraph->numPoints);
+							ImPlot::PlotLineG("##pitchLine", MilesGraphPlot_Line, pd->pitchGraph, std::max((pd->pitchGraph->numPoints) * 10, 1));
+							ImPlot::EndPlot();
+							ImGui::SameLine();
+						}
+
+						if (pd->volumeGraph && pd->volumeGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Volume##Action{}", i).c_str(), ImVec2(avail.x / 2, avail.x / 2))) {
+							ImPlot::SetupAxes(pd->volumeGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->volumeGraph->baseControllerNameOffset) : "n/a", "Volume (dB)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
+
+							ImPlot::PlotScatterG("##volScatter", MilesGraphPlot_Scatter, pd->volumeGraph, pd->volumeGraph->numPoints);
+							ImPlot::PlotLineG("##volLine", MilesGraphPlot_Line, pd->volumeGraph, std::max((pd->volumeGraph->numPoints) * 10, 1), {});
+							ImPlot::EndPlot();
+						}
+						ImPlot::PopStyleVar();
+					}
+
+					break;
 				}
-
-				const bool hasAnyGraphs = (
-					(pd->pitchGraph != nullptr && pd->pitchGraph->numPoints != 0) ||
-					(pd->volumeGraph != nullptr && pd->volumeGraph->numPoints != 0)
-				);
-
-				if (hasAnyGraphs)
+				case 8:
 				{
-					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.f);
-					ImGui::SeparatorText("Controller Graphs");
 					ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
-					ImGui::TextWrapped("These graphs show how the event properties on the Y axis (e.g., pitch or volume) are changed based on the dynamic value of a controller");
+					ImGui::TextWrapped("This event action causes the following additional events to be played:");
 					ImGui::PopStyleColor();
+					EventAction_8_s* act = reinterpret_cast<EventAction_8_s*>(action);
 
-					ImGui::SetCursorPosY(ImGui::GetCursorPosY() + 5.f);
-
-					ImPlot::PushStyleVar(ImPlotStyleVar_FitPadding, ImVec2(0.1f, 0.1f));
-					if (pd->pitchGraph && pd->pitchGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Pitch##Action{}", i).c_str(), ImVec2(avail.x / 2, avail.x / 2))) {
-						ImPlot::SetupAxes(pd->pitchGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->pitchGraph->baseControllerNameOffset) : "n/a", "Pitch (st)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-
-						ImPlot::PlotScatterG("##pitchScatter", MilesGraphPlot_Scatter, pd->pitchGraph, pd->pitchGraph->numPoints);
-						ImPlot::PlotLineG("##pitchLine", MilesGraphPlot_Line, pd->pitchGraph, std::max((pd->pitchGraph->numPoints) * 10, 1));
-						ImPlot::EndPlot();
-						ImGui::SameLine();
+					for (uint32_t j = 0; j < act->eventCount; ++j)
+					{
+						ImGui::BulletText(audioBank->GetString(act->eventNameOffset[j]));
 					}
 
-					if (pd->volumeGraph && pd->volumeGraph->numPoints != 0 && ImPlot::BeginPlot(std::format("Volume##Action{}", i).c_str(), ImVec2(avail.x / 2, avail.x / 2))) {
-						ImPlot::SetupAxes(pd->volumeGraph->baseControllerNameOffset != UINT32_MAX ? audioBank->GetString(pd->volumeGraph->baseControllerNameOffset) : "n/a", "Volume (dB)", ImPlotAxisFlags_AutoFit, ImPlotAxisFlags_AutoFit);
-
-						ImPlot::PlotScatterG("##volScatter", MilesGraphPlot_Scatter, pd->volumeGraph, pd->volumeGraph->numPoints);
-						ImPlot::PlotLineG("##volLine", MilesGraphPlot_Line, pd->volumeGraph, std::max((pd->volumeGraph->numPoints) * 10, 1), {});
-						ImPlot::EndPlot();
+					break;
+				}
+				case 11:
+				{
+					EventAction_11_s* act = reinterpret_cast<EventAction_11_s*>(action);
+					for (uint32_t j = 0; j < act->unk_1; ++j)
+					{
+						ImGui::Text("%s", audioBank->GetString(act->controllerNameOffset[j]));
 					}
-					ImPlot::PopStyleVar();
+					break;
 				}
-
-				break;
-			}
-			case 8:
-			{
-				ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetColorU32(ImGuiCol_TextDisabled));
-				ImGui::TextWrapped("This event action causes the following additional events to be played:");
-				ImGui::PopStyleColor();
-				EventAction_8_s* act = reinterpret_cast<EventAction_8_s*>(action);
-
-				for (uint32_t j = 0; j < act->eventCount; ++j)
+				default:
 				{
-					ImGui::BulletText(audioBank->GetString(act->eventNameOffset[j]));
+					ImGui::TextDisabled("No preview is available for this action type.");
+					break;
 				}
-
-				break;
-			}
-			case 11:
-			{
-				EventAction_11_s* act = reinterpret_cast<EventAction_11_s*>(action);
-				for (uint32_t j = 0; j < act->unk_1; ++j)
-				{
-					ImGui::Text("%s", audioBank->GetString(act->controllerNameOffset[j]));
 				}
-				break;
-			}
-			default:
-			{
-				ImGui::TextDisabled("No preview is available for this action type.");
-				break;
-			}
 			}
 		}
 		ImGui::EndChild();
@@ -411,7 +455,7 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 
 extern void MilesEvent_WriteActionToRSONStream(std::stringstream& rson, CMilesAudioAsset* asset, const EventActionBase_s* const action);
 
-bool ExportAudioEventAsset(CAsset* const asset, int type)
+static bool ExportAudioEventAsset(CAsset* const asset, int type)
 {
 	UNUSED(type);
 	CMilesAudioAsset* audioAsset = reinterpret_cast<CMilesAudioAsset*>(asset);

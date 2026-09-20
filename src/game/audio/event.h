@@ -5,15 +5,22 @@
 // i've only seen 0/2/8/9/10/11/13 in a file
 enum EventActionType_e
 {
-	ACTION_0 = 0, // event play parameters
-	ACTION_1 = 1, // supported but unused in r5 as of s30 apex
-	ACTION_2 = 2, // unk
-	ACTION_8 = 8, // execute events
-	ACTION_9 = 9, // set controller value
+	ACTION_0 = 0x0, // event play parameters
+	ACTION_1 = 0x1, // supported but unused in r5 as of s30 apex
+	ACTION_2 = 0x2, // unk
+	ACTION_8 = 0x8, // execute events
+	ACTION_9 = 0x9, // set controller value
 	ACTION_A = 0xA, // unk
 	ACTION_B = 0xB, // unk - something to do with controller names
 	ACTION_C = 0xC, // unk - i can't find any code for this but i'm sure it's there somewhere
 	ACTION_D = 0xD, // unk - has a count for the number of controllers in ACTION 11. lots of code in event processing func
+};
+
+struct EventActionBase_v13_s
+{
+	uint8_t actionType : 4;
+	uint8_t isLastAction : 4;
+	uint8_t dataSizeDwords;
 };
 
 struct EventActionBase_s
@@ -136,6 +143,61 @@ struct ParsedSourceState
 	void Draw();
 };
 
+#pragma pack(push, 1)
+// All variables are at an offset of +2 from their name, since the action is converted
+// to a generic base struct
+struct EventAction_0_v13_s : public EventActionBase_s
+{
+	char byte_2;
+	char byte_3;
+	float float_4;
+	float float_8;
+	float float_C;
+	float float_10;
+	float float_14;
+	float float_18;
+	float float_1C;
+	float float_20;
+	uint32_t unk_24;
+	int unkGraphOffset_28;
+	int unkGraphOffset_2C;
+	int unkGraphOffset_30;
+	char gap_34[4];
+	short word_38;
+	char playRouteCount : 4;
+	char unk_3A : 4;
+	char metaContentCount; //always 0 in r2
+	int sourceSelectorOffset;
+	float float_40;
+	int filterOffset;
+	int dword_48;
+	short word_4C;
+	char gap_4E[2];
+	GraphValue_u initialOcclusion; //0x2
+	GraphValue_u startDelay; //0x20
+	GraphValue_u pitch; //0x4
+	GraphValue_u volume; //0x1
+	GraphValue_u unkGraphVal_60; //0x40
+	GraphValue_u unkGraphVal_64; //0x80
+	GraphValue_u unkGraphVal_68; //0x200
+	GraphValue_u unkGraphVal_6C; //0x8
+	GraphValue_u unkGraphVal_70; //0x10
+	int duckingNameOffset;
+	short word_78;
+	short word_7A;
+	uint8_t dynamicExtraDataSize;
+	char byte_7D;
+	char byte_7E;
+	char gap_7F[1];
+	uint32_t unk_80;
+	uint32_t unk_84;
+	uint32_t graphFlags;
+	char dynamicExtraData[8];
+};
+#pragma pack(pop)
+
+static_assert(offsetof(EventAction_0_v13_s, unk_80) == 0x82);
+
 struct EventAction_0_s : public EventActionBase_s
 {
 	char unk_0[28];
@@ -158,7 +220,7 @@ struct EventAction_0_s : public EventActionBase_s
 	uint16_t unkDwordOffset_74;
 	uint16_t sourceStatesOffset;
 	uint16_t unkDwordOffset_78;
-	uint16_t sourceSelectorsOffset;
+	uint16_t sourceSelectorOffset;
 	uint16_t unkDwordOffset_7C;
 	uint16_t unkDwordOffset_7E;
 	uint32_t graphFlags;
@@ -180,6 +242,15 @@ struct EventAction_2_s : public EventActionBase_s
 	float unkFloat_10;
 	uint32_t unk_14;
 };
+
+#pragma pack(push, 1)
+struct EventAction_8_v13_s : public EventActionBase_s
+{
+	char gap_4[6];
+	uint32_t eventNameOffset; // There's only one of these on v13's Run Event actions
+};
+#pragma pack(pop)
+static_assert(offsetof(EventAction_8_v13_s, eventNameOffset) == 0xA);
 
 struct EventAction_8_s : public EventActionBase_s
 {
@@ -214,7 +285,7 @@ struct EventAction_13_s : public EventActionBase_s
 static const std::unordered_map<EventActionType_e, const char*> s_eventExportTypes =
 {
 	{ EventActionType_e::ACTION_0, "play" },
-	{ EventActionType_e::ACTION_8, "playEvents" },
+	{ EventActionType_e::ACTION_8, "runEvents" },
 	{ EventActionType_e::ACTION_9, "setControllerValue" },
 	{ EventActionType_e::ACTION_B, "referencedControllers" },
 };
@@ -222,10 +293,48 @@ static const std::unordered_map<EventActionType_e, const char*> s_eventExportTyp
 static const std::unordered_map<EventActionType_e, const char*> s_eventPreviewNames =
 {
 	{ EventActionType_e::ACTION_0, "Play" },
-	{ EventActionType_e::ACTION_8, "Play Events" },
+	{ EventActionType_e::ACTION_8, "Run Events" },
 	{ EventActionType_e::ACTION_9, "Set Controller Value" },
 	{ EventActionType_e::ACTION_B, "Referenced Controllers (meta)" },
 };
+
+enum class MilesEventActionParseResult_e
+{
+	RESULT_SUCCESS = 0,
+	RESULT_INVALID_DATA,         // Supported version but unexpected data
+	RESULT_UNSUPPORTED,          // Unsupported version or action type
+	RESULT_INVALID_PREVIEW_DATA, // No preview data pointer provided
+};
+
+static const std::unordered_map<MilesEventActionParseResult_e, const char*> s_parseResultMessages =
+{
+	{MilesEventActionParseResult_e::RESULT_SUCCESS, "Success"},
+	{MilesEventActionParseResult_e::RESULT_INVALID_DATA, "Unexpected action data"},
+	{MilesEventActionParseResult_e::RESULT_UNSUPPORTED, "Unsupported action type or version"},
+	{MilesEventActionParseResult_e::RESULT_INVALID_PREVIEW_DATA, "[BUG] No preview data provided"}
+};
+
+struct ActionPreviewData_s
+{
+	MilesEventActionParseResult_e parseResult;
+};
+
+struct MilesValueGraph_s;
+
+// Action Preview Data
+struct ActionPreviewData_0_s : public ActionPreviewData_s
+{
+	MilesValueGraph_s* pitchGraph;
+	Vector2D pitchMins;
+	Vector2D pitchMaxs;
+
+	MilesValueGraph_s* volumeGraph;
+	Vector2D volumeMins;
+	Vector2D volumeMaxs;
+
+	std::vector<ParsedSourceState> states;
+};
+
 
 struct MilesEvent_s
 {
@@ -233,12 +342,33 @@ struct MilesEvent_s
 	{
 		for (auto& [action, previewData] : actions)
 		{
-			if (action) delete[] (char*)action;
-			if (previewData) delete previewData;
+			if (action)
+			{
+				if (previewData)
+				{
+					switch (action->actionType)
+					{
+					case 0:
+					{
+						delete (ActionPreviewData_0_s*)previewData;
+						break;
+					}
+					default:
+					{
+						delete (ActionPreviewData_s*)previewData;
+						break;
+					}
+					}
+				}
+
+				delete[](char*)action;
+			}
 		}
 
 		actions.clear();
 	}
+
+	int version;
 
 	const void* originalData;
 	std::shared_ptr<char[]> decompressedData;
@@ -254,20 +384,4 @@ struct MilesEvent_s
 
 	//
 	FORCEINLINE bool IsCompressed() const { return decompressedSize != compressedSize; };
-};
-
-struct MilesValueGraph_s;
-
-// Action Preview Data
-struct ActionPreviewData_0_s
-{
-	MilesValueGraph_s* pitchGraph;
-	Vector2D pitchMins;
-	Vector2D pitchMaxs;
-
-	MilesValueGraph_s* volumeGraph;
-	Vector2D volumeMins;
-	Vector2D volumeMaxs;
-
-	std::vector<ParsedSourceState> states;
 };

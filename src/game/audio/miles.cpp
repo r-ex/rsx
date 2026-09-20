@@ -206,15 +206,26 @@ static void MilesBank_ParseEvents(CMilesAudioBank* bank)
 		const EventName_s* const evName = &evNameArray[i];
 		const char* const eventData = reinterpret_cast<const char*>(evData) + evName->dataOffset;
 
-		const uint16_t decompSize = reinterpret_cast<const uint16_t*>(eventData)[0];
-		const uint16_t compSize = reinterpret_cast<const uint16_t*>(eventData)[1];
+		MilesEvent_s* event;
+		if (bank->GetVersion() == 13) // r2
+		{
+			// Titanfall 2 does not have compressed event data so there's no size header attached to the event data
+			// so we can't tell the full event data size without going through all actions.
+			// Event data became compressed with version 10.0.29 (May 9, 2018)
+			event = new MilesEvent_s(bank->GetVersion(), eventData, nullptr, {}, 0, 0, false);
+		}
+		else
+		{
+			const uint16_t decompSize = reinterpret_cast<const uint16_t*>(eventData)[0];
+			const uint16_t compSize = reinterpret_cast<const uint16_t*>(eventData)[1];
 
-		MilesEvent_s* event = new MilesEvent_s(eventData + 4, nullptr, {}, decompSize, compSize, false);
+			event = new MilesEvent_s(bank->GetVersion(), eventData + 4, nullptr, {}, decompSize, compSize, false);
+		}
 
 		const char* eventName = bank->GetString(evName->nameOffset);
 
 		CMilesAudioAsset* eventAsset = new CMilesAudioAsset(eventName, event, bank);
-		eventAsset->SetAssetType((uint32_t)AssetType_t::AEVT); // asrc - audio source
+		eventAsset->SetAssetType((uint32_t)AssetType_t::AEVT); // aevt - audio event
 		eventAsset->SetAssetGUID(RTech::StringToGuid(eventName));
 		eventAsset->SetAssetVersion({ bank->GetVersion() });
 
@@ -244,6 +255,7 @@ const bool CMilesAudioBank::ParseFromHeader()
 		this->DiscoverStreamingFiles();
 
 		MilesBank_ParseSources<MilesSource_v13_t>(this);
+		MilesBank_ParseEvents(this);
 
 		break;
 	}
@@ -326,10 +338,7 @@ const bool CMilesAudioBank::ParseFromHeader()
 		this->DiscoverStreamingFiles();
 
 		MilesBank_ParseSources<MilesSource_v49_t>(this);
-
-#if HAS_MILES_EVENTS
 		MilesBank_ParseEvents(this);
-#endif
 
 		break;
 	}

@@ -322,7 +322,7 @@ void* PreviewAudioEventAsset(CAsset* const asset, const bool firstFrameForAsset)
 
 				pd->parseResult = res;
 
-				previewData = pd;				
+				previewData = pd;
 			}
 		}
 	}

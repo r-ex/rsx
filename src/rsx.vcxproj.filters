@@ -121,21 +121,6 @@
     <Filter Include="game\audio\actions">
       <UniqueIdentifier>{2c633e37-0581-4dc3-ae10-9d6a3c934306}</UniqueIdentifier>
     </Filter>
-    <Filter Include="thirdparty\lame">
-      <UniqueIdentifier>{c8b8174a-70e8-455c-9b35-c6b07aca96f3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="thirdparty\lame\include">
-      <UniqueIdentifier>{99777c2f-6c8a-494e-b903-424bd44c6b8c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="thirdparty\lame\mpglib">
-      <UniqueIdentifier>{3880ef56-6747-4606-b9a7-a61b887f55b6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="thirdparty\lame\libmp3lame">
-      <UniqueIdentifier>{82be5263-10a2-4491-be79-c690a4390294}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="thirdparty\lame\libmp3lame\vector">
-      <UniqueIdentifier>{e1994a9b-3869-4669-8ab7-443ba0970598}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -543,84 +528,6 @@
     <ClInclude Include="core\bridge\bridge.h">
       <Filter>core\bridge</Filter>
     </ClInclude>
-    <ClInclude Include="thirdparty\lame\config.h">
-      <Filter>thirdparty\lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\mpglib\mpglib.h">
-      <Filter>thirdparty\lame\mpglib</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\include\lame.h">
-      <Filter>thirdparty\lame\include</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\set_get.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\tables.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\util.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\vbrquantize.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\VbrTag.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\VbrTagCrc.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\version.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\bitstream.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\encoder.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\fft.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\gain_analysis.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\id3tag.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\l3side.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\lame_global_flags.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\lame-analysis.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\lameerror.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\machine.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\newmdct.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\psymodel.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\quantize.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\quantize_pvt.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\reservoir.h">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClInclude>
-    <ClInclude Include="thirdparty\lame\libmp3lame\vector\lame_intrin.h">
-      <Filter>thirdparty\lame\libmp3lame\vector</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -988,69 +895,6 @@
     </ClCompile>
     <ClCompile Include="game\audio\actions\action_play.cpp">
       <Filter>game\audio\actions</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\tables.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\takehiro.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\util.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\vbrquantize.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\VbrTag.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\version.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\bitstream.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\encoder.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\fft.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\gain_analysis.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\id3tag.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\lame.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\mpglib_interface.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\newmdct.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\presets.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\psymodel.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\quantize.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\quantize_pvt.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\reservoir.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\set_get.c">
-      <Filter>thirdparty\lame\libmp3lame</Filter>
-    </ClCompile>
-    <ClCompile Include="thirdparty\lame\libmp3lame\vector\xmm_quantize_sub.c">
-      <Filter>thirdparty\lame\libmp3lame\vector</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

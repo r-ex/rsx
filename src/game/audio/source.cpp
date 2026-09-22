@@ -11,9 +11,6 @@
 #include <misc/imgui_utility.h>
 #include <imgui.h>
 
-#include <lame.h>
-
-
 constexpr const char* PATH_PREFIX_ASRC = "audio";
 
 uint32_t ReadAudioStream(char* buffer, size_t length, MilesASIUserData_t* userData)

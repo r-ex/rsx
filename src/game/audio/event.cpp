@@ -457,80 +457,81 @@ extern void MilesEvent_WriteActionToRSONStream(std::stringstream& rson, CMilesAu
 
 static bool ExportAudioEventAsset(CAsset* const asset, int type)
 {
-	UNUSED(type);
-	CMilesAudioAsset* audioAsset = reinterpret_cast<CMilesAudioAsset*>(asset);
-	MilesEvent_s* event = reinterpret_cast<MilesEvent_s*>(audioAsset->GetAssetData());
+	UNUSED(type); UNUSED(asset);
+	return false;
+	//CMilesAudioAsset* audioAsset = reinterpret_cast<CMilesAudioAsset*>(asset);
+	//MilesEvent_s* event = reinterpret_cast<MilesEvent_s*>(audioAsset->GetAssetData());
 
-	if (!event->parsedActions && !event->ParseActions())
-	{
-		printf("Failed to parse!\n");
-		return false;
-	}
-	//CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
+	//if (!event->parsedActions && !event->ParseActions())
+	//{
+	//	printf("Failed to parse!\n");
+	//	return false;
+	//}
+	////CMilesAudioBank* audioBank = asset->GetContainerFile<CMilesAudioBank>();
 
-	// Create exported path + asset path.
-	std::filesystem::path exportPath = g_rsxSettings.GetExportDirectory();
-	const std::filesystem::path aevtPath(audioAsset->GetAssetName());
+	//// Create exported path + asset path.
+	//std::filesystem::path exportPath = g_rsxSettings.GetExportDirectory();
+	//const std::filesystem::path aevtPath(audioAsset->GetAssetName());
 
-	// truncate paths?
-	if (g_rsxSettings.exportPathsFull)
-		exportPath.append(aevtPath.parent_path().string());
-	else
-		exportPath.append("events");
+	//// truncate paths?
+	//if (g_rsxSettings.exportPathsFull)
+	//	exportPath.append(aevtPath.parent_path().string());
+	//else
+	//	exportPath.append("events");
 
-	if (!CreateDirectories(exportPath))
-	{
-		assertm(false, "Failed to create asset type directory.");
-		return false;
-	}
+	//if (!CreateDirectories(exportPath))
+	//{
+	//	assertm(false, "Failed to create asset type directory.");
+	//	return false;
+	//}
 
-	exportPath.append(aevtPath.filename().string() + ".rson");
+	//exportPath.append(aevtPath.filename().string() + ".rson");
 
-	std::stringstream rson;
+	//std::stringstream rson;
 
-	rson
-		<< "eventName: " << aevtPath.filename() << "\n"
-		<< "actions:\n[\n";
+	//rson
+	//	<< "eventName: " << aevtPath.filename() << "\n"
+	//	<< "actions:\n[\n";
 
-	const std::unordered_set<uint8_t> types = {  };
-	bool shouldWrite = false;
+	//const std::unordered_set<uint8_t> types = {  };
+	//bool shouldWrite = false;
 
-	for (auto& [action, previewData] : event->actions)
-	{
-		if (!shouldWrite && types.contains(action->actionType))
-			shouldWrite = true;
+	//for (auto& [action, previewData] : event->actions)
+	//{
+	//	if (!shouldWrite && types.contains(action->actionType))
+	//		shouldWrite = true;
 
-		MilesEvent_WriteActionToRSONStream(rson, audioAsset, action);
-	}
+	//	MilesEvent_WriteActionToRSONStream(rson, audioAsset, action);
+	//}
 
-	rson << "]\n";
+	//rson << "]\n";
 
-	if (shouldWrite)
-	{
-		StreamIO sio(exportPath, eStreamIOMode::Write);
+	//if (shouldWrite)
+	//{
+	//	StreamIO sio(exportPath, eStreamIOMode::Write);
 
-		sio.write(rson.str().c_str(), rson.str().length());
+	//	sio.write(rson.str().c_str(), rson.str().length());
 
-		sio.close();
+	//	sio.close();
 
-		//size_t i = 0;
-		//for (auto& it : event->actions)
-		//{
-		//	if (!types.contains(it->actionType))
-		//		continue;
+	//	//size_t i = 0;
+	//	//for (auto& it : event->actions)
+	//	//{
+	//	//	if (!types.contains(it->actionType))
+	//	//		continue;
 
-		//	exportPath.replace_filename(std::format("{}_{}.{}.bin", aevtPath.filename().string(), i, (int)it->actionType));
-		//	sio = StreamIO(exportPath, eStreamIOMode::Write);
+	//	//	exportPath.replace_filename(std::format("{}_{}.{}.bin", aevtPath.filename().string(), i, (int)it->actionType));
+	//	//	sio = StreamIO(exportPath, eStreamIOMode::Write);
 
-		//	sio.write((char*)it, it->dataSizeDwords * 4);
+	//	//	sio.write((char*)it, it->dataSizeDwords * 4);
 
-		//	sio.close();
+	//	//	sio.close();
 
-		//	i++;
-		//}
-	}
+	//	//	i++;
+	//	//}
+	//}
 
-	return true;
+	//return true;
 }
 
 void InitAudioEventAssetType()

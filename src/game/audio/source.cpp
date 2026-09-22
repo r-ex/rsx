@@ -50,6 +50,8 @@ struct DecodedAudioMetadata_t
 	uint16_t channelCount;
 };
 
+#define READ_STREAM(buffer, size, userData) if(ReadAudioStream(buffer, size, userData) != size) break
+
 std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem::path& streamPath, MilesSource_t* source, DecodedAudioMetadata_t* metadataOut)
 {
 	// Open the MSTR file that contains this audio source
@@ -134,7 +136,7 @@ std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem:
 	// Buffer for holding the decoded data for each decode_block call.
 	std::vector<char> radDecodedData(sampleValueSize * channels * parsedMetadata.maxSamplesPerDecode);
 
-	size_t totalFramesDecoded = 0;
+	uint32_t totalFramesDecoded = 0;
 	uint32_t minInputBufferSize = 0; // start off with 0 bytes for input buffer so we can ask the decoder what it wants
 
 	std::vector<char> stream_data;
@@ -152,7 +154,8 @@ std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem:
 			if (isBinkA)
 			{
 				stream_data.resize(8);
-				ReadAudioStream(stream_data.data(), 8, &userData);
+
+				READ_STREAM(stream_data.data(), 8, &userData);
 			}
 
 			ASI_get_block_size(container.data(), stream_data.data(), stream_data.size(), &bytesConsumed, &blockSize, &minInputBufferSize);
@@ -162,23 +165,28 @@ std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem:
 				// Fetch the smallest possible amount of data to populate the input buffer.
 				// Future decode iterations will include this minimum buffer size in their read operation
 				stream_data.resize(minInputBufferSize);
-				ReadAudioStream(stream_data.data(), stream_data.size(), &userData);
+
+				READ_STREAM(stream_data.data(), stream_data.size(), &userData);
 			}
 		}
 
-		if (!isBinkA)
-		{
-			// Make a call to the decoder to find out how much data it wants for the next decode
+		if(!isBinkA)
 			ASI_get_block_size(container.data(), stream_data.data(), stream_data.size(), &bytesConsumed, &blockSize, &minInputBufferSize);
 
-			if (blockSize == 0xFFFF)
-				break;
-		}
+		if (blockSize == 0xFFFF)
+			break;
 
 		const size_t oldSize = stream_data.size();
 		const size_t newSize = isBinkA ? blockSize : blockSize + minInputBufferSize;
+
 		stream_data.resize(newSize);
-		ReadAudioStream(stream_data.data() + oldSize, stream_data.size() - oldSize, &userData);
+
+		const size_t audioSize = stream_data.size() - oldSize;
+		const uint32_t bytesRead = ReadAudioStream(stream_data.data() + oldSize, audioSize, &userData);
+
+		// RADA does a short read here and it's fine so binka only
+		if (isBinkA && bytesRead != audioSize)
+			break;
 
 		ASI_get_block_size(container.data(), stream_data.data(), stream_data.size(), &bytesConsumed, &blockSize, &minInputBufferSize);
 
@@ -190,6 +198,9 @@ std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem:
 
 			ASI_decode_block(container.data(), stream_data.data(), stream_data.size(), radDecodedData.data(), radDecodedData.size(), &decodeBytesConsumed, &samplesDecoded);
 
+			if (decodeBytesConsumed == 0 && samplesDecoded == 0)
+				break;
+
 			// The decoder provides us with a non-interleaved buffer which means that
 			// each channel's data is separate out into separate locations within the decode buffer
 			// before writing to file, the data must be brought back together
@@ -197,14 +208,24 @@ std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem:
 			// non-interleaved: LLLLLLRRRRRR
 			// interleaved:     LRLRLRLRLRLR
 			// https://stackoverflow.com/a/17883834
-			// 
 			// This may not be valid for other decoders, as miles uses parsedMetadata.decodeFormat to identify the decoded data format
 			// and decide how to process the audio immediately after decoding
+			
+			// size of the decode output in samples. rada data is always aligned to maxSamplesPerDecode, bink is not
+			// e.g. maxSamplesPerDecode = 16, samplesDecoded = 10
+			// 
+			// rad audio: (padded to maxSamples)     || bink audio: (no padding)
+			// LLLLLLLLLLxxxxxx | RRRRRRRRRRxxxxxx   || LLLLLLLLLL | RRRRRRRRRR
+			const size_t decodeBufSizeSamples = isBinkA ? samplesDecoded : parsedMetadata.maxSamplesPerDecode;
+
+			// clamp number of samples to the expected total (the decoder can "decode" more samples than actually exist on the final block)
+			const uint32_t framesToCopy = std::min(samplesDecoded, samplesCount - totalFramesDecoded);
+
 			for (int channelIdx = 0; channelIdx < channels; ++channelIdx)
 			{
-				const char* const channelSampleBuffer = radDecodedData.data() + (sampleValueSize * channelIdx * parsedMetadata.maxSamplesPerDecode);
+				const char* const channelSampleBuffer = radDecodedData.data() + (sampleValueSize * channelIdx * decodeBufSizeSamples);
 
-				for (uint32_t sampleIdx = 0; sampleIdx < samplesDecoded; ++sampleIdx)
+				for (uint32_t sampleIdx = 0; sampleIdx < framesToCopy; ++sampleIdx)
 				{
 					// Index in the output buffer from which the channels of this sample begin
 					const size_t outputIdx = static_cast<size_t>(channels) * (sampleIdx + totalFramesDecoded);
@@ -217,7 +238,7 @@ std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem:
 			}
 
 			// Add number of samples decoded to the total to keep track of when we are done decoding the whole thing
-			totalFramesDecoded += samplesDecoded;
+			totalFramesDecoded += framesToCopy;
 
 			const size_t unconsumedInputBytes = stream_data.size() - decodeBytesConsumed;
 
@@ -261,7 +282,7 @@ std::optional<std::vector<char>> DecodeAudioDataForSource(const std::filesystem:
 
 	return std::move(interleavedBuffer);
 }
-
+#undef READ_STREAM
 
 static bool AudioSource_DoInitialSetup(CAsset* const asset)
 {
@@ -340,7 +361,7 @@ void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 	}
 
 	ImGui::SameLine();
-	ImGui::Text("%.3f", soundLengthTime);
+	ImGui::Text("%.3f/%.3f", progressTime, soundLengthTime);
 
 	if (source->bpm != 0)
 		ImGui::Text("BPM: %u", source->bpm);

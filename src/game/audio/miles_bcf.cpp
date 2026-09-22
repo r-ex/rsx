@@ -468,7 +468,7 @@ void ASI_get_block_size(void* container, const char* input_reservoir, size_t inp
 	uint32_t headerSize = 4;
 	uint32_t someSizeVar = 0;
 
-	if (*reinterpret_cast<const uint16_t*>(input_reservoir) == 0x9999)
+	if (*reinterpret_cast<const uint16_t*>(input_reservoir) != 0x9999)
 	{
 		get_block_size_internal(decoder, input_reservoir, input_reservoir_len, out_consumed_bytes, out_block_size, out_req_size);
 

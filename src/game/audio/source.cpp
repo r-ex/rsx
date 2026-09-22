@@ -11,6 +11,9 @@
 #include <misc/imgui_utility.h>
 #include <imgui.h>
 
+#include <opusenc.h>
+#include <core/version.h>
+
 constexpr const char* PATH_PREFIX_ASRC = "audio";
 
 uint32_t ReadAudioStream(char* buffer, size_t length, MilesASIUserData_t* userData)
@@ -391,9 +394,6 @@ void* AudioSource_Preview(CAsset* const asset, const bool firstFrameForAsset)
 	return nullptr;
 }
 
-void lame_log(const char* fmt, va_list ap) { std::vfprintf(stdout, fmt, ap); };
-void lame_quiet(const char*, va_list) {};
-
 bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 {
 	UNUSED(setting);
@@ -440,13 +440,12 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 
 	if (setting == SOURCE_WAV)
 		exportPath.replace_extension("wav");
-	else if (setting == SOURCE_MP3)
-		exportPath.replace_extension("mp3");
-
-	StreamIO outFile(exportPath, eStreamIOMode::Write);
+	else if (setting == SOURCE_OPUS)
+		exportPath.replace_extension("opus");
 
 	if (setting == SOURCE_WAV)
 	{
+		StreamIO outFile(exportPath, eStreamIOMode::Write);
 		WAVEHEADER hdr;
 
 		outFile.write(hdr);
@@ -470,9 +469,38 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 	}
 	else
 	{
+		OggOpusComments* comments = ope_comments_create();
+		ope_comments_add(comments, "TITLE", audioAsset->GetAssetName().c_str());
+		ope_comments_add(comments, "COMMENT", "Exported by reSource Xtractor v" VERSION_STRING);
+		ope_comments_add(comments, "COPYRIGHT", "Respawn Entertainment");
+		ope_comments_add(comments, "GAME", audioBank->GetVersion() >= 13 ? "Apex Legends" : "Titanfall 2");
 
-		g_assetData.Log_Error(audioBank, "MP3 exporting is currently not supported!");
+		int error;
+		OggOpusEnc* enc = ope_encoder_create_file(
+			exportPath.string().c_str(),
+			comments,
+			metadata.sampleRate, metadata.channelCount,
+			metadata.channelCount <= 2 ? 0 : 1, // family: 0 is mono/stereo, 1 is surround
+			&error);
 
+		if (!enc)
+		{
+			Log("OPUS: Failed to create encoder for source \"%s\": %s\n", audioAsset->GetAssetName().c_str(), ope_strerror(error));
+			ope_comments_destroy(comments);
+			return false;
+		}
+
+		if (metadata.decodeFormat & DECODE_FORMAT_F32)
+			ope_encoder_write_float(enc, reinterpret_cast<const float*>(decodedData.data()), metadata.sampleCount);
+		else
+			ope_encoder_write(enc, reinterpret_cast<const int16_t*>(decodedData.data()), metadata.sampleCount);
+
+
+		ope_encoder_drain(enc);
+		ope_encoder_destroy(enc);
+		ope_comments_destroy(comments);
+		
+		return false;
 	}
 
 	return true;

@@ -121,6 +121,15 @@
     <Filter Include="game\audio\actions">
       <UniqueIdentifier>{2c633e37-0581-4dc3-ae10-9d6a3c934306}</UniqueIdentifier>
     </Filter>
+    <Filter Include="thirdparty\libopusenc">
+      <UniqueIdentifier>{e46a1e10-86c4-4950-b122-c514d5f58bb4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\libopusenc\include">
+      <UniqueIdentifier>{fbd83452-92dc-4427-84ac-175b3b35c888}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="thirdparty\libopusenc\src">
+      <UniqueIdentifier>{16c53d32-dbf0-4571-a765-6dbec593228f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h">
@@ -528,6 +537,33 @@
     <ClInclude Include="core\bridge\bridge.h">
       <Filter>core\bridge</Filter>
     </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\src\config.h">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\src\arch.h">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\src\ogg_packer.h">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\src\opus_header.h">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\src\picture.h">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\src\resample_sse.h">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\src\speex_resampler.h">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\src\unicode_support.h">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClInclude>
+    <ClInclude Include="thirdparty\libopusenc\include\opusenc.h">
+      <Filter>thirdparty\libopusenc\include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">
@@ -895,6 +931,27 @@
     </ClCompile>
     <ClCompile Include="game\audio\actions\action_play.cpp">
       <Filter>game\audio\actions</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\ogg_packer.c">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\opus_header.c">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\opusenc.c">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\picture.c">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\random.c">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\resample.c">
+      <Filter>thirdparty\libopusenc\src</Filter>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\unicode_support.c">
+      <Filter>thirdparty\libopusenc\src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

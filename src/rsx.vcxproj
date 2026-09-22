@@ -161,6 +161,15 @@
     <ClInclude Include="thirdparty\imgui\misc\imgui_memory_editor.h" />
     <ClInclude Include="thirdparty\imgui\misc\imgui_utility.h" />
     <ClInclude Include="thirdparty\imgui\misc\imoguizmo.hpp" />
+    <ClInclude Include="thirdparty\libopusenc\include\opusenc.h" />
+    <ClInclude Include="thirdparty\libopusenc\src\arch.h" />
+    <ClInclude Include="thirdparty\libopusenc\src\config.h" />
+    <ClInclude Include="thirdparty\libopusenc\src\ogg_packer.h" />
+    <ClInclude Include="thirdparty\libopusenc\src\opus_header.h" />
+    <ClInclude Include="thirdparty\libopusenc\src\picture.h" />
+    <ClInclude Include="thirdparty\libopusenc\src\resample_sse.h" />
+    <ClInclude Include="thirdparty\libopusenc\src\speex_resampler.h" />
+    <ClInclude Include="thirdparty\libopusenc\src\unicode_support.h" />
     <ClInclude Include="thirdparty\miniaudio\miniaudio.h" />
     <ClInclude Include="thirdparty\rad_lzb_simple\rad_lzb_simple.h" />
     <ClInclude Include="thirdparty\valvefilevdf\vdf_parser.hpp" />
@@ -364,6 +373,48 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="thirdparty\imgui\misc\imgui_utility.cpp" />
+    <ClCompile Include="thirdparty\libopusenc\src\ogg_packer.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_CI|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\opusenc.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_CI|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\opus_header.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_CI|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\picture.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_CI|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\random.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_CI|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\resample.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_CI|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="thirdparty\libopusenc\src\unicode_support.c">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_CI|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="thirdparty\miniaudio\miniaudio.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">NotUsing</PrecompiledHeader>
@@ -447,25 +498,25 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <OutDir>..\bin\$(Configuration)\</OutDir>
     <IntDir>..\build\$(Configuration)\$(ProjectName)\</IntDir>
-    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(ProjectDir)thirdparty\;$(ProjectDir)thirdparty\lame\;$(ProjectDir)thirdparty\lame\include\;$(ProjectDir)thirdparty\lame\libmp3lame\;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(ProjectDir)thirdparty\;$(ProjectDir)thirdparty\libopusenc\include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_CI|x64'">
     <OutDir>..\bin\$(Configuration)\</OutDir>
     <IntDir>..\build\$(Configuration)\$(ProjectName)\</IntDir>
-    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(ProjectDir)thirdparty\;$(ProjectDir)thirdparty\lame\;$(ProjectDir)thirdparty\lame\include\;$(ProjectDir)thirdparty\lame\libmp3lame\;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(ProjectDir)thirdparty\;$(ProjectDir)thirdparty\libopusenc\include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release_NoGui|x64'">
     <OutDir>..\bin\$(Configuration)\</OutDir>
     <IntDir>..\build\$(Configuration)\$(ProjectName)\</IntDir>
-    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(ProjectDir)thirdparty\;$(ProjectDir)thirdparty\lame\;$(ProjectDir)thirdparty\lame\include\;$(ProjectDir)thirdparty\lame\libmp3lame\;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(ProjectDir)thirdparty\;$(ProjectDir)thirdparty\libopusenc\include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <OutDir>..\bin\$(Configuration)\</OutDir>
     <IntDir>..\build\$(Configuration)\$(ProjectName)\</IntDir>
-    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(ProjectDir)thirdparty\;$(ProjectDir)thirdparty\lame\;$(ProjectDir)thirdparty\lame\include\;$(ProjectDir)thirdparty\lame\libmp3lame\;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir);$(ProjectDir)thirdparty\imgui\;$(ProjectDir)thirdparty\;$(ProjectDir)thirdparty\libopusenc\include\;$(IncludePath)</IncludePath>
     <LibraryPath>$(ProjectDir);$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">

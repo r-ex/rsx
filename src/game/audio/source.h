@@ -3,13 +3,13 @@
 enum AudioExportSetting_e : int
 {
 	SOURCE_WAV,
-	SOURCE_MP3
+	SOURCE_OPUS
 };
 
 static const char* s_AudioExportSettingNames[] =
 {
 	"WAVE",
-	"MP3"
+	"Opus"
 };
 
 // r2

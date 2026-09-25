@@ -2,7 +2,7 @@ name: CI
 on: [push, pull_request]
 
 env:
-  BUILD_PROFILE: Release_CI
+  BUILD_PROFILE: Release
   VCPKG_TRIPLET: x64-windows-static-md
   VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}\vcpkg_cache,readwrite
 

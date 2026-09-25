@@ -435,7 +435,7 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 		return false;
 	}
 
-	const std::vector<char>& decodedData = decodedDataOpt.value();
+	std::vector<char>& decodedData = decodedDataOpt.value();
 	const uint64_t DataSize = decodedData.size();
 
 	if (setting == SOURCE_WAV)
@@ -469,6 +469,50 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 	}
 	else
 	{
+		// wav -> vorbis
+		const std::unordered_map<uint8_t, std::vector<uint8_t>> channelRemapIndices = {
+			/* mono          */ {1, {0}},
+			/* stereo        */ {2, {0,1}},
+			/* 1-d surround  */ {3, {0,2,1}},
+			/* quad surround */ {4, {0,1,2,3}},
+			/* 5.0 surround  */ {5, {0,2,1,3,4}},
+			/* 5.1 surround  */ {6, {0,2,1,4,5,3}},
+			/* 6.1 surround  */ {7, {0,2,1,5,6,4,3}},
+			/* 7.1 surround  */ {8, {0,2,1,6,7,4,5,3}}
+		};
+
+		// mono/stereo have the same channel order in both so don't bother shuffling them
+		if (metadata.channelCount > 2 && channelRemapIndices.contains(metadata.channelCount))
+		{
+			const uint8_t valueSize = metadata.GetValueSize();
+			const size_t frameSize = static_cast<size_t>(metadata.channelCount) * valueSize;
+
+			const std::vector<uint8_t>& channelRemap = channelRemapIndices.at(metadata.channelCount);
+
+			std::vector<char> tempBufferData(frameSize);
+
+			for (size_t i = 0; i < metadata.sampleCount; ++i)
+			{
+				// buffer the current frame for swapping
+				char* const frameStart = &decodedData[i * frameSize];
+				memcpy_s(
+					tempBufferData.data(),
+					frameSize,
+					frameStart,
+					frameSize);
+
+				// start from the second channel because the first channel is always Front Left
+				for (size_t j = 1; j < metadata.channelCount; ++j)
+				{
+					memcpy_s(
+						frameStart + (j * valueSize),
+						valueSize,
+						tempBufferData.data() + (static_cast<size_t>(channelRemap[j]) * valueSize),
+						valueSize);
+				}
+			}
+		}
+
 		OggOpusComments* comments = ope_comments_create();
 		ope_comments_add(comments, "TITLE", audioAsset->GetAssetName().c_str());
 		ope_comments_add(comments, "COMMENT", "Exported by reSource Xtractor v" VERSION_STRING);

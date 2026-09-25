@@ -48,6 +48,8 @@ struct DecodedAudioMetadata_t
 	uint32_t sampleCount;
 	uint32_t sampleRate;
 	uint16_t channelCount;
+
+	uint8_t GetValueSize() const { return decodeFormat & DECODE_FORMAT_F32 ? sizeof(float) : sizeof(uint16_t); };
 };
 
 #define READ_STREAM(buffer, size, userData) if(ReadAudioStream(buffer, size, userData) != size) break
@@ -309,7 +311,7 @@ static bool AudioSource_DoInitialSetup(CAsset* const asset)
 
 	g_audioPlayer.Setup(decodedDataOpt.value(),
 		metadata.sampleCount, metadata.sampleRate, static_cast<uint8_t>(metadata.channelCount),
-		metadata.decodeFormat & DECODE_FORMAT_F32 ? sizeof(float) : sizeof(uint16_t));
+		metadata.GetValueSize());
 
 	return true;
 }
@@ -519,12 +521,14 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 		ope_comments_add(comments, "COPYRIGHT", "Respawn Entertainment");
 		ope_comments_add(comments, "GAME", audioBank->GetVersion() >= 13 ? "Apex Legends" : "Titanfall 2");
 
+		const bool isSurround = metadata.channelCount > 2; // family: 0 is mono/stereo, 1 is surround
+
 		int error;
 		OggOpusEnc* enc = ope_encoder_create_file(
 			exportPath.string().c_str(),
 			comments,
 			metadata.sampleRate, metadata.channelCount,
-			metadata.channelCount <= 2 ? 0 : 1, // family: 0 is mono/stereo, 1 is surround
+			isSurround ? 1 : 0,
 			&error);
 
 		if (!enc)
@@ -532,6 +536,23 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 			Log("OPUS: Failed to create encoder for source \"%s\": %s\n", audioAsset->GetAssetName().c_str(), ope_strerror(error));
 			ope_comments_destroy(comments);
 			return false;
+		}
+
+		// haven't observed anything over 7.1 so idk how to handle them
+		// non-surround stuff is fine so no need to manually set the bitrate
+		if (isSurround && metadata.channelCount <= 8)
+		{
+			constexpr std::array<uint32_t, 6> bitrates = {
+				160000, // 3.0
+				224000, // 4.0
+				256000, // 5.0
+				320000, // 5.1
+				384000, // 6.1
+				448000  // 7.1
+			};
+
+			if (const int ret = ope_encoder_ctl(enc, OPUS_SET_BITRATE(bitrates[metadata.channelCount-3])); ret != OPE_OK)
+				Log("OPUS: Failed to set bitrate for source \"%s\": %s\n", audioAsset->GetAssetName().c_str(), ope_strerror(ret));
 		}
 
 		if (metadata.decodeFormat & DECODE_FORMAT_F32)

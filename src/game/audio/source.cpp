@@ -472,7 +472,7 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 	else
 	{
 		// wav -> vorbis
-		const std::unordered_map<uint8_t, std::vector<uint8_t>> channelRemapIndices = {
+		const std::unordered_map<uint16_t, std::vector<uint8_t>> channelRemapIndices = {
 			/* mono          */ {1, {0}},
 			/* stereo        */ {2, {0,1}},
 			/* 1-d surround  */ {3, {0,2,1}},

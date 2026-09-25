@@ -395,19 +395,20 @@ namespace r5
 	};
 
 	// from release to season 29
-	#define ANIM_BONEFLAG_BITS_4			4 // a nibble even
-	#define ANIM_BONEFLAG_SIZE_4(count)		(IALIGN2((ANIM_BONEFLAG_BITS_4 * count + 7) / 8)) // size in bytes of the bone flag array. pads 7 bits for truncation, then align to 2 bytes
-	#define ANIM_BONEFLAG_SHIFT_4(idx)		(ANIM_BONEFLAG_BITS_4 * (idx % 2)) // return four (bits) if this index is odd, as there are four bits per bone
-	#define ANIM_BONEFLAGS_FLAG_4(ptr, idx)	(static_cast<uint8_t>(ptr[idx / 2] >> ANIM_BONEFLAG_SHIFT_4(idx)) & r5::RleBoneFlags_t::STUDIO_ANIM_MASK_RELEASE) // get byte offset, then shift if needed, mask to four bits
+	#define ANIM_BONEFLAG_BITS_4            4 // a nibble even
+	#define ANIM_BONEFLAG_SIZE_4(count)        (IALIGN2((ANIM_BONEFLAG_BITS_4 * count + 7) / 8)) // size in bytes of the bone flag array. pads 7 bits for truncation, then align to 2 bytes
+	#define ANIM_BONEFLAG_SHIFT_4(idx)        (ANIM_BONEFLAG_BITS_4 * (idx % 2)) // return four (bits) if this index is odd, as there are four bits per bone
+	#define ANIM_BONEFLAG_FLAG_4(ptr, idx)    (static_cast<uint8_t>(ptr[idx / 2] >> ANIM_BONEFLAG_SHIFT_4(idx)) & r5::RleBoneFlags_t::STUDIO_ANIM_MASK_RELEASE) // get byte offset, then shift if needed, mask to four bits
 
 	// starting in season 30 we have six bits for bone flags
-	#define ANIM_BONEFLAG_BITS_6			6 // a morsel ?
-	#define ANIM_BONEFLAG_SIZE_6(count)		(IALIGN2((ANIM_BONEFLAG_BITS_6 * count + 7) / 8))	// size in bytes of the bone flag array. pads 7 bits for truncation, then align to 2 bytes !!! TBD if this works the same !!!
-	#define ANIM_BONEFLAG_SHIFT_6(idx)		(ANIM_BONEFLAG_BITS_6 * (idx % 4))					// return four (bits) if this index is odd, as there are four bits per bone
-	#define ANIM_BONEFLAGS_FLAG_6(ptr, idx)	(static_cast<uint8_t>(*reinterpret_cast<const uint32_t* const>(ptr + ((idx / 4) * 3)) >> ANIM_BONEFLAG_SHIFT_6(idx)) & r5::RleBoneFlags_t::STUDIO_ANIM_MASK_RETAIL) // get byte offset, then shift if needed, mask to four bits
+	#define ANIM_BONEFLAG_BITS_6            6 // a morsel ?
+	#define ANIM_BONEFLAG_SIZE_6(count)        (IALIGN2((ANIM_BONEFLAG_BITS_6 * count + 7) / 8))    // size in bytes of the bone flag array. pads 7 bits for truncation, then align to 2 bytes !!! TBD if this works the same !!!
+	#define ANIM_BONEFLAG_SHIFT_6(idx)        (ANIM_BONEFLAG_BITS_6 * (idx % 4))                    // return four (bits) if this index is odd, as there are four bits per bone
+	//#define ANIM_BONEFLAGS_FLAG_6(ptr, idx)    (static_cast<uint8_t>(*reinterpret_cast<const uint32_t* const>(ptr + ((idx / 4) * 3)) >> ANIM_BONEFLAG_SHIFT_6(idx)) & r5::RleBoneFlags_t::STUDIO_ANIM_MASK_RETAIL) // get byte offset, then shift if needed, mask to four bits
+	#define ANIM_BONEFLAG_FLAG_6(ptr, idx, bits, mask)    (((static_cast<uint8_t>(ptr[bits >> 3]) | (static_cast<uint8_t>(ptr[(bits >> 3) + 1]) << 8)) >> (bits & 7)) & mask) // get byte offset, then shift if needed, mask to four bits
 
 	#define ANIM_BONEFLAG_SIZE(count, width) (width == ANIM_BONEFLAG_BITS_6 ? ANIM_BONEFLAG_SIZE_6(count) : ANIM_BONEFLAG_SIZE_4(count)) 
-	#define ANIM_BONEFLAGS_FLAG(ptr, idx, width) (width == ANIM_BONEFLAG_BITS_6 ? ANIM_BONEFLAGS_FLAG_6(ptr, idx) : ANIM_BONEFLAGS_FLAG_4(ptr, idx)) 
+	#define ANIM_BONEFLAG_FLAG(ptr, idx, width, bits) (width == ANIM_BONEFLAG_BITS_6 ? ANIM_BONEFLAG_FLAG_6(ptr, idx, bits, r5::RleBoneFlags_t::STUDIO_ANIM_MASK_RETAIL) : ANIM_BONEFLAG_FLAG_4(ptr, idx)) 
 
 	struct mstudio_rle_anim_t
 	{

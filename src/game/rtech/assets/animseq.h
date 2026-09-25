@@ -371,7 +371,7 @@ private:
 
 				for (int j = 0; j < boneCount; j++)
 				{
-					const uint8_t boneFlags = ANIM_BONEFLAGS_FLAG_4(boneFlagArray, j);
+					const uint8_t boneFlags = ANIM_BONEFLAG_FLAG_4(boneFlagArray, j);
 
 					if (!(boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_DATA))
 						continue;

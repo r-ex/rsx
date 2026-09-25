@@ -120,9 +120,10 @@ void ParseAnimSeqDataForSeq(ModelSeq_t* const seqdesc, const size_t boneCount, c
 		const uint8_t* const boneFlagArray = reinterpret_cast<const uint8_t* const>(animdesc->animData + index);
 		const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount, flagWidth)]);
 
+		int flagBitOffset = 0;
 		for (size_t bone = 0; bone < boneCount; bone++)
 		{
-			const uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth);
+			const uint8_t boneFlags = ANIM_BONEFLAG_FLAG(boneFlagArray, bone, flagWidth, flagBitOffset);
 
 			// no header for this bone
 			if ((boneFlags & r5::RleBoneFlags_t::STUDIO_ANIM_MASK_RELEASE) == false)
@@ -131,6 +132,7 @@ void ParseAnimSeqDataForSeq(ModelSeq_t* const seqdesc, const size_t boneCount, c
 			}
 
 			panim = panim->pNext();
+			flagBitOffset += flagWidth;
 		}
 
 		animSeqDataAsset->dataSize = reinterpret_cast<const char* const>(panim) - animdesc->animData;

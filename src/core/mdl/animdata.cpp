@@ -1116,7 +1116,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 				Quaternion q(quats[bone]);
 				Vector scale(scales[bone]);
 
-				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth, flagWidth); // truncate byte offset then shift if needed
+				uint8_t boneFlags = ANIM_BONEFLAG_FLAG(boneFlagArray, bone, flagWidth, flagBitOffset); // truncate byte offset then shift if needed
 				const uint8_t* panimtrack = reinterpret_cast<const uint8_t*>(panim + 1);
 				const float fLocalFrame = static_cast<float>(iLocalFrame) + s;
 
@@ -1204,7 +1204,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 				Vector scale(scales[bone]);
 				RadianEuler baseRot(rotations[bone]);
 
-				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth, flagBitOffset); // truncate byte offset then shift if needed
+				uint8_t boneFlags = ANIM_BONEFLAG_FLAG(boneFlagArray, bone, flagWidth, flagBitOffset); // truncate byte offset then shift if needed
 
 				assertm((boneFlags & (r5::RleBoneFlags_t::STUDIO_ANIM_UNK10 | r5::RleBoneFlags_t::STUDIO_ANIM_UNK20)) == 0, "had new flags");
 

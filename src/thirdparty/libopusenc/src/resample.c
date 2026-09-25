@@ -57,9 +57,7 @@
    The latter both reduces CPU time and makes the algorithm more SIMD-friendly.
 */
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #ifdef OUTSIDE_SPEEX
 #include <stdlib.h>

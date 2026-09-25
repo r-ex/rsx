@@ -802,6 +802,9 @@ ModelSeq_t::ModelSeq_t(const r5::mstudioseqdesc_v18_t* const seqdesc, const char
 			{
 				const r5::mstudioanimdesc_v19_1_t* const pAnimdesc = seqdesc->pAnimDesc_V19_1(static_cast<uint16_t>(i));
 
+				// this flag was added in s30.1 (v20 mdl/v14 seq), but has not been seen in the wild yet. it will break things when it does.
+				assertm((pAnimdesc->flags & 0x1000000) == 0, "bingo");
+
 				// sanity checks, there are sequences that have animations, but no data for the anim descriptions, and I am unsure how the game checks them.
 				// fps can't be negative, fps practically shouldn't be more than 2048, 128k frames is an absurd amount, so this is a very good check, since the number (int) should never have those last bits filled.
 				if (ANIMDESC_SANITY_CHECK(pAnimdesc))
@@ -1105,13 +1108,15 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 			const uint8_t* const boneFlagArray = reinterpret_cast<const uint8_t* const>((animdesc->*s_AnimdataFuncs_DP[funcType])(&iLocalFrame, &sectionlength));
 			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount, flagWidth)]);
 
+			int flagBitOffset = 0; // this is how retail apex seems to handle it now since we have a weird bitfield size
+
 			for (int bone = 0; bone < boneCount; bone++)
 			{
 				Vector pos(positions[bone]);
 				Quaternion q(quats[bone]);
 				Vector scale(scales[bone]);
 
-				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth); // truncate byte offset then shift if needed
+				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth, flagWidth); // truncate byte offset then shift if needed
 				const uint8_t* panimtrack = reinterpret_cast<const uint8_t*>(panim + 1);
 				const float fLocalFrame = static_cast<float>(iLocalFrame) + s;
 
@@ -1167,6 +1172,8 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 				CAnimDataBone& animDataBone = animData.GetBone(bone);
 				animDataBone.SetFlags(boneFlags);
 				animDataBone.SetFrame(frame, pos, q, scale);
+
+				flagBitOffset += flagWidth;
 			}
 		}
 	}
@@ -1188,6 +1195,8 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 			const r5::mstudio_rle_anim_t* panim = reinterpret_cast<const r5::mstudio_rle_anim_t*>(&boneFlagArray[ANIM_BONEFLAG_SIZE(boneCount, flagWidth)]);
 			UNUSED(sectionlength);
 
+			int flagBitOffset = 0; // this is how retail apex seems to handle it now since we have a weird bitfield size
+
 			for (int bone = 0; bone < boneCount; bone++)
 			{
 				Vector pos(positions[bone]);
@@ -1195,7 +1204,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 				Vector scale(scales[bone]);
 				RadianEuler baseRot(rotations[bone]);
 
-				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth); // truncate byte offset then shift if needed
+				uint8_t boneFlags = ANIM_BONEFLAGS_FLAG(boneFlagArray, bone, flagWidth, flagBitOffset); // truncate byte offset then shift if needed
 
 				assertm((boneFlags & (r5::RleBoneFlags_t::STUDIO_ANIM_UNK10 | r5::RleBoneFlags_t::STUDIO_ANIM_UNK20)) == 0, "had new flags");
 
@@ -1214,6 +1223,8 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 				CAnimDataBone& animDataBone = animData.GetBone(bone);
 				animDataBone.SetFlags(boneFlags);
 				animDataBone.SetFrame(frame, pos, q, scale);
+
+				flagBitOffset += flagWidth;
 			}
 		}
 	}

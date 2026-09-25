@@ -721,7 +721,7 @@ namespace r5
 	// Model Animation
 	//
 
-	struct mstudio_nointerpframes_t
+	struct mstudio_nointerpframes_v18_t
 	{
 		int firstFrame;
 		int lastFrame;
@@ -811,7 +811,7 @@ namespace r5
 		uint16_t noInterpFrameOffset;
 		uint16_t noInterpFrameCount;
 		const int NoInterpFrameSingle(const int i) const { return reinterpret_cast<int*>((char*)this + FIX_OFFSET(noInterpFrameOffset))[i]; }
-		const mstudio_nointerpframes_t* NoInterpFramePair(const int i) const { return &reinterpret_cast<mstudio_nointerpframes_t*>((char*)this + FIX_OFFSET(noInterpFrameOffset))[i]; }
+		const mstudio_nointerpframes_v18_t* NoInterpFramePair(const int i) const { return &reinterpret_cast<mstudio_nointerpframes_v18_t*>((char*)this + FIX_OFFSET(noInterpFrameOffset))[i]; }
 	};
 
 
@@ -896,6 +896,23 @@ namespace r5
 			assert(i >= 0 && i < numbones);
 			return reinterpret_cast<Vector*>((char*)this + FIX_OFFSET(scaleindex)) + i;
 		}
+	};
+
+
+	//
+	// VERSION 20
+	//
+
+	//
+	// Model Animation
+	//
+
+	struct mstudio_nointerpframes_v20_t
+	{
+		int firstFrame;
+		int lastFrame;
+
+		uint16_t interpScaleOffset; // per bone
 	};
 
 

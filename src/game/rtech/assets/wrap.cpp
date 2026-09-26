@@ -234,7 +234,7 @@ bool ExportWrapAsset(CAsset* const asset, const int setting)
         break;
     }
 #if (HAS_BSP_SUPPORT)
-    case WrapAssetType_e::BSP:
+    case VPKFileType_e::BSP:
     {
         StreamIO wrapOut;
 
@@ -320,14 +320,16 @@ void* PreviewWrapAsset(CAsset* const asset, const bool firstFrameForAsset)
     case VPKFileType_e::UNKNOWN:
         return Wrap_PreviewTextOrBinary(asset, wrapAsset, firstFrameForAsset);
 #if (HAS_BSP_SUPPORT)
-    case WrapAssetType_e::BSP:
+    case VPKFileType_e::BSP:
+    {
+        if (!wrapAsset->parsedData)
+            return Wrap_PreviewTextOrBinary(asset, wrapAsset, firstFrameForAsset);
+
         return reinterpret_cast<CBSPData*>(wrapAsset->parsedData)->ConstructPreviewData();
+    }
 #endif
     default:
-    {
-        ImGui::Text("Preview for WRAP assets is currently not supported for BSP files");
         return nullptr;
-    }
     }
 
     unreachable();

@@ -7,7 +7,7 @@
 // [ASSET FEATURES]
 #define HAS_ODL_ASSET true
 #define HAS_QC true
-#define HAS_BSP_SUPPORT false
+#define HAS_BSP_SUPPORT true
 #define HAS_MILES_EVENTS true
 
 // [GENERAL FEATURES]

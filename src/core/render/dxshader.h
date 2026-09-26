@@ -529,7 +529,6 @@ constexpr static const char s_BSPPixelShader[] = {
 "{"
 "return baseTexture.Sample(texSampler, input.uv);"
 "}"
-};
 
 };
 

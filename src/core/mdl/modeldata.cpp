@@ -1906,6 +1906,9 @@ void CalcMatrixForBone_Unparented(const DXBone_t& bone, XMMATRIX& matOut)
 //
 void UpdateModelBoneMatrix(CDXDrawData* const drawData)
 {
+	if (!drawData->boneMatrixBuffer)
+		return;
+
 	ID3D11DeviceContext* const ctx = g_dxHandler->GetDeviceContext();
 
 	D3D11_MAPPED_SUBRESOURCE resource;

@@ -10,7 +10,7 @@
 extern CDXParentHandler* g_dxHandler;
 extern std::unique_ptr<char[]> GetWrapAssetData(CAsset* const asset, uint64_t* outSize);
 
-void GetShadersForVertexLump(int vertexType, CShader** vertexShaderOut, CShader** pixelShaderOut)
+static void BSP_GetVertexLumpShaders(int vertexType, CShader** vertexShaderOut, CShader** pixelShaderOut)
 {
 	D3D11_INPUT_ELEMENT_DESC* inputElements = nullptr;
 	UINT numElements = 0;
@@ -329,13 +329,11 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		m_drawData = new CDXDrawData();
 
 		m_drawData->dataType = CDXDrawData::DrawDataType_e::MODEL;
-
 		//CreateOrUpdatePreviewStructuredBuffers();
-
-		m_drawData->pixelShader = g_dxHandler->GetShaderManager()->LoadShader("shaders/bsp_ps", eShaderType::Pixel);
-		m_drawData->vertexShader = g_dxHandler->GetShaderManager()->LoadShader("shaders/bsp_vs", eShaderType::Vertex);
+		m_drawData->modelName = m_mapName;
 
 		std::map<int, ID3D11Buffer*> lumpVertexBuffers;
+		BSP_GetVertexLumpShaders(MESH_VERTEX_UNLIT, &m_drawData->vertexShader, &m_drawData->pixelShader);
 
 		const float3* vertexPositionsLumpData = reinterpret_cast<const float3*>(GetLumpData(LUMP_VERTEXES).get());
 		const float3* vertexNormalsLumpData = reinterpret_cast<const float3*>(GetLumpData(LUMP_VERTNORMALS).get());

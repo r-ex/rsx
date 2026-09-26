@@ -515,21 +515,23 @@ constexpr static const char s_AdvancedPreviewVertexShader[] = {
 
 // File: bsp_ps.hlsl
 constexpr static const char s_BSPPixelShader[] = {
-"struct VS_Output"
-"{"
-"float4 position : SV_POSITION;"
-"float3 worldPosition : POSITION;"
-"float4 color : COLOR;"
-"float3 normal : NORMAL;"
-"float2 uv : TEXCOORD;"
-"};"
-"Texture2D baseTexture : register(t0);"
-"SamplerState texSampler : register(s0);"
-"float4 ps_main(VS_Output input) : SV_Target"
-"{"
-"return baseTexture.Sample(texSampler, input.uv);"
-"}"
-
+"struct VS_Output\n"
+"{\n"
+"float4 position : SV_POSITION;\n"
+"float3 worldPosition : POSITION;\n"
+"float4 color : COLOR;\n"
+"float3 normal : NORMAL;\n"
+"float2 uv : TEXCOORD;\n"
+"};\n"
+"Texture2D baseTexture : register(t0);\n"
+"SamplerState texSampler : register(s0);\n"
+"float4 ps_main(VS_Output input) : SV_Target\n"
+"{\n"
+"float4 col = baseTexture.Sample(texSampler, input.uv);\n"
+"const float3 lightDir = normalize(float3(0.4f, 1.f, 0.3f));\n"
+"const float Id = 0.35f + (0.65f * saturate(dot(input.normal, lightDir)));\n"
+"return float4(Id * col.rgb * float3(1.f, 1.f, 1.f), 1.f);\n"
+"}\n"
 };
 
 // File: vertexLitBump_vs.hlsl

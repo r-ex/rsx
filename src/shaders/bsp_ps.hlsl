@@ -14,6 +14,11 @@ SamplerState texSampler : register(s0);
 
 float4 ps_main(VS_Output input) : SV_Target
 {
-    // return input.color;
-    return baseTexture.Sample(texSampler, input.uv);
+    float4 col = baseTexture.Sample(texSampler, input.uv);
+
+    // simple lambertian lighting: https://bentobaux.github.io/posts/basic-lighting-models-in-hlsl/
+    const float3 lightDir = normalize(float3(0.4f, 1.f, 0.3f));
+    const float Id = 0.65f * saturate(dot(input.normal, lightDir));
+
+    return float4(Id * col.rgb * float3(1.f, 1.f, 1.f), 1.f);
 }

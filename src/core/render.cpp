@@ -365,6 +365,12 @@ void SettingsWnd_Draw(CUIState* uiState)
         ImGui::SameLine();
         ImGuiExt::HelpMarker("Distance at which render of 3D objects will stop.");
 
+#if (PREVIEW_FIRST_PERSON)
+        ImGui::SliderFloat("Camera Movement Speed", &g_PreviewSettings.previewMovementSpeed, PREVIEW_SPEED_MIN, PREVIEW_SPEED_MAX);
+        ImGui::SameLine();
+        ImGuiExt::HelpMarker("Speed at which the camera moves through the 3D scene.\n");
+#endif
+
         // ===============================================================================================================
         ImGui::SeparatorText("Asset Settings");
 

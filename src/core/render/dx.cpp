@@ -372,19 +372,19 @@ void CDXCamera::AddRotation(float yaw, float pitch, float roll)
     rotation.z += roll;
 }
 
-// first-person
-//XMMATRIX CDXCamera::GetViewMatrix()
-//{
-//    const XMMATRIX rotMatrix = XMMatrixRotationRollPitchYaw(rotation.x, rotation.y, rotation.z);
-//
-//    target = XMVector3TransformCoord(XMVectorSet(0, 0, 1, 0), rotMatrix);
-//    up = XMVector3TransformCoord(XMVectorSet(0, 1, 0, 0), rotMatrix);
-//
-//    target = position.AsXMVector() + target;
-//
-//    return XMMatrixLookAtLH(position.AsXMVector(), target, up);
-//}
+#if (PREVIEW_FIRST_PERSON)
+XMMATRIX CDXCamera::GetViewMatrix()
+{
+    const XMMATRIX rotMatrix = XMMatrixRotationRollPitchYaw(rotation.x, rotation.y, rotation.z);
 
+    target = XMVector3TransformCoord(XMVectorSet(0, 0, 1, 0), rotMatrix);
+    up = XMVector3TransformCoord(XMVectorSet(0, 1, 0, 0), rotMatrix);
+
+    target = position.AsXMVector() + target;
+
+    return XMMatrixLookAtLH(position.AsXMVector(), target, up);
+}
+#else // orbit
 XMMATRIX CDXCamera::GetViewMatrix()
 {
     Vector ttarget = { 0,0,0 };
@@ -399,6 +399,7 @@ XMMATRIX CDXCamera::GetViewMatrix()
 
     return XMMatrixLookAtLH(cameraPos, focusPos, upDir);
 }
+#endif
 
 bool CDXParentHandler::SetupAdapters()
 {

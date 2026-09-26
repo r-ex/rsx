@@ -223,7 +223,17 @@ void Preview_Model(CDXDrawData* drawData, float dt)
 
         ImGui::Image(g_dxHandler->GetPreviewFrameBufferSRV(), avail);
 
+        // Model name overlay
+        // Calculate the full size of the model name's text.
+        // If the full model path is too long for the window, truncate it to just the file name
+        const ImVec2 fullTextSize = ImGui::CalcTextSize(drawData->modelName.c_str());
+
+        ImGui::SetCursorPos(initCursorPos + ImVec2(3.f, 0.f));
+        ImGui::Text("%s", fullTextSize.x > windowSize.x ? GetStringAfterLastSlash(drawData->modelName.c_str()) : drawData->modelName.c_str());
+
         const bool isSceneHovered = ImGui::IsItemHovered();
+
+#if !(PREVIEW_FIRST_PERSON) // only the orbit camera is able to zoom
         if (isSceneHovered)
         {
             const float wheel = ImGui::GetIO().MouseWheel;
@@ -236,14 +246,6 @@ void Preview_Model(CDXDrawData* drawData, float dt)
             }
         }
 
-        // Other UI stuff
-        // Calculate the full size of the model name's text.
-        // If the full model path is too long for the window, truncate it to just the file name
-        const ImVec2 fullTextSize = ImGui::CalcTextSize(drawData->modelName.c_str());
-
-        ImGui::SetCursorPos(initCursorPos + ImVec2(3.f, 0.f));
-        ImGui::Text("%s", fullTextSize.x > windowSize.x ? GetStringAfterLastSlash(drawData->modelName.c_str()) : drawData->modelName.c_str());
-
         ImGui::SetCursorPos(ImVec2(initCursorPos.x + 5.f, (initCursorPos.y + windowSize.y) - 215.f));
         ImGui::VSliderFloat("##ModelZoom", ImVec2(20.f, 150.f), &camera->distanceToPivot, 300.f, 5.f, "", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoInput);
 
@@ -255,12 +257,22 @@ void Preview_Model(CDXDrawData* drawData, float dt)
         ImGui::Text("-");
 
         ImGui::Text("%.f%%", (CAMERA_DEFAULT_DISTANCE / camera->distanceToPivot) * 100.f);
+#else
+        constexpr bool isSliderHovered = false;
+#endif
 
         const bool mouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
         if (!g_pInput->applyMouseInput)
             g_pInput->applyMouseInput = isSceneHovered && !isSliderHovered && mouseDown;
         else
             g_pInput->applyMouseInput = mouseDown;
+
+#if (PREVIEW_FIRST_PERSON)
+        if (g_pInput->applyMouseInput)
+            ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
+        else
+            ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoKeyboard;
+#endif
 
         // Gizmo
         auto& cfg = ImOGuizmo::config;

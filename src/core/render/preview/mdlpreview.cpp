@@ -223,6 +223,9 @@ void Preview_Model(CDXDrawData* drawData, float dt)
 
         ImGui::Image(g_dxHandler->GetPreviewFrameBufferSRV(), avail);
 
+        // Must immediately follow the ImGui::Image call as ImGui looks for the last item drawn
+        const bool isSceneHovered = ImGui::IsItemHovered(); 
+
         // Model name overlay
         // Calculate the full size of the model name's text.
         // If the full model path is too long for the window, truncate it to just the file name
@@ -230,8 +233,6 @@ void Preview_Model(CDXDrawData* drawData, float dt)
 
         ImGui::SetCursorPos(initCursorPos + ImVec2(3.f, 0.f));
         ImGui::Text("%s", fullTextSize.x > windowSize.x ? GetStringAfterLastSlash(drawData->modelName.c_str()) : drawData->modelName.c_str());
-
-        const bool isSceneHovered = ImGui::IsItemHovered();
 
 #if !(PREVIEW_FIRST_PERSON) // only the orbit camera is able to zoom
         if (isSceneHovered)

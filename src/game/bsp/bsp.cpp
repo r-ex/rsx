@@ -415,10 +415,12 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				DXMeshDrawData_t meshDrawData = {};
 				meshDrawData.indexFormat = DXGI_FORMAT_R32_UINT;
 
-				meshDrawData.doFrustumCulling = true;
+				meshDrawData.doFrustumCulling = false;
 				meshDrawData.modelMins = model->mins;
 				meshDrawData.modelMaxs = model->maxs;
 				meshDrawData.visible = true;
+				meshDrawData.hasGameShaders = false;
+				meshDrawData.wireframe = false;
 
 				const dmaterialsort_t* mtlSort = &materialLumpData[mesh->mtlSortIdx];
 

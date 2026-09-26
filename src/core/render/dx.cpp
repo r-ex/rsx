@@ -363,8 +363,6 @@ void CDXCamera::AddRotation(float yaw, float pitch, float roll)
     if (rotation.y < (-XM_PI))
         rotation.y += 2.f * XM_PI;
 
-    rotation.x += pitch;
-
     // when this is clamped to 90 degrees, the view flips when it hits 90
     // if it's 89.5 the bug doesn't happen. i dont know how to fix it right now so i'm just going to leave it like this for now
     rotation.x = std::clamp(rotation.x + pitch, -DEG2RAD(89.5f), DEG2RAD(89.5f));

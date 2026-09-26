@@ -5,6 +5,7 @@
 #include <core/render/dx.h>
 #include <game/rtech/assets/material.h>
 #include <game/rtech/assets/texture.h>
+#include <core/render/preview/preview.h>
 
 extern CDXParentHandler* g_dxHandler;
 extern std::unique_ptr<char[]> GetWrapAssetData(CAsset* const asset, uint64_t* outSize);
@@ -310,44 +311,13 @@ void CBSPData::PopulateFromPakAsset(CPakAsset* pakAsset, void* bspData)
 	l.numVertNormals = header->lumps[LUMP_VERTNORMALS].filelen / sizeof(Vector);
 }
 
-void CreateDXDrawDataTransformsBuffer(CDXDrawData* drawData)
 {
-	if (!drawData->transformsBuffer)
-	{
-		D3D11_BUFFER_DESC desc{};
 
-		constexpr UINT transformsBufferSizeAligned = IALIGN(sizeof(VS_TransformConstants), 16);
 
-		desc.ByteWidth = transformsBufferSizeAligned;
 
-		// make sure this buffer can be updated every frame
-		desc.Usage = D3D11_USAGE_DYNAMIC;
-		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-		// const buffer
-		desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-
-		g_dxHandler->GetDevice()->CreateBuffer(&desc, NULL, &drawData->transformsBuffer);
 	}
 
-	D3D11_MAPPED_SUBRESOURCE resource;
-	g_dxHandler->GetDeviceContext()->Map(
-		drawData->transformsBuffer, 0,
-		D3D11_MAP_WRITE_DISCARD, 0,
-		&resource
-	);
-
-	CDXCamera* const camera = g_dxHandler->GetCamera();
-	const XMMATRIX view = camera->GetViewMatrix();
-	const XMMATRIX model = XMMatrixTranslationFromVector(drawData->position.AsXMVector());
-	const XMMATRIX projection = g_dxHandler->GetProjMatrix();
-
-	VS_TransformConstants* const transforms = reinterpret_cast<VS_TransformConstants*>(resource.pData);
-	transforms->modelMatrix = XMMatrixTranspose(model);
-	transforms->viewMatrix = XMMatrixTranspose(view);
-	transforms->projectionMatrix = XMMatrixTranspose(projection);
-
-	g_dxHandler->GetDeviceContext()->Unmap(drawData->transformsBuffer, 0);
 }
 
 #define CONVERT_VERT_STRIDE(originalStride) (originalStride - (2*sizeof(uint32_t))) + (2 * sizeof(float3))
@@ -527,7 +497,7 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		}
 	}
 
-	CreateDXDrawDataTransformsBuffer(m_drawData);
+	Preview_MapTransformsBuffer(m_drawData);
 
 	return m_drawData;
 }

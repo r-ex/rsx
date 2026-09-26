@@ -329,7 +329,6 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		m_drawData = new CDXDrawData();
 
 		m_drawData->dataType = CDXDrawData::DrawDataType_e::MODEL;
-		//CreateOrUpdatePreviewStructuredBuffers();
 		m_drawData->modelName = m_mapName;
 
 		std::map<int, ID3D11Buffer*> lumpVertexBuffers;
@@ -428,7 +427,7 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				const int meshVertType = mesh->flags & 0x600;
 				const int meshVertLumpId = GetVertexLumpIdByMeshFlag(meshVertType);
 
-				GetShadersForVertexLump(meshVertType, &meshVertexShader, &meshPixelShader);
+				BSP_GetVertexLumpShaders(meshVertType, &meshVertexShader, &meshPixelShader);
 
 				meshDrawData.vertexShader = meshVertexShader->Get<ID3D11VertexShader>();
 				meshDrawData.pixelShader = meshPixelShader->Get<ID3D11PixelShader>();

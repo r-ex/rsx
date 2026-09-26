@@ -263,7 +263,12 @@ public:
         TEXTURE,
     };
 
-    CDXDrawData() : bones() {};
+    CDXDrawData() : bones(),
+        transformsBuffer(nullptr), modelInstanceBuffer(nullptr),
+        boneMatrixBuffer(nullptr), boneMatrixSRV(nullptr),
+        inputLayout(nullptr), pixelShader(nullptr), vertexShader(nullptr),
+        modelName(""), position(0.f), dataType(DrawDataType_e::MODEL)
+    {};
 
     ~CDXDrawData()
     {
@@ -302,7 +307,7 @@ public:
     std::unordered_map<uint8_t, ID3D11ShaderResourceView*> pixelShaderResources;
     std::unordered_map<uint8_t, ID3D11ShaderResourceView*> vertexShaderResources;
 
-    char* modelName;
+    std::string modelName;
 
     Vector position;
 

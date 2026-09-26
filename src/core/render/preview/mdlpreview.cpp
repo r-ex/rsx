@@ -239,10 +239,10 @@ void Preview_Model(CDXDrawData* drawData, float dt)
         // Other UI stuff
         // Calculate the full size of the model name's text.
         // If the full model path is too long for the window, truncate it to just the file name
-        const ImVec2 fullTextSize = ImGui::CalcTextSize(drawData->modelName);
+        const ImVec2 fullTextSize = ImGui::CalcTextSize(drawData->modelName.c_str());
 
         ImGui::SetCursorPos(initCursorPos + ImVec2(3.f, 0.f));
-        ImGui::Text("%s", fullTextSize.x > windowSize.x ? GetStringAfterLastSlash(drawData->modelName) : drawData->modelName);
+        ImGui::Text("%s", fullTextSize.x > windowSize.x ? GetStringAfterLastSlash(drawData->modelName.c_str()) : drawData->modelName.c_str());
 
         ImGui::SetCursorPos(ImVec2(initCursorPos.x + 5.f, (initCursorPos.y + windowSize.y) - 215.f));
         ImGui::VSliderFloat("##ModelZoom", ImVec2(20.f, 150.f), &camera->distanceToPivot, 300.f, 5.f, "", ImGuiSliderFlags_Logarithmic | ImGuiSliderFlags_NoInput);

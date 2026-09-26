@@ -11,10 +11,11 @@ extern std::unique_ptr<char[]> GetWrapAssetData(CAsset* const asset, uint64_t* o
 
 void GetShadersForVertexLump(int vertexType, CShader** vertexShaderOut, CShader** pixelShaderOut)
 {
-	CShader* vertexShader = nullptr;
-	CShader* pixelShader = nullptr;
 	D3D11_INPUT_ELEMENT_DESC* inputElements = nullptr;
 	UINT numElements = 0;
+
+	CShader* pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/bsp_ps", s_BSPPixelShader, eShaderType::Pixel);
+	CShader* vertexShader = nullptr;
 
 	switch (vertexType)
 	{
@@ -35,7 +36,6 @@ void GetShadersForVertexLump(int vertexType, CShader** vertexShaderOut, CShader*
 		inputElements[3] = { "UNK",      0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
 		vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/vertexLitFlat_vs", s_VertexLitFlatShader, eShaderType::Vertex, inputElements, numElements);
-		pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/bsp_ps", s_BSPPixelShader, eShaderType::Pixel);
 
 		break;
 	}
@@ -67,7 +67,6 @@ void GetShadersForVertexLump(int vertexType, CShader** vertexShaderOut, CShader*
 		inputElements[5] = { "UNK",       0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
 		vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/vertexLitBump_vs", s_VertexLitBumpShader, eShaderType::Vertex, inputElements, numElements);
-		pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/bsp_ps", s_BSPPixelShader, eShaderType::Pixel);
 
 		break;
 	}
@@ -88,7 +87,6 @@ void GetShadersForVertexLump(int vertexType, CShader** vertexShaderOut, CShader*
 		inputElements[3] = { "UNK",      0, DXGI_FORMAT_R32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
 		vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/vertexLitFlat_vs", s_VertexLitFlatShader, eShaderType::Vertex, inputElements, numElements);
-		pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/bsp_ps", s_BSPPixelShader, eShaderType::Pixel);
 
 		break;
 	}
@@ -109,7 +107,6 @@ void GetShadersForVertexLump(int vertexType, CShader** vertexShaderOut, CShader*
 		inputElements[3] = { "UNK",      0, DXGI_FORMAT_R32G32_UINT,        0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0 };
 
 		vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/vertexUnlitTS_vs", s_VertexUnlitTSShader, eShaderType::Vertex, inputElements, numElements);
-		pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/bsp_ps", s_BSPPixelShader, eShaderType::Pixel);
 
 		break;
 	}
@@ -196,7 +193,6 @@ uint8_t GetVertexLumpIdByMeshFlag(int vertexType)
 	}
 }
 
-#define CONVERT_VERT_STRIDE(originalStride) (originalStride - (2*sizeof(uint32_t))) + (2 * sizeof(float3))
 
 void CBSPData::CreateOrUpdatePreviewStructuredBuffers()
 {
@@ -353,6 +349,8 @@ void CreateDXDrawDataTransformsBuffer(CDXDrawData* drawData)
 
 	g_dxHandler->GetDeviceContext()->Unmap(drawData->transformsBuffer, 0);
 }
+
+#define CONVERT_VERT_STRIDE(originalStride) (originalStride - (2*sizeof(uint32_t))) + (2 * sizeof(float3))
 
 CDXDrawData* CBSPData::ConstructPreviewData()
 {

@@ -42,8 +42,9 @@ LPARAM CInput::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		RAWINPUT* rawInput = reinterpret_cast<RAWINPUT*>(data);
 		if (rawInput->header.dwType == RIM_TYPEMOUSE)
 		{
-			this->mousedx = rawInput->data.mouse.lLastX;
-			this->mousedy = rawInput->data.mouse.lLastY;
+			// accumulate mouse deltas
+			this->mousedx += rawInput->data.mouse.lLastX;
+			this->mousedy += rawInput->data.mouse.lLastY;
 		}
 
 		break;

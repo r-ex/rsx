@@ -311,15 +311,6 @@ void CBSPData::PopulateFromPakAsset(CPakAsset* pakAsset, void* bspData)
 	l.numVertNormals = header->lumps[LUMP_VERTNORMALS].filelen / sizeof(Vector);
 }
 
-{
-
-
-
-
-	}
-
-}
-
 #define CONVERT_VERT_STRIDE(originalStride) (originalStride - (2*sizeof(uint32_t))) + (2 * sizeof(float3))
 
 CDXDrawData* CBSPData::ConstructPreviewData()

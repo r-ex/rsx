@@ -382,6 +382,21 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 			delete[] newVertexBuffer;
 		}
 
+		// Precache the vertex lump shaders so we don't have to hit the shadermanager cache for every mesh
+		std::unordered_map<uint16_t, std::pair<CShader*, CShader*>> vertShaders =
+		{
+			{MESH_VERTEX_LIT_FLAT, {}},
+			{MESH_VERTEX_LIT_BUMP, {}},
+			{MESH_VERTEX_UNLIT, {}},
+			{MESH_VERTEX_UNLIT_TS, {}},
+
+		};
+
+		for (auto& [typeFlags, shaders] : vertShaders)
+		{
+			BSP_GetVertexLumpShaders(typeFlags, &shaders.first, &shaders.second);
+		}
+
 		const dmodel_t* modelLumpData = reinterpret_cast<dmodel_t*>(GetLumpData(LUMP_MODELS).get());
 		const dmesh_t* meshLumpData = reinterpret_cast<dmesh_t*>(GetLumpData(LUMP_MESHES).get());
 		const dmaterialsort_t* materialLumpData = reinterpret_cast<dmaterialsort_t*>(GetLumpData(LUMP_MATERIAL_SORT).get());
@@ -389,19 +404,7 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		const dtexdata_t* texLumpData = reinterpret_cast<dtexdata_t*>(GetLumpData(LUMP_TEXDATA).get());
 		const char* texStringLumpData = reinterpret_cast<char*>(GetLumpData(LUMP_TEXDATA_STRING_DATA).get());
 
-		std::unordered_map<uint16_t, std::pair<CShader*, CShader*>> vertShaders =
-		{
-			{MESH_VERTEX_LIT_FLAT, {}},
-			{MESH_VERTEX_LIT_BUMP, {}},
-			{MESH_VERTEX_UNLIT, {}},
-			{MESH_VERTEX_UNLIT_TS, {}},
-		
-		};
-
-		for (auto& [typeFlags, shaders] : vertShaders)
-		{
-			BSP_GetVertexLumpShaders(typeFlags, &shaders.first, &shaders.second);
-		}
+		std::unordered_map<int, std::shared_ptr<CTexture>> meshTextureCache;
 
 		for (int i = 0; i < l.numModels; ++i)
 		{
@@ -476,29 +479,36 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 					meshIndexData
 				);
 
-
 				delete[] meshIndexData;
 
-
-				const dtexdata_t& tex = texLumpData[mtlSort->texdata];
-				std::string materialName = &texStringLumpData[tex.nameStringTableID];
-				materialName = "material/" + materialName + "_wldc.rpak";
-
-				CAsset* materialAsset = g_assetData.FindAsset(materialName);
-				if (materialAsset)
+				if (meshTextureCache.contains(mtlSort->texdata))
 				{
-					CPakAsset* matlPakAsset = reinterpret_cast<CPakAsset*>(materialAsset);
-					const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlPakAsset->extraData());
+					meshDrawData.textures.push_back({ 0, meshTextureCache.at(mtlSort->texdata) });
+				}
+				else
+				{
+					const dtexdata_t& tex = texLumpData[mtlSort->texdata];
+					std::string materialName = &texStringLumpData[tex.nameStringTableID];
+					materialName = "material/" + materialName + "_wldc.rpak";
 
-					meshDrawData.textures.clear();
-					const TextureAssetEntry_t& texEntry = matl->txtrAssets[0];
-					//for (auto& texEntry : matl->txtrAssets)
+					CAsset* materialAsset = g_assetData.FindAsset(materialName);
+					if (materialAsset)
 					{
-						if (texEntry.asset)
+						CPakAsset* matlPakAsset = reinterpret_cast<CPakAsset*>(materialAsset);
+						const MaterialAsset* const matl = reinterpret_cast<MaterialAsset*>(matlPakAsset->extraData());
+
+						meshDrawData.textures.clear();
+						const TextureAssetEntry_t& texEntry = matl->txtrAssets[0];
+						//for (auto& texEntry : matl->txtrAssets)
 						{
-							TextureAsset* txtr = reinterpret_cast<TextureAsset*>(texEntry.asset->extraData());
-							const std::shared_ptr<CTexture> highestTextureMip = CreateTextureFromMip(texEntry.asset, &txtr->mipArray[std::min(2ull, txtr->mipArray.size() - 1)], s_PakToDxgiFormat[txtr->imgFormat]);
-							meshDrawData.textures.push_back({ texEntry.index, highestTextureMip });
+							if (texEntry.asset)
+							{
+								TextureAsset* txtr = reinterpret_cast<TextureAsset*>(texEntry.asset->extraData());
+								const std::shared_ptr<CTexture> highestTextureMip = CreateTextureFromMip(texEntry.asset, &txtr->mipArray[std::min(2ull, txtr->mipArray.size() - 1)], s_PakToDxgiFormat[txtr->imgFormat]);
+								meshDrawData.textures.push_back({ 0, highestTextureMip });
+
+								meshTextureCache.emplace(mtlSort->texdata, highestTextureMip);
+							}
 						}
 					}
 				}

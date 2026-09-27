@@ -323,7 +323,6 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		m_drawData->modelName = m_mapName;
 
 		std::map<int, ID3D11Buffer*> lumpVertexBuffers;
-		BSP_GetVertexLumpShaders(MESH_VERTEX_UNLIT, &m_drawData->vertexShader, &m_drawData->pixelShader);
 
 		const float3* vertexPositionsLumpData = reinterpret_cast<const float3*>(GetLumpData(LUMP_VERTEXES).get());
 		const float3* vertexNormalsLumpData = reinterpret_cast<const float3*>(GetLumpData(LUMP_VERTNORMALS).get());

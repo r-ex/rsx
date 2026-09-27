@@ -2343,9 +2343,6 @@ void* PreviewParsedData(ModelPreviewInfo_t* const info, ModelParsedData_t* const
 	if (!drawData)
 		return nullptr;
 
-	drawData->vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_vs", s_PreviewVertexShader, eShaderType::Vertex);
-	drawData->pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("shaders/model_ps", s_PreviewPixelShader, eShaderType::Pixel);
-
 	// [rika]: do the preview stuff here!
 	assertm(parsedData->lods.size() > 0, "no lods in preview?");
 	const ModelLODData_t& lodData = parsedData->lods.at(info->selectedLODLevel);

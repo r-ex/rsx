@@ -266,7 +266,7 @@ public:
     CDXDrawData() : bones(),
         transformsBuffer(nullptr), modelInstanceBuffer(nullptr),
         boneMatrixBuffer(nullptr), boneMatrixSRV(nullptr),
-        inputLayout(nullptr), pixelShader(nullptr), vertexShader(nullptr),
+        inputLayout(nullptr),
         modelName(""), position(0.f), dataType(DrawDataType_e::MODEL)
     {};
 
@@ -300,9 +300,6 @@ public:
     std::shared_ptr<CTexture> previewTexture;
 
     ID3D11InputLayout* inputLayout;
-
-    CShader* pixelShader;
-    CShader* vertexShader;
 
     std::unordered_map<uint8_t, ID3D11ShaderResourceView*> pixelShaderResources;
     std::unordered_map<uint8_t, ID3D11ShaderResourceView*> vertexShaderResources;

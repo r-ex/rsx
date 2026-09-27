@@ -56,6 +56,15 @@ void Preview_Model(CDXDrawData* drawData, float dt)
     UNUSED(device);
 #endif
 
+    const bool hasBones = drawData->boneMatrixBuffer && drawData->boneMatrixSRV;
+
+    if (hasBones)
+    {
+        // VertexShader: g_boneMatrix, g_boneMatrixPrevFrame
+        ctx->VSSetShaderResources(VSRSRC_BONE_MATRIX, 1u, &drawData->boneMatrixSRV);
+        ctx->VSSetShaderResources(VSRSRC_BONE_MATRIX_PREV_FRAME, 1u, &drawData->boneMatrixSRV);
+    }
+
     drawData->SetPSResource(PSRSRC_CUBEMAP, g_dxHandler->GetCubemapSRV());
     drawData->SetPSResource(PSRSRC_CSMDEPTHATLASSAMPLER, g_dxHandler->GetCSMDepthAtlasSamplerSRV());
     drawData->SetPSResource(PSRSRC_SHADOWMAP, g_dxHandler->GetShadowMapSRV());
@@ -64,156 +73,164 @@ void Preview_Model(CDXDrawData* drawData, float dt)
 
     CDXCamera* const camera = g_dxHandler->GetCamera();
 
-    if (drawData->vertexShader && drawData->pixelShader) LIKELY
+    ID3D11SamplerState* const defaultSamplerState = g_dxHandler->GetSamplerState();
+    ctx->PSSetSamplers(0, 1, &defaultSamplerState);
+
+    assertm(drawData->transformsBuffer, "uh oh something very bad happened!!!!!!");
+
+    ctx->VSSetConstantBuffers(0u, 1u, &drawData->transformsBuffer); // VS_TransformConstants/CBufModelInstance
+
+    scene.previewGrid.Draw(ctx);
+
+    ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+    UINT offset = 0u;
+
+    // Initially set up with non-wireframe RS and then only change it when needed, instead of calling on every mesh
+    ctx->RSSetState(g_dxHandler->GetRasterizerState());
+    bool previousMeshWireframe = false;
+
+    for (size_t i = 0; i < drawData->meshBuffers.size(); ++i)
     {
-        assertm(drawData->transformsBuffer, "uh oh something very bad happened!!!!!!");
+        const DXMeshDrawData_t& meshDrawData = drawData->meshBuffers[i];
 
-        ctx->VSSetConstantBuffers(0u, 1u, &drawData->transformsBuffer); // VS_TransformConstants/CBufModelInstance
+        if (!meshDrawData.visible || !meshDrawData.vertexShader || !meshDrawData.pixelShader)
+            continue;
 
-        scene.previewGrid.Draw(ctx);
-
-        ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-        UINT offset = 0u;
-
-        for (size_t i = 0; i < drawData->meshBuffers.size(); ++i)
-        {
-            const DXMeshDrawData_t& meshDrawData = drawData->meshBuffers[i];
-
-            if (!meshDrawData.visible || !meshDrawData.vertexShader || !meshDrawData.pixelShader)
-                continue;
-
-            // Add mesh weights StructuredBuffer as a resource
+        if(hasBones)
             drawData->SetVSResource(61u, meshDrawData.weightsSRV);
 
+        if (previousMeshWireframe != meshDrawData.wireframe)
+        {
             ctx->RSSetState(meshDrawData.wireframe ? g_dxHandler->GetRasterizerStateWireFrame() : g_dxHandler->GetRasterizerState());
-
-            assertm(meshDrawData.vertexShader != nullptr, "No vertex shader?");
-            assertm(meshDrawData.pixelShader != nullptr, "No pixel shader?");
-
-            ctx->IASetInputLayout(meshDrawData.inputLayout);
-            ctx->VSSetShader(meshDrawData.vertexShader, nullptr, 0u);
-
-            ID3D11Buffer* sharedConstBuffers[] = {
-                camera->bufCommonPerCamera,    // CBufCommonPerCamera - b2
-                drawData->modelInstanceBuffer, // CBufModelInstance   - b3
-            };
-
-            for (auto& rsrc : drawData->vertexShaderResources)
-            {
-                if (rsrc.second)
-                    ctx->VSSetShaderResources(rsrc.first, 1u, &rsrc.second);
-            }
-
-            // [AMP]
-            if (meshDrawData.hasGameShaders)
-            {
-                // VertexShader: CBufCommonPerCamera, CBufModelInstance
-                ctx->VSSetConstantBuffers(2u, ARRSIZE(sharedConstBuffers), sharedConstBuffers);
-            }
-
-            // VertexShader: g_boneMatrix, g_boneMatrixPrevFrame
-            ctx->VSSetShaderResources(VSRSRC_BONE_MATRIX, 1u, &drawData->boneMatrixSRV);
-            ctx->VSSetShaderResources(VSRSRC_BONE_MATRIX_PREV_FRAME, 1u, &drawData->boneMatrixSRV);
-
-            ctx->IASetVertexBuffers(0u, 1u, &meshDrawData.vertexBuffer, &meshDrawData.vertexStride, &offset);
-            // ==============================================================================
-
-            ctx->PSSetShader(meshDrawData.pixelShader, nullptr, 0u);
-
-            ID3D11SamplerState* const samplerState = g_dxHandler->GetSamplerState();
-
-            // [AMP] Samplers, Lights, CBufs
-            if (meshDrawData.hasGameShaders)
-            {
-                ID3D11SamplerState* samplers[] = {
-                    g_dxHandler->GetSamplerComparisonState(),
-                    samplerState,
-                    samplerState,
-                };
-                ctx->PSSetSamplers(0, ARRSIZE(samplers), samplers);
-
-                if (meshDrawData.uberStaticBuf)
-                    ctx->PSSetConstantBuffers(0u, 1u, &meshDrawData.uberStaticBuf);
-
-                if (meshDrawData.uberDynamicBuf)
-                    ctx->PSSetConstantBuffers(1u, 1u, &meshDrawData.uberDynamicBuf);
-
-                // PixelShader: CBufCommonPerCamera, CBufModelInstance
-                ctx->PSSetConstantBuffers(2u, ARRSIZE(sharedConstBuffers), sharedConstBuffers);
-
-                // PixelShader: s_globalLights
-                ctx->PSSetShaderResources(PSRSRC_GLOBAL_LIGHTS, 1u, &scene.globalLightsSRV);
-                ctx->PSSetShaderResources(PSRSRC_CUBEMAP_SAMPLES, 1u, &scene.cubemapSamplesSRV);
-            }
-            else
-                ctx->PSSetSamplers(0, 1, &samplerState);
-
-            // Bind texture resources for this mesh's material
-            for (auto& tex : meshDrawData.textures)
-            {
-                ID3D11ShaderResourceView* const textureSRV = tex.texture
-                    ? tex.texture.get()->GetSRV()
-                    : nullptr;
-
-                ctx->PSSetShaderResources(tex.resourceBindPoint, 1u, &textureSRV);
-            }
-
-            // Bind pixel shader resources
-            for (auto& rsrc : drawData->pixelShaderResources)
-            {
-                ctx->PSSetShaderResources(rsrc.first, 1u, &rsrc.second);
-            }
-
-            // ==============================================================================
-            ctx->IASetIndexBuffer(meshDrawData.indexBuffer, meshDrawData.indexFormat, 0u);
-            ctx->DrawIndexed(static_cast<UINT>(meshDrawData.numIndices), 0u, 0u);
+            previousMeshWireframe = meshDrawData.wireframe;
         }
 
-        CShader* vertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("preview/prim_vs", s_PrimitiveVertexShader, eShaderType::Vertex, s_PrimitiveInputLayout, std::size(s_PrimitiveInputLayout));
-        CShader* pixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("preview/prim_ps", s_PrimitivePixelShader, eShaderType::Pixel);
+        assertm(meshDrawData.vertexShader != nullptr, "No vertex shader?");
+        assertm(meshDrawData.pixelShader != nullptr, "No pixel shader?");
+
+        ctx->IASetInputLayout(meshDrawData.inputLayout);
+        ctx->VSSetShader(meshDrawData.vertexShader, nullptr, 0u);
+
+        ID3D11Buffer* sharedConstBuffers[] = {
+            camera->bufCommonPerCamera,    // CBufCommonPerCamera - b2
+            drawData->modelInstanceBuffer, // CBufModelInstance   - b3
+        };
+
+        for (auto& rsrc : drawData->vertexShaderResources)
+        {
+            if (rsrc.second)
+                ctx->VSSetShaderResources(rsrc.first, 1u, &rsrc.second);
+        }
+
+#if (ADVANCED_MODEL_PREVIEW)
+        // [AMP]
+        if (meshDrawData.hasGameShaders)
+        {
+            // VertexShader: CBufCommonPerCamera, CBufModelInstance
+            ctx->VSSetConstantBuffers(2u, ARRSIZE(sharedConstBuffers), sharedConstBuffers);
+        }
+#endif
+
+
+        ctx->IASetVertexBuffers(0u, 1u, &meshDrawData.vertexBuffer, &meshDrawData.vertexStride, &offset);
+        // ==============================================================================
+
+        ctx->PSSetShader(meshDrawData.pixelShader, nullptr, 0u);
+
+
+#if (ADVANCED_MODEL_PREVIEW)
+        // [AMP] Samplers, Lights, CBufs
+        if (meshDrawData.hasGameShaders)
+        {
+            ID3D11SamplerState* samplers[] = {
+                g_dxHandler->GetSamplerComparisonState(),
+                defaultSamplerState,
+                defaultSamplerState,
+            };
+            ctx->PSSetSamplers(0, ARRSIZE(samplers), samplers);
+
+            if (meshDrawData.uberStaticBuf)
+                ctx->PSSetConstantBuffers(0u, 1u, &meshDrawData.uberStaticBuf);
+
+            if (meshDrawData.uberDynamicBuf)
+                ctx->PSSetConstantBuffers(1u, 1u, &meshDrawData.uberDynamicBuf);
+
+            // PixelShader: CBufCommonPerCamera, CBufModelInstance
+            ctx->PSSetConstantBuffers(2u, ARRSIZE(sharedConstBuffers), sharedConstBuffers);
+
+            // PixelShader: s_globalLights
+            ctx->PSSetShaderResources(PSRSRC_GLOBAL_LIGHTS, 1u, &scene.globalLightsSRV);
+            ctx->PSSetShaderResources(PSRSRC_CUBEMAP_SAMPLES, 1u, &scene.cubemapSamplesSRV);
+        }
+#endif
+
+        // Bind texture resources for this mesh's material
+        for (auto& tex : meshDrawData.textures)
+        {
+            ID3D11ShaderResourceView* const textureSRV = tex.texture
+                ? tex.texture.get()->GetSRV()
+                : nullptr;
+
+            ctx->PSSetShaderResources(tex.resourceBindPoint, 1u, &textureSRV);
+        }
+
+        // Bind pixel shader resources
+        for (auto& rsrc : drawData->pixelShaderResources)
+        {
+            ctx->PSSetShaderResources(rsrc.first, 1u, &rsrc.second);
+        }
+
+        // ==============================================================================
+        ctx->IASetIndexBuffer(meshDrawData.indexBuffer, meshDrawData.indexFormat, 0u);
+        ctx->DrawIndexed(static_cast<UINT>(meshDrawData.numIndices), 0u, 0u);
+    }
+
+
+    // Debug Drawing =========================================================================
+    static CShader* debugVertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("preview/prim_vs", s_PrimitiveVertexShader, eShaderType::Vertex, s_PrimitiveInputLayout, std::size(s_PrimitiveInputLayout));
+    static CShader* debugPixelShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("preview/prim_ps", s_PrimitivePixelShader, eShaderType::Pixel);
         
+    if(drawData->debugPrims.size() > 0)
         ctx->VSSetConstantBuffers(0u, 1u, &drawData->transformsBuffer);
 
-        auto iterator = drawData->debugPrims.begin();
-        while (iterator != drawData->debugPrims.end())
+    auto iterator = drawData->debugPrims.begin();
+    while (iterator != drawData->debugPrims.end())
+    {
+        if (!iterator->visible)
         {
-            if (!iterator->visible)
-            {
-                iterator++;
-                continue;
-            }
-
-            ctx->IASetPrimitiveTopology(iterator->primTopology);
-
-            ctx->RSSetState(iterator->wireframe ? g_dxHandler->GetRasterizerStateWireFrame() : g_dxHandler->GetRasterizerState());
-
-            ctx->IASetInputLayout(vertexShader->GetInputLayout());
-            ctx->VSSetShader(vertexShader->Get<ID3D11VertexShader>(), nullptr, 0u);
-            ctx->PSSetShader(pixelShader->Get<ID3D11PixelShader>(), nullptr, 0u);
-
-            constexpr UINT vertexStride = sizeof(PrimitiveVertex_t);
-            ctx->IASetVertexBuffers(0u, 1u, &iterator->vertexBuffer, &vertexStride, &offset);
-
-            // ==============================================================================
-            ctx->IASetIndexBuffer(iterator->indexBuffer, DXGI_FORMAT_R16_UINT, 0u);
-
-            ctx->OMSetDepthStencilState(g_dxHandler->GetDepthStencilState(false), 1u);
-
-            if (iterator->indexed)
-                ctx->DrawIndexed(iterator->numIndices, 0u, 0u);
-            else
-                ctx->Draw(iterator->numVertices, 0u);
-
-            iterator->lifeRemaining -= dt;
-
-            if (iterator->lifeRemaining <= 0)
-                iterator = drawData->debugPrims.erase(iterator);
-            else
-                iterator++;
+            iterator++;
+            continue;
         }
+
+        ctx->IASetPrimitiveTopology(iterator->primTopology);
+
+        ctx->RSSetState(iterator->wireframe ? g_dxHandler->GetRasterizerStateWireFrame() : g_dxHandler->GetRasterizerState());
+
+        ctx->IASetInputLayout(debugVertexShader->GetInputLayout());
+        ctx->VSSetShader(debugVertexShader->Get<ID3D11VertexShader>(), nullptr, 0u);
+        ctx->PSSetShader(debugPixelShader->Get<ID3D11PixelShader>(), nullptr, 0u);
+
+        constexpr UINT vertexStride = sizeof(PrimitiveVertex_t);
+        ctx->IASetVertexBuffers(0u, 1u, &iterator->vertexBuffer, &vertexStride, &offset);
+
+        // ==============================================================================
+        ctx->IASetIndexBuffer(iterator->indexBuffer, DXGI_FORMAT_R16_UINT, 0u);
+
+        ctx->OMSetDepthStencilState(g_dxHandler->GetDepthStencilState(false), 1u);
+
+        if (iterator->indexed)
+            ctx->DrawIndexed(iterator->numIndices, 0u, 0u);
+        else
+            ctx->Draw(iterator->numVertices, 0u);
+
+        iterator->lifeRemaining -= dt;
+
+        if (iterator->lifeRemaining <= 0)
+            iterator = drawData->debugPrims.erase(iterator);
+        else
+            iterator++;
     }
-    else assertm(0, "Failed to load shaders for model preview.");
 
     if (g_dxHandler->GetPreviewFrameBuffer())
     {

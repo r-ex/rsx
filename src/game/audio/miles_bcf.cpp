@@ -249,39 +249,42 @@ void __fastcall BinkInterface_ResetStart(__int64 a1)
 void get_block_size_internal(BinkDecoder_t* decoder, const char* input_reservoir, size_t input_reservoir_len,
 	uint32_t* out_consumed_bytes, uint32_t* out_block_size, uint32_t* out_req_size)
 {
-	unsigned int v13; // ecx
-	unsigned int v14; // ecx
-	int v15; // edx
-
 	ASI_reset_start(decoder);
 	const char* initialReservoirPtr = input_reservoir;
 	if (input_reservoir_len < 4)
 	{
-	LABEL_12:
 		*out_consumed_bytes = 0xFFFF;
 	}
 	else
 	{
 		while (1)
 		{
-			v13 = *(uint32_t*)input_reservoir;
+			uint32_t frameCheck = *(uint32_t*)input_reservoir;
+
 			if (*(uint32_t*)input_reservoir == 'BCF1')
 				break;
-			if ((uint16_t)v13 == 0x9999)
+
+			if ((frameCheck & 0xFFFF) == 0x9999)
 			{
-				v14 = HIWORD(v13);
-				v15 = 4;
-				if (v14 == 0xFFFF)
+				uint16_t frameSize = frameCheck >> 16;
+				uint32_t frameHeaderSize = 4;
+				if (frameSize == 0xFFFF)
 				{
 					if (input_reservoir_len < 8)
-						goto LABEL_12;
-					v14 = *(unsigned __int16*)(input_reservoir + 4);
-					v15 = 8;
+					{
+						*out_consumed_bytes = 0xFFFF;
+						*out_block_size = 0xFFFF;
+						*out_req_size = 0;
+						return;
+					}
+
+					frameSize = *(uint16_t*)(input_reservoir + 4);
+					frameHeaderSize = 8;
 				}
-				if (v14 <= LOWORD(decoder->maxCompSpaceNeeded))
+				if (frameSize <= LOWORD(decoder->maxCompSpaceNeeded))
 				{
 					*out_consumed_bytes = static_cast<uint32_t>(input_reservoir - initialReservoirPtr);
-					*out_block_size = v15 + v14;
+					*out_block_size = frameHeaderSize + frameSize;
 					*out_req_size = 8;
 					return;
 				}
@@ -289,10 +292,16 @@ void get_block_size_internal(BinkDecoder_t* decoder, const char* input_reservoir
 			--input_reservoir_len;
 			++input_reservoir;
 			if (input_reservoir_len < 4)
-				goto LABEL_12;
+			{
+				*out_consumed_bytes = 0xFFFF;
+				*out_block_size = 0xFFFF;
+				*out_req_size = 0;
+				return;
+			}
 		}
 		*out_consumed_bytes = decoder->seekTableSize;
 	}
+
 	*out_block_size = 0xFFFF;
 	*out_req_size = 0;
 }

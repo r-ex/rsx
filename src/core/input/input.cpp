@@ -90,10 +90,10 @@ void CInput::Init(HWND hwnd) const
 
 void CInput::Frame(float dt)
 {
-	//UNUSED(dt);
+	UNUSED(dt);
 
 	if(applyMouseInput)
-		g_dxHandler->GetCamera()->AddRotation(mousedx * 0.5f * dt, mousedy * 0.5f * dt, 0);
+		g_dxHandler->GetCamera()->AddRotation(mousedx * 0.0005f, mousedy * 0.0005f, 0);
 
 	//if (this->mouseCaptured)
 	//{

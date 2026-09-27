@@ -498,16 +498,27 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 
 						meshDrawData.textures.clear();
 						const TextureAssetEntry_t& texEntry = matl->txtrAssets[0];
-						//for (auto& texEntry : matl->txtrAssets)
+						if (texEntry.asset)
 						{
-							if (texEntry.asset)
-							{
-								TextureAsset* txtr = reinterpret_cast<TextureAsset*>(texEntry.asset->extraData());
-								const std::shared_ptr<CTexture> highestTextureMip = CreateTextureFromMip(texEntry.asset, &txtr->mipArray[std::min(2ull, txtr->mipArray.size() - 1)], s_PakToDxgiFormat[txtr->imgFormat]);
-								meshDrawData.textures.push_back({ 0, highestTextureMip });
+							TextureAsset* txtr = reinterpret_cast<TextureAsset*>(texEntry.asset->extraData());
 
-								meshTextureCache.emplace(mtlSort->texdata, highestTextureMip);
+							// go thru the mips until we find the largest permanent one
+							// (idrc if the textures look a bit bad, using all starpak ones will be laggy)
+							std::shared_ptr<CTexture> highestTextureMip = nullptr;
+							for (const TextureMip_t& mip : txtr->mipArray | std::views::reverse)
+							{
+								if (mip.type != eTextureMipType::RPak)
+									continue;
+
+								highestTextureMip = CreateTextureFromMip(texEntry.asset, &mip, s_PakToDxgiFormat[txtr->imgFormat]);
+
+								if (highestTextureMip)
+									break;
 							}
+
+							meshDrawData.textures.push_back({ 0, highestTextureMip });
+
+							meshTextureCache.emplace(mtlSort->texdata, highestTextureMip);
 						}
 					}
 				}

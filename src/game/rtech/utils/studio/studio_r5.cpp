@@ -498,6 +498,251 @@ namespace r5
 		*panimtrack = reinterpret_cast<const uint8_t*>(pPackedData + total);
 	}
 
+	// newer revision of functions, seemingly more 'optimized' by skipping certain interp parsing if unneeded
+	void CalcBoneQuaternion_DP(const bool hasFlagTmp, const int sectionlength, const uint8_t** panimtrack, const float fFrame, Quaternion& q)
+	{
+		const uint8_t* ptrack = *reinterpret_cast<const uint8_t** const>(panimtrack);
+
+		uint8_t valid = 1;
+		uint8_t total = 1;
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 1.0f; // previously init as 0.0f, new version is 1.0f!
+
+		// [rika]: get data pointers
+		const AnimQuat32* pPackedData = reinterpret_cast<const AnimQuat32* const>(ptrack + 2);
+
+		if (hasFlagTmp == false)
+		{
+			valid = ptrack[0];
+			total = ptrack[1];
+
+			if (total > 1)
+			{
+				const uint8_t* const pFrameIndices = ptrack + 2;
+
+				CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pPackedData);
+			}
+		}
+
+		const AxisFixup_t* pAxisFixup = reinterpret_cast<const AxisFixup_t*>(pPackedData + valid);
+
+		// [rika]: see to our datapoint
+		int validIdx = 0;
+		uint32_t remainingFrames = 0;
+
+		const uint32_t prevTarget = prevFrame;
+		CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ prevTarget);
+
+		Quaternion q1;
+		AnimQuat32::Unpack(q1, pPackedData[validIdx], &pAxisFixup[prevFrame]);
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			q = q1;
+		}
+		else
+		{
+			// [rika]: see to our datapoint (the sequal)
+			const uint32_t nextTarget = (nextFrame - prevFrame) + remainingFrames; // to check if our current data will contain this interp data, seek until we have it
+			CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ nextTarget);
+
+			Quaternion q2;
+			AnimQuat32::Unpack(q2, pPackedData[validIdx], &pAxisFixup[nextFrame]);
+
+			QuaternionSlerp(q1, q2, s, q);
+		}
+
+		assertm(q.IsValid(), "invalid quaternion");
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pAxisFixup + total);
+	}
+
+	void CalcBonePosition_DP(const bool hasFlagTmp, const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& pos)
+	{
+		const uint8_t* ptrack = *reinterpret_cast<const uint8_t** const>(panimtrack);
+
+		const uint8_t valid = ptrack[0];
+		uint8_t total = 1;
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 1.0f; // previously init as 0.0f, new version is 1.0f!
+
+		// [rika]: get data pointers
+		const AnimPos64* pPackedData = reinterpret_cast<const AnimPos64* const>(ptrack + 1);
+
+		if (hasFlagTmp == false)
+		{
+			total = ptrack[1];
+
+			// [rika]: return zeros if no data
+			if (!total)
+			{
+				pos.Init(0.0f, 0.0f, 0.0f);
+				return;
+			}
+
+			if (total > 1)
+			{
+				const uint8_t* const pFrameIndices = ptrack + 2;
+
+				CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pPackedData);
+			}
+		}
+
+		if (valid)
+		{
+			const AxisFixup_t* pAxisFixup = reinterpret_cast<const AxisFixup_t*>(pPackedData + valid);
+
+			// [rika]: see to our datapoint
+			int validIdx = 0;
+			uint32_t remainingFrames = 0;
+
+			const uint32_t prevTarget = prevFrame;
+			CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ prevTarget);
+
+			Vector pos1;
+			AnimPos64::Unpack(pos1, pPackedData[validIdx], &pAxisFixup[prevFrame]);
+
+			// [rika]: check if we need interp or not
+			if (prevFrame == nextFrame)
+			{
+				pos = pos1;
+			}
+			else
+			{
+				// [rika]: see to our datapoint (the sequal)
+				const uint32_t nextTarget = (nextFrame - prevFrame) + remainingFrames; // to check if our current data will contain this interp data, seek until we have it
+				CalcBoneSeek_DP(pPackedData, validIdx, remainingFrames, /*valid,*/ nextTarget);
+
+				Vector pos2;
+				AnimPos64::Unpack(pos2, pPackedData[validIdx], &pAxisFixup[nextFrame]);
+
+				pos = pos1 * (1.0f - s) + pos2 * s;
+			}
+
+			// [rika]: advance the data ptr for other functions
+			*panimtrack = reinterpret_cast<const uint8_t*>(pAxisFixup + total);
+		}
+		else
+		{
+			const AnimPos48* const pPosValues = reinterpret_cast<const AnimPos48* const>(pPackedData);
+
+			const Vector pos1(pPosValues[prevFrame].values[0], pPosValues[prevFrame].values[1], pPosValues[prevFrame].values[2]);
+
+			if (prevFrame == nextFrame)
+			{
+				pos = pos1;
+			}
+			else
+			{
+				Vector pos2(pPosValues[nextFrame].values[0], pPosValues[nextFrame].values[1], pPosValues[nextFrame].values[2]);
+
+				pos = pos1 + ((pos2 - pos1) * s);
+			}
+
+			pos *= 0.0099999998f;
+
+			*panimtrack = reinterpret_cast<const uint8_t*>(pPosValues + total);
+		}
+	}
+
+	void CalcBonePositionVirtual_DP(const bool hasFlagTmp, const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& pos)
+	{
+		const uint8_t* ptrack = *reinterpret_cast<const uint8_t** const>(panimtrack);
+
+		uint8_t total = 1;
+		float posscale = 0.0f;
+
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 1.0f; // always init as 0!
+
+		// [rika]: get data pointers
+		const AxisFixup_t* pAxisFixup = nullptr;
+
+		if (hasFlagTmp)
+		{
+			const int packedscale = ptrack[0];
+			posscale = static_cast<float>(packedscale) / 127.0f;
+			pAxisFixup = reinterpret_cast<const AxisFixup_t* const>(ptrack + 1);
+		}
+		else
+		{
+			total = ptrack[0];
+
+			const int packedscale = ptrack[1];
+			posscale = static_cast<float>(packedscale) / 127.0f;
+			pAxisFixup = reinterpret_cast<const AxisFixup_t* const>(ptrack + 2);
+
+			if (total > 1)
+			{
+				const uint8_t* pFrameIndices = ptrack + 2;
+
+				CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pAxisFixup);
+			}
+		}
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			pos = pAxisFixup[prevFrame].ToVector(posscale);
+		}
+		else
+		{
+			const Vector pos1(pAxisFixup[prevFrame].ToVector(posscale));
+			const Vector pos2(pAxisFixup[nextFrame].ToVector(posscale));
+
+			pos = pos1 * (1.0f - s) + pos2 * s;
+		}
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pAxisFixup + total);
+	}
+
+	void CalcBoneScale_DP(const bool hasFlagTmp, const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& scale)
+	{
+		const uint8_t* ptrack = *reinterpret_cast<const uint8_t** const>(panimtrack);
+
+		uint8_t total = 1;
+
+		int prevFrame = 0, nextFrame = 0;
+		float s = 1.0f; // always init as 0!
+
+		// [rika]: get data pointers
+		const Vector48* pPackedData = reinterpret_cast<const Vector48* const>(ptrack + 1);
+
+		if (hasFlagTmp == false)
+		{
+			total = ptrack[0];
+
+			if (total > 1)
+			{
+				const uint8_t* pFrameIndices = ptrack + 1;
+
+				CalcBoneInterpFrames_DP(prevFrame, nextFrame, s, fFrame, total, sectionlength, pFrameIndices, &pPackedData);
+			}
+		}
+
+		// [rika]: check if we need interp or not
+		if (prevFrame == nextFrame)
+		{
+			scale = pPackedData[prevFrame].AsVector();
+		}
+		else
+		{
+			Vector scale1(pPackedData[prevFrame].AsVector());
+			Vector scale2(pPackedData[nextFrame].AsVector());
+
+			scale = scale1 * (1.0f - s) + scale2 * s;
+		}
+
+		// [rika]: advance the data ptr for other functions
+		*panimtrack = reinterpret_cast<const uint8_t*>(pPackedData + total);
+	}
+
 	void AnimQuat32::Unpack(Quaternion& quat, const AnimQuat32 packedQuat, const AxisFixup_t* const axisFixup)
 	{
 		const int scaleFac = packedQuat.scaleFactor;

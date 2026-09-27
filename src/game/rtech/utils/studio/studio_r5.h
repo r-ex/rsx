@@ -1040,6 +1040,11 @@ namespace r5
 	void CalcBonePosition_DP(int sectionlength, const uint8_t** panimtrack, float fFrame, Vector& pos);
 	void CalcBonePositionVirtual_DP(const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& pos);
 	void CalcBoneScale_DP(const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& scale);
+	// new 'optimized' style, appears in more recent builds. subject to change and cannot be tested currently, datapoint anims are not shipping. TODO: check out that weird flag once they start shipping again!
+	void CalcBoneQuaternion_DP(const bool useFlagTmp, const int sectionlength, const uint8_t** panimtrack, float fFrame, Quaternion& q);
+	void CalcBonePosition_DP(const bool useFlagTmp, const int sectionlength, const uint8_t** panimtrack, float fFrame, Vector& pos);
+	void CalcBonePositionVirtual_DP(const bool useFlagTmp, const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& pos);
+	void CalcBoneScale_DP(const bool useFlagTmp, const int sectionlength, const uint8_t** panimtrack, const float fFrame, Vector& scale);
 
 	template<class PackedType>
 	__forceinline void CalcBoneSeek_DP(const PackedType* const pPackedData, int& validIdx, uint32_t& remainingFrames, const uint32_t targetFrame)

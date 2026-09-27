@@ -802,9 +802,6 @@ ModelSeq_t::ModelSeq_t(const r5::mstudioseqdesc_v18_t* const seqdesc, const char
 			{
 				const r5::mstudioanimdesc_v19_1_t* const pAnimdesc = seqdesc->pAnimDesc_V19_1(static_cast<uint16_t>(i));
 
-				// this flag was added in s30.1 (v20 mdl/v14 seq), but has not been seen in the wild yet. it will break things when it does.
-				assertm((pAnimdesc->flags & 0x1000000) == 0, "bingo");
-
 				// sanity checks, there are sequences that have animations, but no data for the anim descriptions, and I am unsure how the game checks them.
 				// fps can't be negative, fps practically shouldn't be more than 2048, 128k frames is an absurd amount, so this is a very good check, since the number (int) should never have those last bits filled.
 				if (ANIMDESC_SANITY_CHECK(pAnimdesc))
@@ -813,6 +810,9 @@ ModelSeq_t::ModelSeq_t(const r5::mstudioseqdesc_v18_t* const seqdesc, const char
 					numblends = 0;
 					break;
 				}
+
+				// this flag was added in s30.1 (v20 mdl/v14 seq), but has not been seen in the wild yet. it will break things when it does.
+				assertm((pAnimdesc->flags & 0x1000000) == 0, "bingo");
 
 				anims[i] = ModelAnim_t(pAnimdesc, ext);
 			}

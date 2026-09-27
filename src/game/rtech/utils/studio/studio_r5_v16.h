@@ -977,6 +977,11 @@ namespace r5
 	};
 	static_assert(sizeof(AnimQuat32) == 0x4);
 
+	struct AnimPos48
+	{
+		int16_t values[3];
+	};
+
 	struct AnimPos64
 	{
 		inline uint64_t AsUint64() const { return *reinterpret_cast<const uint64_t*>(this); }

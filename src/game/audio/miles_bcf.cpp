@@ -452,6 +452,7 @@ void ASI_decode_block(void* container, const char* inputBuffer, size_t inputBuff
 
 }
 
+// BinkAudioBlockSize
 void ASI_get_block_size(void* container, const char* input_reservoir, size_t input_reservoir_len,
 	uint32_t* out_consumed_bytes, uint32_t* out_block_size, uint32_t* out_req_size)
 {
@@ -465,17 +466,19 @@ void ASI_get_block_size(void* container, const char* input_reservoir, size_t inp
 		return;
 	}
 
-	uint32_t headerSize = 4;
-	uint32_t someSizeVar = 0;
 
-	if (*reinterpret_cast<const uint16_t*>(input_reservoir) != 0x9999)
+	uint32_t frameHeaderSize = 4;
+	const uint32_t frameCheck = *reinterpret_cast<const uint32_t*>(input_reservoir);
+
+	if ((frameCheck & 0xFFFF) != 0x9999)
 	{
 		get_block_size_internal(decoder, input_reservoir, input_reservoir_len, out_consumed_bytes, out_block_size, out_req_size);
 
 		return;
 	}
 
-	if (*reinterpret_cast<const uint16_t*>(input_reservoir + 2) == 0xFFFF)
+	uint32_t frameSize = frameCheck >> 16;
+	if (frameSize == 0xFFFF)
 	{
 		if (input_reservoir_len < 8)
 		{
@@ -485,14 +488,14 @@ void ASI_get_block_size(void* container, const char* input_reservoir, size_t inp
 			return;
 		}
 
-		someSizeVar = *reinterpret_cast<const uint16_t*>(input_reservoir + 4);
-		headerSize = 8;
+		frameSize = *reinterpret_cast<const uint16_t*>(input_reservoir + 4);
+		frameHeaderSize = 8;
 
 	}
 
-	if (someSizeVar <= decoder->maxCompSpaceNeeded) // maxCompSpaceNeeded
+	if (frameSize <= decoder->maxCompSpaceNeeded) // maxCompSpaceNeeded
 	{
-		*out_block_size = headerSize + someSizeVar;
+		*out_block_size = frameHeaderSize + frameSize;
 		*out_consumed_bytes = 0;
 		*out_req_size = 8;
 	}

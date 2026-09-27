@@ -389,6 +389,20 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		const dtexdata_t* texLumpData = reinterpret_cast<dtexdata_t*>(GetLumpData(LUMP_TEXDATA).get());
 		const char* texStringLumpData = reinterpret_cast<char*>(GetLumpData(LUMP_TEXDATA_STRING_DATA).get());
 
+		std::unordered_map<uint16_t, std::pair<CShader*, CShader*>> vertShaders =
+		{
+			{MESH_VERTEX_LIT_FLAT, {}},
+			{MESH_VERTEX_LIT_BUMP, {}},
+			{MESH_VERTEX_UNLIT, {}},
+			{MESH_VERTEX_UNLIT_TS, {}},
+		
+		};
+
+		for (auto& [typeFlags, shaders] : vertShaders)
+		{
+			BSP_GetVertexLumpShaders(typeFlags, &shaders.first, &shaders.second);
+		}
+
 		for (int i = 0; i < l.numModels; ++i)
 		{
 			const dmodel_t* model = &modelLumpData[i];
@@ -415,10 +429,17 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				CShader* meshPixelShader = nullptr;
 				CShader* meshVertexShader = nullptr;
 
-				const int meshVertType = mesh->flags & 0x600;
+				const uint16_t meshVertType = mesh->flags & 0x600;
 				const int meshVertLumpId = GetVertexLumpIdByMeshFlag(meshVertType);
 
-				BSP_GetVertexLumpShaders(meshVertType, &meshVertexShader, &meshPixelShader);
+				if (vertShaders.contains(meshVertType))
+				{
+					const auto& shaderPair = vertShaders.at(meshVertType);
+
+					meshVertexShader = shaderPair.first;
+					meshPixelShader = shaderPair.second;
+				}
+				else assert(0);
 
 				meshDrawData.vertexShader = meshVertexShader->Get<ID3D11VertexShader>();
 				meshDrawData.pixelShader = meshPixelShader->Get<ID3D11PixelShader>();

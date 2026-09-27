@@ -371,9 +371,9 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				g_dxHandler->GetDevice(),
 				&lumpVertexBuffers[i],
 				static_cast<UINT>(numVertices * newStride),
-				D3D11_USAGE_DYNAMIC,
+				D3D11_USAGE_IMMUTABLE,
 				D3D11_BIND_VERTEX_BUFFER,
-				D3D11_CPU_ACCESS_WRITE,
+				0,
 				0, 0,
 				newVertexBuffer
 			);
@@ -471,9 +471,9 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 					g_dxHandler->GetDevice(),
 					&meshDrawData.indexBuffer,
 					static_cast<UINT>(meshDrawData.numIndices*sizeof(uint32_t)),
-					D3D11_USAGE_DYNAMIC,
+					D3D11_USAGE_IMMUTABLE,
 					D3D11_BIND_INDEX_BUFFER,
-					D3D11_CPU_ACCESS_WRITE,
+					0,
 					0, 0,
 					meshIndexData
 				);

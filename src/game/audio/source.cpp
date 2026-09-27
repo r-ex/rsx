@@ -564,8 +564,6 @@ bool ExportAudioSourceAsset(CAsset* const asset, const int setting)
 		ope_encoder_drain(enc);
 		ope_encoder_destroy(enc);
 		ope_comments_destroy(comments);
-		
-		return false;
 	}
 
 	return true;

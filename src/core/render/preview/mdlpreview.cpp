@@ -111,35 +111,21 @@ void Preview_Model(CDXDrawData* drawData, float dt)
 
         ctx->IASetInputLayout(meshDrawData.inputLayout);
         ctx->VSSetShader(meshDrawData.vertexShader, nullptr, 0u);
+        ctx->PSSetShader(meshDrawData.pixelShader, nullptr, 0u);
 
+#if (ADVANCED_MODEL_PREVIEW)
         ID3D11Buffer* sharedConstBuffers[] = {
             camera->bufCommonPerCamera,    // CBufCommonPerCamera - b2
             drawData->modelInstanceBuffer, // CBufModelInstance   - b3
         };
 
-        for (auto& rsrc : drawData->vertexShaderResources)
-        {
-            if (rsrc.second)
-                ctx->VSSetShaderResources(rsrc.first, 1u, &rsrc.second);
-        }
-
-#if (ADVANCED_MODEL_PREVIEW)
         // [AMP]
         if (meshDrawData.hasGameShaders)
         {
             // VertexShader: CBufCommonPerCamera, CBufModelInstance
             ctx->VSSetConstantBuffers(2u, ARRSIZE(sharedConstBuffers), sharedConstBuffers);
         }
-#endif
 
-
-        ctx->IASetVertexBuffers(0u, 1u, &meshDrawData.vertexBuffer, &meshDrawData.vertexStride, &offset);
-        // ==============================================================================
-
-        ctx->PSSetShader(meshDrawData.pixelShader, nullptr, 0u);
-
-
-#if (ADVANCED_MODEL_PREVIEW)
         // [AMP] Samplers, Lights, CBufs
         if (meshDrawData.hasGameShaders)
         {
@@ -181,11 +167,34 @@ void Preview_Model(CDXDrawData* drawData, float dt)
             ctx->PSSetShaderResources(rsrc.first, 1u, &rsrc.second);
         }
 
-        // ==============================================================================
-        ctx->IASetIndexBuffer(meshDrawData.indexBuffer, meshDrawData.indexFormat, 0u);
-        ctx->DrawIndexed(static_cast<UINT>(meshDrawData.numIndices), 0u, 0u);
-    }
+        // Bind vertex shader resources
+        for (auto& rsrc : drawData->vertexShaderResources)
+        {
+            if (rsrc.second)
+                ctx->VSSetShaderResources(rsrc.first, 1u, &rsrc.second);
+        }
 
+        // ==============================================================================
+
+        if (meshDrawData.usesCommonBuffers)
+        {
+            if (drawData->state.currentVertexBufIdx != meshDrawData.buffers.vertexBufferIdx)
+            {
+                ID3D11Buffer* const vb = drawData->GetCommonBuffer(meshDrawData.GetVBIndex());
+                ctx->IASetVertexBuffers(0u, 1u, &vb, &meshDrawData.vertexStride, &offset);
+            }
+
+            if (drawData->state.currentIndexBufIdx != meshDrawData.buffers.indexBufferIdx)
+                ctx->IASetIndexBuffer(drawData->GetCommonBuffer(meshDrawData.GetIBIndex()), meshDrawData.indexFormat, 0u);
+        }
+        else
+        {
+            ctx->IASetVertexBuffers(0u, 1u, &meshDrawData.buffers.vertexBuffer, &meshDrawData.vertexStride, &offset);
+            ctx->IASetIndexBuffer(meshDrawData.buffers.indexBuffer, meshDrawData.indexFormat, 0u);
+        }
+
+        ctx->DrawIndexed(static_cast<UINT>(meshDrawData.numIndices), meshDrawData.GetIndexStart(), 0u);
+    }
 
     // Debug Drawing =========================================================================
     static CShader* debugVertexShader = g_dxHandler->GetShaderManager()->LoadShaderFromString("preview/prim_vs", s_PrimitiveVertexShader, eShaderType::Vertex, s_PrimitiveInputLayout, std::size(s_PrimitiveInputLayout));

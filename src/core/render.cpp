@@ -530,7 +530,7 @@ static void MainWnd_MenuBar()
         ImGuiExt::IconText(ICON_CI_ERROR, ImVec4(1.f, 0.f, 0.f, 1.f)); ImGui::SameLine();
         ImGui::Text("%i", errorCounts.second);
 
-#if _DEBUG
+#if 1
         IMGUI_RIGHT_ALIGN_FOR_TEXT("Avg 1.000 ms/frame (100.0 FPS)"); // [rexx]: i hate this actually
 
         ImGuiIO& io = ImGui::GetIO();

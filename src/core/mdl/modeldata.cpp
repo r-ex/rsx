@@ -622,7 +622,7 @@ void CreateBuffersForModelHitboxes(ModelParsedData_t* const parsedData, CDXDrawD
 			meshDrawData.inputLayout = vertexShader->GetInputLayout();
 			meshDrawData.hasGameShaders = false;
 
-			if (!meshDrawData.vertexBuffer)
+			if (!meshDrawData.buffers.vertexBuffer)
 			{
 				constexpr UINT vertStride = sizeof(Vertex_t);
 
@@ -636,13 +636,13 @@ void CreateBuffersForModelHitboxes(ModelParsedData_t* const parsedData, CDXDrawD
 
 				D3D11_SUBRESOURCE_DATA srd{ vertices.data() };
 
-				if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData.vertexBuffer)))
+				if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData.buffers.vertexBuffer)))
 					return;
 
 				meshDrawData.vertexStride = vertStride;
 			}
 
-			if (!meshDrawData.indexBuffer)
+			if (!meshDrawData.buffers.indexBuffer)
 			{
 				D3D11_BUFFER_DESC desc = {};
 
@@ -653,7 +653,7 @@ void CreateBuffersForModelHitboxes(ModelParsedData_t* const parsedData, CDXDrawD
 				desc.MiscFlags = 0;
 
 				D3D11_SUBRESOURCE_DATA srd = { indices.data()};
-				if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData.indexBuffer)))
+				if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData.buffers.indexBuffer)))
 					return;
 
 				meshDrawData.numIndices = indices.size();
@@ -686,7 +686,7 @@ void CreateBuffersForModelDrawData(ModelParsedData_t* const parsedData, CDXDrawD
 		std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(mesh.meshVertexDataIndex);
 		const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
 
-		if (!meshDrawData->vertexBuffer)
+		if (!meshDrawData->buffers.vertexBuffer)
 		{
 			constexpr UINT vertStride = sizeof(Vertex_t);
 
@@ -702,13 +702,13 @@ void CreateBuffersForModelDrawData(ModelParsedData_t* const parsedData, CDXDrawD
 
 			D3D11_SUBRESOURCE_DATA srd{ vertexData };
 
-			if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData->vertexBuffer)))
+			if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData->buffers.vertexBuffer)))
 				return;
 
 			meshDrawData->vertexStride = vertStride;
 		}
 
-		if (!meshDrawData->indexBuffer)
+		if (!meshDrawData->buffers.indexBuffer)
 		{
 			D3D11_BUFFER_DESC desc = {};
 
@@ -719,7 +719,7 @@ void CreateBuffersForModelDrawData(ModelParsedData_t* const parsedData, CDXDrawD
 			desc.MiscFlags = 0;
 
 			D3D11_SUBRESOURCE_DATA srd = { parsedVertexData->GetIndices() };
-			if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData->indexBuffer)))
+			if (FAILED(g_dxHandler->GetDevice()->CreateBuffer(&desc, &srd, &meshDrawData->buffers.indexBuffer)))
 				return;
 
 			meshDrawData->numIndices = mesh.indexCount;

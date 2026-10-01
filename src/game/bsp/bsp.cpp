@@ -194,7 +194,6 @@ uint8_t GetVertexLumpIdByMeshFlag(int vertexType)
 	}
 }
 
-
 void CBSPData::CreateOrUpdatePreviewStructuredBuffers()
 {
 	const uint32_t vertPositionsLumpSize = GetLumpSize(LUMP_VERTEXES);
@@ -323,6 +322,7 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		m_drawData->modelName = m_mapName;
 
 		std::map<int, ID3D11Buffer*> lumpVertexBuffers;
+		std::unordered_map<int, uint32_t> lumpVertBufferIndices;
 
 		const float3* vertexPositionsLumpData = reinterpret_cast<const float3*>(GetLumpData(LUMP_VERTEXES).get());
 		const float3* vertexNormalsLumpData = reinterpret_cast<const float3*>(GetLumpData(LUMP_VERTNORMALS).get());
@@ -378,6 +378,8 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				newVertexBuffer
 			);
 
+			lumpVertBufferIndices[i] = m_drawData->AddCommonBuffer(lumpVertexBuffers[i]);
+
 			delete[] newVertexBuffer;
 		}
 
@@ -388,7 +390,6 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 			{MESH_VERTEX_LIT_BUMP, {}},
 			{MESH_VERTEX_UNLIT, {}},
 			{MESH_VERTEX_UNLIT_TS, {}},
-
 		};
 
 		for (auto& [typeFlags, shaders] : vertShaders)
@@ -404,6 +405,7 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		const char* texStringLumpData = reinterpret_cast<char*>(GetLumpData(LUMP_TEXDATA_STRING_DATA).get());
 
 		std::unordered_map<int, std::shared_ptr<CTexture>> meshTextureCache;
+		std::vector<int> modelIndices;
 
 		for (int i = 0; i < l.numModels; ++i)
 		{
@@ -425,6 +427,7 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				meshDrawData.visible = true;
 				meshDrawData.hasGameShaders = false;
 				meshDrawData.wireframe = false;
+				meshDrawData.usesCommonBuffers = true;
 
 				const dmaterialsort_t* mtlSort = &materialLumpData[mesh->mtlSortIdx];
 
@@ -443,6 +446,7 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				}
 				else assert(0);
 
+				meshDrawData.buffers.vertexBufferIdx = lumpVertBufferIndices[meshVertLumpId];
 				meshDrawData.vertexShader = meshVertexShader->Get<ID3D11VertexShader>();
 				meshDrawData.pixelShader = meshPixelShader->Get<ID3D11PixelShader>();
 
@@ -455,30 +459,19 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				meshDrawData.vertexStride = CONVERT_VERT_STRIDE(originalStride);
 				meshDrawData.numIndices = mesh->triCount * 3;
 
-				uint32_t* meshIndexData = new uint32_t[meshDrawData.numIndices];
+				const uint32_t indexOffset = static_cast<uint32_t>(modelIndices.size());
+
+				meshDrawData.buffers.indexStartOffset = indexOffset;
+
+				modelIndices.resize(modelIndices.size() + meshDrawData.numIndices);
 
 				int indexIndex = 0; // ok
 				for (int k = mesh->firstIdx; k < mesh->firstIdx	+ (mesh->triCount*3); ++k)
 				{
-					meshIndexData[indexIndex] = indexLumpData[k] + mtlSort->firstVertex;
+					modelIndices[indexOffset + indexIndex] = indexLumpData[k] + mtlSort->firstVertex;
 
 					indexIndex++;
 				}
-
-				meshDrawData.vertexBuffer = lumpVertexBuffers[meshVertLumpId];
-
-				CreateD3DBuffer(
-					g_dxHandler->GetDevice(),
-					&meshDrawData.indexBuffer,
-					static_cast<UINT>(meshDrawData.numIndices*sizeof(uint32_t)),
-					D3D11_USAGE_IMMUTABLE,
-					D3D11_BIND_INDEX_BUFFER,
-					0,
-					0, 0,
-					meshIndexData
-				);
-
-				delete[] meshIndexData;
 
 				if (meshTextureCache.contains(mtlSort->texdata))
 				{
@@ -525,6 +518,26 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 
 				m_drawData->meshBuffers.push_back(meshDrawData);
 			}
+		}
+
+		ID3D11Buffer* indexBuffer = nullptr;
+
+		CreateD3DBuffer(
+			g_dxHandler->GetDevice(),
+			&indexBuffer,
+			static_cast<UINT>(modelIndices.size()*sizeof(uint32_t)),
+			D3D11_USAGE_IMMUTABLE,
+			D3D11_BIND_INDEX_BUFFER,
+			0,
+			0, 0,
+			modelIndices.data()
+		);
+
+		const uint32_t indexBufferIdx = m_drawData->AddCommonBuffer(indexBuffer);
+
+		for (auto& mesh : m_drawData->meshBuffers)
+		{
+			mesh.buffers.indexBufferIdx = indexBufferIdx;
 		}
 	}
 

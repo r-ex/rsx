@@ -149,12 +149,12 @@ static const char* s_CompressionLevelSetting[eCompressionLevel::CMPR_LVL_COUNT] 
 // preview settings
 #define PREVIEW_CULL_DEFAULT    1000.0f
 #define PREVIEW_CULL_MIN        256.0f // map max size
-#define PREVIEW_CULL_MAX        16384.0f // quarter of max map size
+#define PREVIEW_CULL_MAX        65536.0f // quarter of max map size
 
 #define PREVIEW_SPEED_DEFAULT   10.0f
 #define PREVIEW_SPEED_MIN       1.0f
-#define PREVIEW_SPEED_MAX       200.0f
-#define PREVIEW_SPEED_MULT      5.0f
+#define PREVIEW_SPEED_MAX       500.0f
+#define PREVIEW_SPEED_MULT      10.0f
 
 struct PreviewSettings_t
 {

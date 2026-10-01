@@ -64,6 +64,9 @@ struct DXDrawDataTexture_t
     std::shared_ptr<CTexture> texture;
 };
 
+#define DMDD_TRIGGER (1 << 0)
+#define DMDD_WATER   (1 << 1)
+
 struct DXMeshDrawData_t
 {
     union {
@@ -102,6 +105,8 @@ struct DXMeshDrawData_t
 
     Vector modelMins;
     Vector modelMaxs;
+
+    uint32_t meshTypeFlags;
 
     bool visible : 1;
     bool doFrustumCulling : 1;

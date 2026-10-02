@@ -250,7 +250,7 @@ void Preview_Model(CDXDrawData* drawData, float dt)
         ImGui::Image(g_dxHandler->GetPreviewFrameBufferSRV(), avail);
 
         // Must immediately follow the ImGui::Image call as ImGui looks for the last item drawn
-        const bool isSceneHovered = ImGui::IsItemHovered(); 
+        const bool isSceneHovered = ImGui::IsItemHovered();
 
         // Model name overlay
         // Calculate the full size of the model name's text.
@@ -295,6 +295,8 @@ void Preview_Model(CDXDrawData* drawData, float dt)
             g_pInput->applyMouseInput = mouseDown;
 
 #if (PREVIEW_FIRST_PERSON)
+        g_pInput->applyMouseInput = isSceneHovered;
+
         if (g_pInput->applyMouseInput)
             ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoKeyboard;
         else

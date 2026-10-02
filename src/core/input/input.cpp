@@ -92,20 +92,25 @@ void CInput::Frame(float dt)
 {
 	UNUSED(dt);
 
-	if(applyMouseInput)
-		g_dxHandler->GetCamera()->AddRotation(mousedx * 0.0005f, mousedy * 0.0005f, 0);
+#if !(PREVIEW_FIRST_PERSON)
+	const bool applyMouseRotation = applyMouseInput;
+#else
+	const bool applyMouseRotation = applyMouseInput && mouseCaptured;
+#endif
+	if(applyMouseRotation)
+		g_dxHandler->GetCamera()->AddRotation(mousedx * 0.005f, mousedy * 0.005f, 0);
 
-	//if (this->mouseCaptured)
-	//{
-	//	if (GetActiveWindow() != NULL)
-	//	{
-	//		RECT rect{};
-	//		GetWindowRect(g_dxHandler->GetWindowHandle(), &rect);
-	//		int cx = (rect.left + rect.right) / 2;
-	//		int cy = (rect.bottom + rect.top) / 2;
-	//		SetCursorPos(cx, cy);
-	//	}
-	//}
+	if (this->mouseCaptured)
+	{
+		if (GetActiveWindow() != NULL)
+		{
+			RECT rect{};
+			GetWindowRect(g_dxHandler->GetWindowHandle(), &rect);
+			int cx = (rect.left + rect.right) / 2;
+			int cy = (rect.bottom + rect.top) / 2;
+			SetCursorPos(cx, cy);
+		}
+	}
 
 	mousedx = 0;
 	mousedy = 0;

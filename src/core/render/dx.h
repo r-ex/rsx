@@ -64,8 +64,17 @@ struct DXDrawDataTexture_t
     std::shared_ptr<CTexture> texture;
 };
 
-#define DMDD_TRIGGER (1 << 0)
+#define DMDD_TRIGGER (1 << 0) // trigger_*
 #define DMDD_WATER   (1 << 1)
+#define DMDD_FOGVOL  (1 << 2) // fog_volume
+#define DMDD_EXPVOL  (1 << 3) // exposure_volume
+
+static const std::unordered_map<const char*, int> s_dxMeshTypeFlags = {
+    {"Triggers", DMDD_TRIGGER},
+    {"Water", DMDD_WATER},
+    {"Fog Volumes", DMDD_FOGVOL},
+    {"Exposure Volumes", DMDD_EXPVOL}
+};
 
 struct DXMeshDrawData_t
 {
@@ -290,6 +299,8 @@ struct DXState_t
 {
     uint32_t currentVertexBufIdx;
     uint32_t currentIndexBufIdx;
+
+    uint32_t disabledFlags;
 };
 
 class CDXDrawData
@@ -307,7 +318,7 @@ public:
         boneMatrixBuffer(nullptr), boneMatrixSRV(nullptr),
         inputLayout(nullptr),
         modelName(""), position(0.f), dataType(DrawDataType_e::MODEL),
-        state({UINT32_MAX, UINT32_MAX})
+        state({UINT32_MAX, UINT32_MAX, 0})
     {};
 
     ~CDXDrawData()

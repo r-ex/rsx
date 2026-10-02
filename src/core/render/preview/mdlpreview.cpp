@@ -97,6 +97,10 @@ void Preview_Model(CDXDrawData* drawData, float dt)
         if (!meshDrawData.visible || !meshDrawData.vertexShader || !meshDrawData.pixelShader)
             continue;
 
+        // if this mesh contains any of the flags that are disabled, skip the mesh
+        if ((meshDrawData.meshTypeFlags & drawData->state.disabledFlags) != 0)
+            continue;
+
         if(hasBones)
             drawData->SetVSResource(61u, meshDrawData.weightsSRV);
 

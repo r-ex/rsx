@@ -7,6 +7,7 @@
 #include <game/rtech/assets/texture.h>
 #include <core/render/preview/preview.h>
 #include "entities.h"
+#include <imgui.h>
 
 extern CDXParentHandler* g_dxHandler;
 extern std::unique_ptr<char[]> GetWrapAssetData(CAsset* const asset, uint64_t* outSize);
@@ -323,12 +324,70 @@ void CBSPData::PopulateFromPakAsset(CPakAsset* pakAsset, void* bspData)
 	POPULATE_BSP_ENTS(script);
 }
 
+static const std::unordered_map<std::string, int> s_classnameFlagMap = {
+	{"fog_volume", DMDD_FOGVOL},
+
+};
+
+static const std::vector<std::pair<std::string, int>> s_classnamePrefixFlags = {
+	{"trigger_", DMDD_TRIGGER},
+
+};
+
+#define ADD_MODEL_FLAG(modelIdx, val) \
+									if (flagMap.contains(modelIdx)) \
+										flagMap.at(modelIdx) |= val; \
+									else \
+										flagMap[modelIdx] = val;
+
+// fetch a map of flags for models according to any entities that reference the model
+std::unordered_map<int, uint32_t> CBSPData::ParseModelFlagsFromEntities() const
+{
+	std::unordered_map<int, uint32_t> flagMap;
+
+	if (hasEntities_env)
+	{
+		for (const BSPEntity_s& ent : envEntitiesKV)
+		{
+			std::string modelVal;
+			std::string classnameVal;
+			if (ent.GetValue("model", &modelVal) && ent.GetValue("classname", &classnameVal))
+			{
+				if (modelVal[0] == '*')
+				{
+					const int modelIdx = std::stoi(modelVal.substr(1));
+
+					const int flagValue = s_classnameFlagMap.contains(classnameVal) ? s_classnameFlagMap.at(classnameVal) : 0;
+
+					ADD_MODEL_FLAG(modelIdx, flagValue);
+
+					for (auto& [prefix, prefixFlagVal] : s_classnamePrefixFlags)
+					{
+						if (classnameVal.starts_with(prefix))
+						{
+							ADD_MODEL_FLAG(modelIdx, flagValue);
+
+							// Classes will only ever have one of the registered prefixes so like...
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return flagMap;
+}
+#undef ADD_MODEL_FLAG
+
 #define CONVERT_VERT_STRIDE(originalStride) (originalStride - (2*sizeof(uint32_t))) + (2 * sizeof(float3))
 
 CDXDrawData* CBSPData::ConstructPreviewData()
 {
 	if (!m_drawData)
 	{
+		const std::unordered_map<int, uint32_t> modelFlags = ParseModelFlagsFromEntities();
+
 		m_drawData = new CDXDrawData();
 
 		m_drawData->dataType = CDXDrawData::DrawDataType_e::MODEL;
@@ -441,6 +500,9 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 				meshDrawData.hasGameShaders = false;
 				meshDrawData.wireframe = false;
 				meshDrawData.usesCommonBuffers = true;
+				
+				if (modelFlags.contains(i))
+					meshDrawData.meshTypeFlags = modelFlags.at(i);
 
 				const dmaterialsort_t* mtlSort = &materialLumpData[mesh->mtlSortIdx];
 
@@ -552,6 +614,11 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 		{
 			mesh.buffers.indexBufferIdx = indexBufferIdx;
 		}
+	}
+
+	for (auto& [flagName, flagVal] : s_dxMeshTypeFlags)
+	{
+		ImGui::CheckboxFlags(flagName, &m_drawData->state.disabledFlags, flagVal);
 	}
 
 	Preview_MapTransformsBuffer(m_drawData);

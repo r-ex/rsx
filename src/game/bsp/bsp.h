@@ -138,6 +138,7 @@ public:
 private:
 
 	void CreateOrUpdatePreviewStructuredBuffers();
+	std::unordered_map<int, uint32_t> ParseModelFlagsFromEntities() const;
 
 private:
 	std::string m_mapName;

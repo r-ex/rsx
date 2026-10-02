@@ -1094,3 +1094,5 @@ bool ExportPngTextureAsset(CPakAsset* const asset, const TextureAsset* const txt
 bool ExportDdsTextureAsset(CPakAsset* const asset, const TextureAsset* const txtrAsset, std::filesystem::path& exportPath, const int setting, const bool isNormal);
 std::unique_ptr<char[]> GetTextureDataForMip(CPakAsset* const asset, const TextureMip_t* const mip, const DXGI_FORMAT format, const size_t arrayIndex = 0);
 std::shared_ptr<CTexture> CreateTextureFromMip(CPakAsset* const asset, const TextureMip_t* const mip, const DXGI_FORMAT format, const size_t arrayIdx = 0);
+
+std::shared_ptr<CTexture> CreateTextureFromMipChain(CPakAsset* const asset, const TextureMip_t* const topMip, const DXGI_FORMAT format, const size_t arrayIdx = 0);

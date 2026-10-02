@@ -1,6 +1,7 @@
 #include <pch.h>
 #include <game/rtech/assets/texture.h>
 #include <core/render/dx.h>
+#include <thirdparty/directxtex/DirectXTex.h>
 #include <thirdparty/imgui/imgui.h>
 #include <core/render/ui/styles.h>
 
@@ -350,17 +351,68 @@ std::shared_ptr<CTexture> CreateTextureFromMip(CPakAsset* const asset, const Tex
     if (format == DXGI_FORMAT::DXGI_FORMAT_UNKNOWN)
         return nullptr;
 
-    // Texture isn't multiple of 4, most textures are BC which requires the width n height to be multiple of 4 causing a crash.
-    if (((mip->width % 4) != 0 || (mip->height % 4) != 0))
+    if (!mip->isLoaded)
         return nullptr;
 
-    if (!mip->isLoaded)
+    // Texture isn't multiple of 4, most textures are BC which requires the width n height to be multiple of 4 causing a crash.
+    // [rexx]: uncompressed formats dont need this check since it's only BCn formats that have the block requirement
+    if (DirectX::IsCompressed(format) && ((mip->width % 4) != 0 || (mip->height % 4) != 0))
         return nullptr;
 
     std::unique_ptr<char[]> txtrData = GetTextureDataForMip(asset, mip, format, arrayIdx);
 
     return std::move(g_dxHandler->CreateRenderTexture(txtrData.get(), mip->slicePitch, mip->width, mip->height, format, 1u, 1u));
 };
+
+std::shared_ptr<CTexture> CreateTextureFromMipChain(
+    CPakAsset* const asset, const TextureMip_t* const topMip,
+    const DXGI_FORMAT format, const size_t arrayIdx)
+{
+    if (format == DXGI_FORMAT::DXGI_FORMAT_UNKNOWN)
+        return nullptr;
+
+    if (!topMip->isLoaded)
+        return nullptr;
+
+    if (DirectX::IsCompressed(format) && ((topMip->width % 4) != 0 || (topMip->height % 4) != 0))
+        return nullptr;
+
+    const TextureAsset* const txtrAsset = reinterpret_cast<TextureAsset*>(asset->extraData());
+
+    size_t loadedMipCount = 0;
+    size_t loadedMipDataSize = 0;
+
+    const size_t highestMipIdx = topMip->level - 1;
+
+    // scan thru all of the mips up to our chosen top mip to see if they are actually loaded
+    // if we hit one that isn't loaded, the mip chain ends there. the only time that this can really happen in theory is if
+    // someone loads opt starpaks but not regular starpaks, which almost def won't happen in apex anyway because of model data
+    for (size_t i = 0; i <= highestMipIdx; ++i)
+    {
+        const TextureMip_t* const mip = &txtrAsset->mipArray[highestMipIdx - i];
+
+        if (!mip->isLoaded)
+            break;
+
+        loadedMipDataSize += mip->slicePitch;
+        loadedMipCount++;
+    }
+
+    std::unique_ptr<char[]> txtrData(new char[loadedMipDataSize]);
+    char* cursor = txtrData.get();
+
+    for (size_t i = 0; i < loadedMipCount; ++i)
+    {
+        const TextureMip_t* const mip = &txtrAsset->mipArray[highestMipIdx - i];
+
+        std::unique_ptr<char[]> mipData = GetTextureDataForMip(asset, mip, format, arrayIdx);
+
+        memcpy_s(cursor, mip->slicePitch, mipData.get(), mip->slicePitch);
+        cursor += mip->slicePitch;
+    }
+
+    return std::move(g_dxHandler->CreateRenderTexture(txtrData.get(), loadedMipDataSize, topMip->width, topMip->height, format, 1u, loadedMipCount));
+}
 
 struct TexturePreviewData_t
 {

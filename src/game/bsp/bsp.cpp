@@ -572,13 +572,14 @@ CDXDrawData* CBSPData::ConstructPreviewData()
 
 							// go thru the mips until we find the largest permanent one
 							// (idrc if the textures look a bit bad, using all starpak ones will be laggy)
+							// now featuring mipmapping!
 							std::shared_ptr<CTexture> highestTextureMip = nullptr;
 							for (const TextureMip_t& mip : txtr->mipArray | std::views::reverse)
 							{
 								if (mip.type != eTextureMipType::RPak)
 									continue;
 
-								highestTextureMip = CreateTextureFromMip(texEntry.asset, &mip, s_PakToDxgiFormat[txtr->imgFormat]);
+								highestTextureMip = CreateTextureFromMipChain(texEntry.asset, &mip, s_PakToDxgiFormat[txtr->imgFormat]);
 
 								if (highestTextureMip)
 									break;

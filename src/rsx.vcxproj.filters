@@ -420,6 +420,9 @@
     <ClInclude Include="game\bsp\bsp.h">
       <Filter>game\bsp</Filter>
     </ClInclude>
+    <ClInclude Include="game\bsp\entities.h">
+      <Filter>game\bsp</Filter>
+    </ClInclude>
     <ClInclude Include="game\rtech\utils\bsp\bspflags.h">
       <Filter>game\rtech\utils\bsp</Filter>
     </ClInclude>
@@ -825,6 +828,9 @@
       <Filter>core\filehandling</Filter>
     </ClCompile>
     <ClCompile Include="game\bsp\bsp.cpp">
+      <Filter>game\bsp</Filter>
+    </ClCompile>
+    <ClCompile Include="game\bsp\entities.cpp">
       <Filter>game\bsp</Filter>
     </ClCompile>
     <ClCompile Include="game\rtech\assets\lcd_screen_effect.cpp">

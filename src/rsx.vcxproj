@@ -82,6 +82,7 @@
     <ClInclude Include="game\audio\wavefile.h" />
     <ClInclude Include="game\bluepoint\bp_pakfile.h" />
     <ClInclude Include="game\bsp\bsp.h" />
+    <ClInclude Include="game\bsp\entities.h" />
     <ClInclude Include="game\model\sourcemodel.h" />
     <ClInclude Include="game\rtech\assets\animrig.h" />
     <ClInclude Include="game\rtech\assets\animseq.h" />
@@ -236,6 +237,7 @@
     <ClCompile Include="game\audio\source.cpp" />
     <ClCompile Include="game\bluepoint\bp_pakfile.cpp" />
     <ClCompile Include="game\bsp\bsp.cpp" />
+    <ClCompile Include="game\bsp\entities.cpp" />
     <ClCompile Include="game\model\sourcemodel.cpp" />
     <ClCompile Include="game\rtech\assets\animrig.cpp" />
     <ClCompile Include="game\rtech\assets\animseq.cpp" />

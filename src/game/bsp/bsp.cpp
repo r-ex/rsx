@@ -6,6 +6,7 @@
 #include <game/rtech/assets/material.h>
 #include <game/rtech/assets/texture.h>
 #include <core/render/preview/preview.h>
+#include "entities.h"
 
 extern CDXParentHandler* g_dxHandler;
 extern std::unique_ptr<char[]> GetWrapAssetData(CAsset* const asset, uint64_t* outSize);
@@ -273,6 +274,15 @@ void CBSPData::CreateOrUpdatePreviewStructuredBuffers()
 	}
 }
 
+#define POPULATE_BSP_ENTS(type) \
+	if(CAsset* entAsset = g_assetData.FindAsset(std::format("maps/{}_{}.ent", m_mapName, #type))) \
+	{ \
+		std::unique_ptr<char[]> entData = GetWrapAssetData(entAsset, nullptr); \
+		std::string str(entData.get()); \
+		BSP_ParseEntities(str, type##EntitiesKV); \
+		hasEntities_##type = true; \
+	}
+
 void CBSPData::PopulateFromPakAsset(CPakAsset* pakAsset, void* bspData)
 {
 	CPakFile* pak = static_cast<CPakFile*>(pakAsset->GetContainerFile());
@@ -308,6 +318,9 @@ void CBSPData::PopulateFromPakAsset(CPakAsset* pakAsset, void* bspData)
 
 	l.numVertPositions = header->lumps[LUMP_VERTEXES].filelen / sizeof(Vector);
 	l.numVertNormals = header->lumps[LUMP_VERTNORMALS].filelen / sizeof(Vector);
+
+	POPULATE_BSP_ENTS(env);
+	POPULATE_BSP_ENTS(script);
 }
 
 #define CONVERT_VERT_STRIDE(originalStride) (originalStride - (2*sizeof(uint32_t))) + (2 * sizeof(float3))

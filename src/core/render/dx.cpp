@@ -607,7 +607,7 @@ bool CDXParentHandler::CreateMainView(const uint16_t w, const uint16_t h)
     {
         D3D11_RASTERIZER_DESC desc = {};
         desc.FillMode = D3D11_FILL_SOLID;
-        desc.CullMode = D3D11_CULL_BACK;
+        desc.CullMode = D3D11_CULL_NONE;
 
         if (FAILED(m_pDevice->CreateRasterizerState(&desc, &m_pRasterizerState)))
         {

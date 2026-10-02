@@ -67,7 +67,7 @@ static FORCEINLINE bool ParseString(const std::string_view& str, size_t& pos, st
 	return true;
 }
 
-bool BSP_ParseEntities(std::string_view text, std::vector<BSPEntity_s>& outEntities)
+bool BSP_ParseEntities(const std::string_view& text, std::vector<BSPEntity_s>& outEntities)
 {
 	size_t pos = 0;
 

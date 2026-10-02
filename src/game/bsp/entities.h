@@ -8,4 +8,4 @@ struct BSPEntity_s
 	bool GetValue(const std::string_view& key, std::string* outValue) const;
 };
 
-bool BSP_ParseEntities(const std::string_view text, std::vector<BSPEntity_s>& outEntities);
+bool BSP_ParseEntities(const std::string_view& text, std::vector<BSPEntity_s>& outEntities);

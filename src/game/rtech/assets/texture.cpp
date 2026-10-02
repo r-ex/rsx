@@ -351,7 +351,7 @@ std::shared_ptr<CTexture> CreateTextureFromMip(CPakAsset* const asset, const Tex
         return nullptr;
 
     // Texture isn't multiple of 4, most textures are BC which requires the width n height to be multiple of 4 causing a crash.
-    if (mip->width < 3 || mip->height < 3)
+    if (((mip->width % 4) != 0 || (mip->height % 4) != 0))
         return nullptr;
 
     if (!mip->isLoaded)

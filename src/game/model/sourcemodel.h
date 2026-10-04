@@ -81,7 +81,7 @@ public:
 
 	inline void SetParsedData(ModelParsedData_t* const parsedData) { m_modelParsed = parsedData; }
 	inline void SetLooseData(StudioLooseData_t* const looseData) { m_modelLoose = looseData; }
-	inline void SetName(char* const name) { m_modelName = name; }
+	inline void SetName(const char* const name) { m_modelName = name; }
 	void SetSequenceList(uint64_t* guids, const int count)
 	{
 		m_sequences = guids;
@@ -91,10 +91,10 @@ public:
 	inline ModelParsedData_t* const GetParsedData() const { return m_modelParsed; }
 	inline StudioLooseData_t* const GetLooseData() const { return m_modelLoose; }
 	inline const char* const GetName() const { return m_modelName; }
-	inline char* const GetNameData() const { return m_modelName; }
+	//inline char* const GetNameData() const { return m_modelName; }
 	inline const int GetSequenceCount() const { return m_numSequences; }
 	inline const uint64_t GetSequenceGUID(const int index) const { return m_sequences[index]; }
-	inline const std::vector<ModelBone_t>* const GetRig() const { return m_modelParsed ? &m_modelParsed->bones : nullptr; }
+	inline const ModelParsedData_t* const GetRig() const { return m_modelParsed ? m_modelParsed : nullptr; }
 
 	void FixupSkinData();
 
@@ -104,7 +104,7 @@ private:
 
 	ModelParsedData_t* m_modelParsed;
 	StudioLooseData_t* m_modelLoose;
-	char* m_modelName;
+	const char* m_modelName;
 
 	char** m_modelSkinNames;
 	int m_numModelSkinNames;
@@ -145,13 +145,13 @@ public:
 	inline const void* GetSequenceData() const { return m_assetSequenceData; }
 	inline const uint64_t GetAssetGUID() const { return m_assetGuid; }
 	inline ModelSeq_t* const GetSequence() const { return m_sequence; }
-	inline const std::vector<ModelBone_t>* GetRig() { return m_rig; }
+	inline const ModelParsedData_t* const GetRig() { return m_rig; }
 	inline const uint64_t GetRigGUID() const { return m_rigGuid; }
 
 	inline void SetAssetSequenceData(const void* data) { m_assetSequenceData = data; }
 	inline void SetAssetGUID(const uint64_t guid) { m_assetGuid = guid; }
 	inline void SetSequence(ModelSeq_t* const seqdesc) { m_sequence = seqdesc; }
-	inline void SetRig(const std::vector<ModelBone_t>* rig) { m_rig = rig; }
+	inline void SetRig(const ModelParsedData_t* rig) { m_rig = rig; }
 
 	// anim data
 	void SetParsed() { m_animationParsed = true; }
@@ -164,7 +164,7 @@ private:
 	ModelSeq_t* m_sequence;
 	bool m_animationParsed;
 
-	const std::vector<ModelBone_t>* m_rig;
+	const ModelParsedData_t* m_rig;
 	uint64_t m_rigGuid;
 
 	void SetUnparsed() { m_animationParsed = false; }

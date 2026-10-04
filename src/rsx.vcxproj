@@ -125,7 +125,6 @@
     <ClInclude Include="game\rtech\utils\bvh\bvh.h" />
     <ClInclude Include="game\rtech\utils\studio\optimize.h" />
     <ClInclude Include="game\rtech\utils\studio\studio.h" />
-    <ClInclude Include="game\rtech\utils\studio\studio_generic.h" />
     <ClInclude Include="game\rtech\utils\studio\studio_r1.h" />
     <ClInclude Include="game\rtech\utils\studio\studio_r2.h" />
     <ClInclude Include="game\rtech\utils\studio\studio_r5.h" />
@@ -276,7 +275,6 @@
     <ClCompile Include="game\rtech\patchapi.cpp" />
     <ClCompile Include="game\rtech\utils\bvh\bvh.cpp" />
     <ClCompile Include="game\rtech\utils\studio\studio.cpp" />
-    <ClCompile Include="game\rtech\utils\studio\studio_generic.cpp" />
     <ClCompile Include="game\rtech\utils\studio\studio_r1.cpp" />
     <ClCompile Include="game\rtech\utils\studio\studio_r2.cpp" />
     <ClCompile Include="game\rtech\utils\studio\studio_r5.cpp" />

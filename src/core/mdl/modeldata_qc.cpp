@@ -57,122 +57,120 @@ void QC_ParseStudioHeader(qc::QCFile* const qc, const ModelParsedData_t* const p
 {
 	using namespace qc;
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	CmdParse(qc, QC_MODELNAME, pStudioHdr->pszName());
-	CmdParse(qc, QC_CONTENTS, &pStudioHdr->contents);
-	CmdParse(qc, QC_SURFACEPROP, pStudioHdr->pszSurfaceProp());
+	CmdParse(qc, QC_MODELNAME, parsedData->name);
+	CmdParse(qc, QC_CONTENTS, &parsedData->contents);
+	CmdParse(qc, QC_SURFACEPROP, parsedData->surfaceProp);
 
 	// [rika]: flag based options
-	if (pStudioHdr->flags & STUDIOHDR_FLAGS_STATIC_PROP)
+	if (parsedData->flags & STUDIOHDR_FLAGS_STATIC_PROP)
 		CmdParse(qc, QC_STATICPROP, nullptr);
 
 	if (version < 52)
 	{
-		if (pStudioHdr->flags & STUDIOHDR_FLAGS_FORCE_OPAQUE)
+		if (parsedData->flags & STUDIOHDR_FLAGS_FORCE_OPAQUE)
 		{
-			assertm(!(pStudioHdr->flags & STUDIOHDR_FLAGS_TRANSLUCENT_TWOPASS), "translucent and opaque");
+			assertm(!(parsedData->flags & STUDIOHDR_FLAGS_TRANSLUCENT_TWOPASS), "translucent and opaque");
 			CmdParse(qc, QC_OPAQUE, nullptr);
 		}
 
 		// removed in r1, parsed from materials. flag replaced in r5, used by arms and loading models a lot!
-		if (pStudioHdr->flags & STUDIOHDR_FLAGS_TRANSLUCENT_TWOPASS)
+		if (parsedData->flags & STUDIOHDR_FLAGS_TRANSLUCENT_TWOPASS)
 		{
-			assertm(!(pStudioHdr->flags & STUDIOHDR_FLAGS_FORCE_OPAQUE), "translucent and opaque");
+			assertm(!(parsedData->flags & STUDIOHDR_FLAGS_FORCE_OPAQUE), "translucent and opaque");
 			CmdParse(qc, QC_MOSTLYOPAQUE, nullptr);
 		}
 	}
 	else
 	{
 		// [rika]: pretty sure this one is still supported!
-		if (pStudioHdr->flags & STUDIOHDR_FLAGS_FORCE_OPAQUE)
+		if (parsedData->flags & STUDIOHDR_FLAGS_FORCE_OPAQUE)
 		{
 			CmdParse(qc, QC_OPAQUE, nullptr);
 		}
 	}
 
-	if (version != 54 && pStudioHdr->flags & STUDIOHDR_FLAGS_OBSOLETE)
+	if (version != 54 && parsedData->flags & STUDIOHDR_FLAGS_OBSOLETE)
 	{
 		CmdParse(qc, QC_OBSOLETE, nullptr);
 	}
 
-	if (pStudioHdr->flags & STUDIOHDR_FLAGS_NO_FORCED_FADE)
+	if (parsedData->flags & STUDIOHDR_FLAGS_NO_FORCED_FADE)
 	{
 		CmdParse(qc, QC_NOFORCEDFADE, nullptr);
 	}
 
-	if (pStudioHdr->flags & STUDIOHDR_FLAGS_FORCE_PHONEME_CROSSFADE)
+	if (parsedData->flags & STUDIOHDR_FLAGS_FORCE_PHONEME_CROSSFADE)
 	{
 		CmdParse(qc, QC_FORCEPHONEMECROSSFADE, nullptr);
 	}
 
-	if (pStudioHdr->flags & STUDIOHDR_FLAGS_CONSTANT_DIRECTIONAL_LIGHT_DOT)
+	if (parsedData->flags & STUDIOHDR_FLAGS_CONSTANT_DIRECTIONAL_LIGHT_DOT)
 	{
-		CmdParse(qc, QC_CONSTANTDIRECTIONALLIGHT, &pStudioHdr->constdirectionallightdot);
+		CmdParse(qc, QC_CONSTANTDIRECTIONALLIGHT, &parsedData->constdirectionallightdot);
 	}
 
-	if (version == 54 && pStudioHdr->flags & STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS)
+	if (version == 54 && parsedData->flags & STUDIOHDR_FLAGS_USES_EXTRA_BONE_WEIGHTS)
 	{
 		CmdParse(qc, QC_USEDETAILEDWEIGHTS, nullptr);
 	}
 
 	// believe this is different later seasons 
-	if (pStudioHdr->flags & STUDIOHDR_FLAGS_AMBIENT_BOOST)
+	if (parsedData->flags & STUDIOHDR_FLAGS_AMBIENT_BOOST)
 	{
 		CmdParse(qc, QC_AMBIENTBOOST, nullptr);
 	}
 
-	if (pStudioHdr->flags & STUDIOHDR_FLAGS_DO_NOT_CAST_SHADOWS)
+	if (parsedData->flags & STUDIOHDR_FLAGS_DO_NOT_CAST_SHADOWS)
 	{
 		CmdParse(qc, QC_DONOTCASTSHADOWS, nullptr);
 	}
 
 	// believe this is different later seasons (used on non static props)
-	if (pStudioHdr->flags & STUDIOHDR_FLAGS_CAST_TEXTURE_SHADOWS)
+	if (parsedData->flags & STUDIOHDR_FLAGS_CAST_TEXTURE_SHADOWS)
 	{
 		CmdParse(qc, QC_CASTTEXTURESHADOWS, nullptr);
 	}
 
-	if (version != 54 && pStudioHdr->flags & STUDIOHDR_FLAGS_SUBDIVISION_SURFACE)
+	if (version != 54 && parsedData->flags & STUDIOHDR_FLAGS_SUBDIVISION_SURFACE)
 	{
 		CmdParse(qc, QC_SUBD, nullptr);
 	}
 
-	if (version >= 52 && pStudioHdr->flags & STUDIOHDR_FLAGS_USES_VERTEX_COLOR)
+	if (version >= 52 && parsedData->flags & STUDIOHDR_FLAGS_USES_VERTEX_COLOR)
 	{
 		CmdParse(qc, QC_USEVERTEXCOLOR, nullptr);
 	}
 
-	if (version >= 52 && pStudioHdr->flags & STUDIOHDR_FLAGS_USES_UV2)
+	if (version >= 52 && parsedData->flags & STUDIOHDR_FLAGS_USES_UV2)
 	{
 		CmdParse(qc, QC_USEEXTRATEXCOORD, nullptr);
 	}
 
 	// [rika]: -1 is the default value to not fade, skip if it is set
-	if (pStudioHdr->fadeDistance != -1.0f)
+	if (parsedData->fadeDistance != -1.0f)
 	{
-		CmdParse(qc, QC_FADEDISTANCE, &pStudioHdr->fadeDistance);
+		CmdParse(qc, QC_FADEDISTANCE, &parsedData->fadeDistance);
 	}
 
-	CmdParse(qc, QC_EYEPOSITION, &pStudioHdr->eyeposition, 3);
+	CmdParse(qc, QC_EYEPOSITION, &parsedData->eyeposition, 3);
 
-	if (pStudioHdr->flMaxEyeDeflection != 0.0f)
+	if (parsedData->flMaxEyeDeflection != 0.0f)
 	{
-		CmdParse(qc, QC_MAXEYEDEFLECTION, &pStudioHdr->flMaxEyeDeflection);
+		CmdParse(qc, QC_MAXEYEDEFLECTION, &parsedData->flMaxEyeDeflection);
 	}
 
-	if (pStudioHdr->numSkinRef > 0)
+	if (parsedData->MaterialCount() > 0)
 	{
-		const char** materials = new const char* [pStudioHdr->numSkinRef] {};
+		const char** materials = new const char* [parsedData->MaterialCount()] {};
 		const char** materialFullPaths = nullptr;
 
 		// if we are going to rename materials
 		if (g_rsxSettings.exportModelMatsTruncated)
 		{
-			materialFullPaths = new const char* [pStudioHdr->numSkinRef] {};
+			materialFullPaths = new const char* [parsedData->MaterialCount()] {};
 		}
 
-		for (int i = 0; i < pStudioHdr->numSkinRef; i++)
+		for (int i = 0; i < parsedData->MaterialCount(); i++)
 		{
 			materials[i] = parsedData->pMaterial(i)->GetName(true);
 
@@ -186,25 +184,25 @@ void QC_ParseStudioHeader(qc::QCFile* const qc, const ModelParsedData_t* const p
 			materials[i] = GetStringAfterLastSlash(materials[i]);
 		}
 
-		if (pStudioHdr->numSkinFamilies > 1)
+		if (parsedData->SkinCount() > 1)
 		{
-			const int16_t* const skins = pStudioHdr->pSkinref(0);
-			int16_t* const indices = new int16_t[pStudioHdr->numSkinRef]{};
+			const int16_t* const skins = parsedData->pSkin(0)->indices; // this is toxic but works
+			int16_t* const indices = new int16_t[parsedData->MaterialCount()]{};
 			const char** names = nullptr;
 
 			if (version == 54)
 			{
-				names = new const char* [pStudioHdr->numSkinFamilies] {};
+				names = new const char* [parsedData->SkinCount()] {};
 
-				for (int i = 0; i < pStudioHdr->numSkinFamilies; i++)
+				for (int i = 0; i < parsedData->SkinCount(); i++)
 				{
-					names[i] = pStudioHdr->pSkinName(i);
+					names[i] = parsedData->pSkin(i)->name;
 				}
 			}
 
-			const uint32_t usedIndices = QC_GetUsedSkinIndices(skins, pStudioHdr->numSkinRef, pStudioHdr->numSkinFamilies, indices);
+			const uint32_t usedIndices = QC_GetUsedSkinIndices(skins, parsedData->MaterialCount(), parsedData->SkinCount(), indices);
 
-			const TextureGroupData_t texturegroup(materials, skins, indices, pStudioHdr->numSkinRef, pStudioHdr->numSkinFamilies, usedIndices, names);
+			const TextureGroupData_t texturegroup(materials, skins, indices, parsedData->MaterialCount(), parsedData->SkinCount(), usedIndices, names);
 			CmdParse(qc, QC_TEXTUREGROUP, &texturegroup);
 
 			FreeAllocArray(indices);
@@ -213,7 +211,7 @@ void QC_ParseStudioHeader(qc::QCFile* const qc, const ModelParsedData_t* const p
 
 		if (g_rsxSettings.exportModelMatsTruncated)
 		{
-			for (int i = 0; i < pStudioHdr->numSkinRef; i++)
+			for (int i = 0; i < parsedData->MaterialCount(); i++)
 			{
 				const CommandOptionPair_t renameData(materials[i], materialFullPaths[i]);
 				CmdParse(qc, QC_RENAMEMATERIAL, &renameData);
@@ -225,33 +223,32 @@ void QC_ParseStudioHeader(qc::QCFile* const qc, const ModelParsedData_t* const p
 	}
 
 	// [rika]: most models will have at least one (unless it's retail apex), it will be the path prefixing 'mdl' or 'models', in most cases this is just an empty string
-	for (int i = 0; i < pStudioHdr->cdTexturesCount; i++)
-		CmdParse(qc, QC_CDMATERIALS, pStudioHdr->pCdtexture(i));
+	for (int i = 0; i < parsedData->CDMaterialCount(); i++)
+		CmdParse(qc, QC_CDMATERIALS, parsedData->CDMaterial(i));
 
-	if (pStudioHdr->keyValueSize > 0 || (pStudioHdr->keyValueOffset && pStudioHdr->keyValueSize == -1))
-		CmdParse(qc, QC_KEYVALUES, pStudioHdr->KeyValueText());
+	if (parsedData->keyValueSize > 0 || (parsedData->keyValues && parsedData->keyValueSize == -1))
+		CmdParse(qc, QC_KEYVALUES, parsedData->keyValues);
 
-	if (pStudioHdr->numAllowedRootLODs > 0)
-		CmdParse(qc, QC_ALLOWROOTLODS, &pStudioHdr->numAllowedRootLODs);
+	if (parsedData->numAllowedRootLODs > 0)
+		CmdParse(qc, QC_ALLOWROOTLODS, &parsedData->numAllowedRootLODs);
 
-	if (pStudioHdr->rootLOD > 0)
-		CmdParse(qc, QC_MINLOD, &pStudioHdr->rootLOD);
+	if (parsedData->rootLOD > 0)
+		CmdParse(qc, QC_MINLOD, &parsedData->rootLOD);
 }
 
 void QC_ParseStudioBone(qc::QCFile* const qc, const ModelParsedData_t* const parsedData, const ModelBone_t* const bone, const int version)
 {
 	using namespace qc;
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
 	// [rika]: parse out the data required for a $definebone (and other) command(s)
 	const char* const parent = bone->parent > -1 ? parsedData->pBone(bone->parent)->pszName() : nullptr;
 	const matrix3x4_t* pPostTransform = nullptr;
 
 	// [rika]: get data for fixups if it exits
-	if (pStudioHdr->srcBoneTransformCount)
+	// [rika]: no names on v16 and above, how do we do that
+	if (parsedData->numSrcBoneTransforms && 16 > parsedData->version.majorVer)
 	{
-		const mstudiosrcbonetransform_t* const pSrcBoneTransform = GetSrcBoneTransform(bone->name, pStudioHdr->pSrcBoneTransform(0), pStudioHdr->srcBoneTransformCount);
+		const mstudiosrcbonetransform_t* const pSrcBoneTransform = GetSrcBoneTransform(bone->name, parsedData->srcBoneTransforms, parsedData->numSrcBoneTransforms);
 
 		if (pSrcBoneTransform)
 			pPostTransform = &pSrcBoneTransform->posttransform;
@@ -323,7 +320,7 @@ void QC_ParseStudioBodypart(qc::QCFile* const qc, const ModelParsedData_t* const
 		return;
 	}
 
-	assertm(!parsedData->lods.empty(), "model had bodyparts but no lods");
+	assertm(parsedData->LODCount() == 0, "model had bodyparts but no lods");
 
 	const ModelLODData_t* const lodData0 = parsedData->pLOD(0);
 
@@ -339,7 +336,7 @@ void QC_ParseStudioBodypart(qc::QCFile* const qc, const ModelParsedData_t* const
 		FixupExportLodNames(name, 0);
 		snprintf(buf, MAX_PATH, s_QCModelNameFormat, stem, name.c_str(), s_ModelExportExtensions[setting]);
 
-		const CommandOptionPair_t bodyData(bodypart->GetNameCStr(), buf);
+		const CommandOptionPair_t bodyData(bodypart->GetName(), buf);
 
 		CmdParse(qc, QC_BODY, &bodyData, 1, true);
 
@@ -348,9 +345,9 @@ void QC_ParseStudioBodypart(qc::QCFile* const qc, const ModelParsedData_t* const
 		return;
 	}
 
-	BodyGroupData_t bodyGroupData(bodypart->GetNameCStr(), bodypart->numModels);
+	BodyGroupData_t bodyGroupData(bodypart->GetName(), bodypart->GetModelCount());
 
-	for (uint32_t i = 0; i < static_cast<uint32_t>(bodypart->numModels); i++)
+	for (uint32_t i = 0; i < static_cast<uint32_t>(bodypart->GetModelCount()); i++)
 	{
 		const ModelModelData_t* const modelData = lodData0->pModel(bodypart->modelIndex + i);
 
@@ -449,7 +446,7 @@ void QC_ParseStudioLOD(qc::QCFile* const qc, const ModelParsedData_t* const pars
 		lodGroupData.ReplaceBone(i, pBoneChild->pszName(), pBoneParent->pszName());
 	}
 
-	if (lodGroupData.isShadowLOD && parsedData->pStudioHdr()->flags & STUDIOHDR_FLAGS_USE_SHADOWLOD_MATERIALS)
+	if (lodGroupData.isShadowLOD && parsedData->flags & STUDIOHDR_FLAGS_USE_SHADOWLOD_MATERIALS)
 		lodGroupData.useShadowLODMaterials = true;
 
 	const CommandList_t lodType = isShadowLOD ? QC_SHADOWLOD : QC_LOD;
@@ -461,17 +458,15 @@ void QC_ParseStudioAttachments(qc::QCFile* const qc, const ModelParsedData_t* co
 {
 	using namespace qc;
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	const bool staticProp = pStudioHdr->flags & STUDIOHDR_FLAGS_STATIC_PROP;
-	const bool useIllumAttachment = IllumPositionData_t::useAttachment(pStudioHdr->illumpositionattachmentindex);
-	size_t illumpositionattachmentindex = pStudioHdr->illumpositionattachmentindex - 1;
+	const bool staticProp = parsedData->flags & STUDIOHDR_FLAGS_STATIC_PROP;
+	const bool useIllumAttachment = IllumPositionData_t::useAttachment(parsedData->illumpositionattachmentindex);
+	int illumpositionattachmentindex = parsedData->illumpositionattachmentindex - 1;
 
 	bool useAutoCenter = false;
 	//size_t autoCenterIndex = 0ull;
 
-	const size_t numAttachments = parsedData->attachments.size();
-	for (size_t i = 0; i < numAttachments; i++)
+	const int numAttachments = parsedData->numAttachments;
+	for (int i = 0; i < numAttachments; i++)
 	{
 		// skip __illumPosition attachment
 		if (useIllumAttachment && illumpositionattachmentindex == i)
@@ -513,7 +508,7 @@ void QC_ParseStudioAttachments(qc::QCFile* const qc, const ModelParsedData_t* co
 			localmatrix = pAttachment->localmatrix;
 		}
 
-		const IllumPositionData_t illumdata(&pStudioHdr->illumposition, pStudioHdr->illumpositionattachmentindex, localbone, localmatrix);
+		const IllumPositionData_t illumdata(&parsedData->illumposition, parsedData->illumpositionattachmentindex, localbone, localmatrix);
 
 		CmdParse(qc, QC_ILLUMPOSITION, &illumdata);
 	}
@@ -528,20 +523,18 @@ void QC_ParseStudioBoxes(qc::QCFile* const qc, const ModelParsedData_t* const pa
 {
 	using namespace qc;
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	const bool autoGeneratedHitbox = pStudioHdr->flags & STUDIOHDR_FLAGS_AUTOGENERATED_HITBOX;
+	const bool autoGeneratedHitbox = parsedData->flags & STUDIOHDR_FLAGS_AUTOGENERATED_HITBOX;
 	const CommandFormat_t cmdFmt = autoGeneratedHitbox ? QC_FMT_COMMENT : QC_FMT_NONE;
 	bool skipBoneInBBox = false;
 
-	const CommandOptionPair_t bboxData(pStudioHdr->hull_min.Base(), pStudioHdr->hull_max.Base(), 3, 3);
+	const CommandOptionPair_t bboxData(parsedData->hull_min.Base(), parsedData->hull_max.Base(), 3, 3);
 	CmdParse(qc, QC_BBOX, &bboxData);
 
-	const CommandOptionPair_t cboxData(pStudioHdr->view_bbmin.Base(), pStudioHdr->view_bbmax.Base(), 3, 3);
+	const CommandOptionPair_t cboxData(parsedData->view_bbmin.Base(), parsedData->view_bbmax.Base(), 3, 3);
 	CmdParse(qc, QC_CBOX, &cboxData);
 
 	// [rika]: it's important to parse these in order
-	for (size_t i = 0; i < parsedData->hitboxsets.size(); i++)
+	for (int i = 0; i < parsedData->HitboxSetCount(); i++)
 	{
 		const ModelHitboxSet_t* const hitboxSetData = parsedData->pHitboxSet(i);
 		CmdParse(qc, QC_HBOXSET, hitboxSetData->name, 1, false, cmdFmt);
@@ -583,40 +576,38 @@ void QC_ParseStudioAnimationTypes(qc::QCFile* const qc, const ModelParsedData_t*
 {
 	using namespace qc;
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	for (int i = 0; i < pStudioHdr->localPoseParamCount; i++)
+	for (int i = 0; i < parsedData->numPoseParm; i++)
 	{
-		assertm(parsedData->poseparams, "invalid pointer, wicked bad");
+		assertm(parsedData->PoseParamCount(), "invalid pointer, wicked bad");
 
-		const ModelPoseParam_t* const poseParam = parsedData->poseparams + i;
+		const ModelPoseParam_t* const poseParam = parsedData->pPoseParam(i);
 		const PoseParamData_t poseParamData(poseParam->name, poseParam->flags, poseParam->start, poseParam->end, poseParam->loop);
 		CmdParse(qc, QC_POSEPARAMETER, &poseParamData);
 	}
 
-	for (int i = 0; i < pStudioHdr->ikChainCount; i++)
+	for (int i = 0; i < parsedData->IKChainCount(); i++)
 	{
-		assertm(parsedData->ikchains, "invalid pointer, wicked bad");
+		assertm(parsedData->ikChains, "invalid pointer, wicked bad");
 
-		const ModelIKChain_t* const ikChain = parsedData->ikchains + i;
+		const ModelIKChain_t* const ikChain = parsedData->pIKChain(i);
 		const IKChainData_t ikChainData(ikChain->name, parsedData->pBone(ikChain->links[ModelIKChain_t::IKLINK_FOOT].bone)->pszName(), &ikChain->links[ModelIKChain_t::IKLINK_THIGH].kneeDir, ikChain->unk_10);
 		CmdParse(qc, QC_IKCHAIN, &ikChainData);
 	}
 
-	for (int i = 0; i < pStudioHdr->localIkAutoPlayLockCount; i++)
+	for (int i = 0; i < parsedData->numIkLocks; i++)
 	{
-		assertm(parsedData->iklocks, "invalid pointer, wicked bad");
+		assertm(parsedData->ikLocks, "invalid pointer, wicked bad");
 
-		const ModelIKLock_t* const ikLock = parsedData->iklocks + i;
-		assertm(ikLock->chain < pStudioHdr->ikChainCount, "invaild ik chain index");
+		const ModelIKLock_t* const ikLock = parsedData->pIKLock(i);
+		assertm(ikLock->chain < parsedData->IKChainCount(), "invaild ik chain index");
 
-		const IKLockData_t ikLockData(parsedData->ikchains[ikLock->chain].name, ikLock->flPosWeight, ikLock->flLocalQWeight);
+		const IKLockData_t ikLockData(parsedData->pIKChain(ikLock->chain)->name, ikLock->flPosWeight, ikLock->flLocalQWeight);
 		CmdParse(qc, QC_IKAUTOPLAYLOCK, &ikLockData);
 	}
 
-	for (int i = 0; i < pStudioHdr->includeModelCount; i++)
+	for (int i = 0; i < parsedData->IncludeModelCount(); i++)
 	{
-		const mstudiomodelgroup_t* const includemodel = reinterpret_cast<const mstudiomodelgroup_t* const>(pStudioHdr->baseptr + pStudioHdr->includeModelOffset) + i;
+		const mstudiomodelgroup_t* const includemodel = parsedData->pIncludeModel(i);
 		CmdParse(qc, QC_INCLUDEMODEL, includemodel->pszName());
 	}
 
@@ -813,7 +804,7 @@ void QC_ParseStudioAnimation_IKRules(qc::QCFile* const file, const ModelParsedDa
 
 	using namespace qc;
 
-	const uint32_t numIkChains = parsedData->NumIkChain();
+	const uint32_t numIkChains = parsedData->IKLockCount();
 	const int numIkRules = anim->numikrules;
 
 	// [rika]: nothing to parse, ikrules require ikchains
@@ -1257,7 +1248,7 @@ void QC_ParseStudioSequence(qc::QCFile* const file, const ModelParsedData_t* con
 			if (layer->iSequence > -1)
 			{
 				// should never not be external (cannot exist in pak based models)
-				sequence = parsedData->LocalSeq(layer->iSequence)->szlabel;
+				sequence = parsedData->pLocalSeq(layer->iSequence)->szlabel;
 			}
 			else
 			{
@@ -1326,16 +1317,16 @@ void QC_ParseStudioSequence(qc::QCFile* const file, const ModelParsedData_t* con
 
 ModelSeqInfo_t* const BuildSequenceList(const ModelParsedData_t* const parsedData, const int numSeqs)
 {
-	assertm(numSeqs == (parsedData->NumLocalSeq() + parsedData->NumExternalSeq()), "unexpected number of sequences");
+	assertm(numSeqs == (parsedData->LocalSeqCount() + parsedData->ExternalSeqCount()), "unexpected number of sequences");
 	ModelSeqInfo_t* sequences = new ModelSeqInfo_t[numSeqs]{};
 
 	int seqIdx = 0;
-	for (int i = 0; i < parsedData->NumLocalSeq(); i++, seqIdx++)
+	for (int i = 0; i < parsedData->LocalSeqCount(); i++, seqIdx++)
 	{
-		sequences[seqIdx].seq = parsedData->LocalSeq(i);
+		sequences[seqIdx].seq = parsedData->pLocalSeq(i);
 	}
 
-	for (int i = 0; i < parsedData->NumExternalSeq(); i++, seqIdx++)
+	for (int i = 0; i < parsedData->ExternalSeqCount(); i++, seqIdx++)
 	{
 		const uint64_t guid = parsedData->externalSequences[i].guid;
 
@@ -1441,7 +1432,7 @@ bool ExportModelQC(const ModelParsedData_t* const parsedData, std::filesystem::p
 #if defined(HAS_QC)
 	using namespace qc;
 
-	if (!parsedData->studiohdr.baseptr)
+	if (parsedData->baseptr == nullptr)
 		return false;
 
 	const std::string fileStem(exportPath.stem().string());
@@ -1456,14 +1447,14 @@ bool ExportModelQC(const ModelParsedData_t* const parsedData, std::filesystem::p
 		QC_ParseStudioBone(&qcFile, parsedData, parsedData->pBone(i), version);
 
 	s_QCMaxVerts = 0u;
-	for (size_t i = 0; i < parsedData->bodyParts.size(); i++)
+	for (size_t i = 0; i < parsedData->BodypartCount(); i++)
 		QC_ParseStudioBodypart(&qcFile, parsedData, parsedData->pBodypart(i), fileStem.c_str(), setting);
 
-	if (parsedData->lods.size() > 1)
+	if (parsedData->LODCount() > 1)
 	{
-		for (size_t i = 1; i < parsedData->lods.size(); i++)
+		for (size_t i = 1; i < parsedData->LODCount(); i++)
 		{
-			if (parsedData->pStudioHdr()->flags & STUDIOHDR_FLAGS_HASSHADOWLOD && parsedData->pLOD(i)->switchPoint == -1.0f)
+			if (parsedData->flags & STUDIOHDR_FLAGS_HASSHADOWLOD && parsedData->pLOD(i)->switchPoint == -1.0f)
 			{
 				QC_ParseStudioLOD(&qcFile, parsedData, i, true, fileStem.c_str(), setting);
 				continue;
@@ -1493,7 +1484,7 @@ bool ExportModelQC(const ModelParsedData_t* const parsedData, std::filesystem::p
 	// animation and sequences
 	QC_ParseStudioAnimationTypes(&qcFile, parsedData);
 
-	const int numSeqs = parsedData->NumLocalSeq() + parsedData->NumExternalSeq();
+	const int numSeqs = parsedData->LocalSeqCount() + parsedData->ExternalSeqCount();
 	if (numSeqs)
 	{
 		// first we have to build a list of sequences and animations

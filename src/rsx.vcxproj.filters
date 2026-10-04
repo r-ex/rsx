@@ -369,9 +369,6 @@
     <ClInclude Include="game\model\sourcemodel.h">
       <Filter>game\model</Filter>
     </ClInclude>
-    <ClInclude Include="game\rtech\utils\studio\studio_generic.h">
-      <Filter>game\rtech\utils\studio</Filter>
-    </ClInclude>
     <ClInclude Include="game\rtech\utils\studio\studio_r5.h">
       <Filter>game\rtech\utils\studio</Filter>
     </ClInclude>
@@ -781,9 +778,6 @@
     </ClCompile>
     <ClCompile Include="game\audio\miles_bcf.cpp">
       <Filter>game\audio</Filter>
-    </ClCompile>
-    <ClCompile Include="game\rtech\utils\studio\studio_generic.cpp">
-      <Filter>game\rtech\utils\studio</Filter>
     </ClCompile>
     <ClCompile Include="game\rtech\utils\studio\studio_r5.cpp">
       <Filter>game\rtech\utils\studio</Filter>

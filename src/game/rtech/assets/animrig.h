@@ -43,46 +43,51 @@ public:
 	AnimRigAsset() = default;
 	AnimRigAsset(AnimRigAssetHeader_v4_t* hdr, const eMDLVersion ver) : data(hdr->data), name(hdr->name), numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), studioVersion(ver)
 	{
+		const AssetVersion_t assetVersion = GetAssetVersionFromMDL(ver);
+
 		switch (ver)
 		{
 		case eMDLVersion::VERSION_8:
+		case eMDLVersion::VERSION_9:
+		case eMDLVersion::VERSION_10:
+		case eMDLVersion::VERSION_11:
+		case eMDLVersion::VERSION_12:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v8_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v8_t* const>(data), assetVersion);
 			break;
 		}
 		case eMDLVersion::VERSION_12_1:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_1_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v12_1_t* const>(data), assetVersion);
 			break;
 		}
 		case eMDLVersion::VERSION_12_2:
 		case eMDLVersion::VERSION_12_3:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_2_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v12_2_t* const>(data), assetVersion);
 			break;
 		}
 		case eMDLVersion::VERSION_12_4:
 		case eMDLVersion::VERSION_12_5:
+		case eMDLVersion::VERSION_13:
+		case eMDLVersion::VERSION_13_1:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_4_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v12_4_t* const>(data), assetVersion);
 			break;
 		}
 		case eMDLVersion::VERSION_14:
-		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v14_t*>(data), 0);
-			break;
-		}
-		// todo: dected this on animrig! maybe we need to store a global version for models per pak? nodenames will not work on these versions
 		case eMDLVersion::VERSION_14_1:
 		case eMDLVersion::VERSION_15:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v14_t*>(data), 1);
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v14_t* const>(data), assetVersion);
 			break;
 		}
 		}
 	}
 	AnimRigAsset(AnimRigAssetHeader_v5_t* hdr, const eMDLVersion ver) : data(hdr->data), name(hdr->name), numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), studioVersion(ver)
 	{
+		const AssetVersion_t assetVersion = GetAssetVersionFromMDL(ver);
+
 		switch (ver)
 		{
 		case eMDLVersion::VERSION_16:
@@ -90,7 +95,7 @@ public:
 			const r5::studiohdr_v16_t* const tmp = reinterpret_cast<const r5::studiohdr_v16_t* const>(data);
 			const int studioDataSize = FIX_OFFSET(tmp->boneDataOffset) + (tmp->boneCount * sizeof(r5::mstudiobonedata_v16_t));
 
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v16_t*>(data), 0, studioDataSize);
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v16_t*>(data), assetVersion, 0, studioDataSize);
 			break;
 		}
 		case eMDLVersion::VERSION_17:
@@ -99,7 +104,7 @@ public:
 			const r5::studiohdr_v17_t* const tmp = reinterpret_cast<const r5::studiohdr_v17_t* const>(data);
 			const int studioDataSize = FIX_OFFSET(tmp->boneDataOffset) + (tmp->boneCount * sizeof(r5::mstudiobonedata_v16_t));
 
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v17_t*>(data), 0, studioDataSize);
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v17_t*>(data), assetVersion, 0, studioDataSize);
 			break;
 		}
 		case eMDLVersion::VERSION_19:
@@ -110,7 +115,7 @@ public:
 
 			const int studioDataSize = IALIGN16(FIX_OFFSET(tmp->linearboneindex) + sizeof(r5::mstudiolinearbone_v19_t) + (dataPerBone * tmp->boneCount));
 
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v17_t*>(data), 0, studioDataSize);
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v17_t*>(data), assetVersion, 0, studioDataSize);
 			break;
 		}
 		case eMDLVersion::VERSION_19_2:
@@ -121,7 +126,7 @@ public:
 
 			const int studioDataSize = IALIGN16(FIX_OFFSET(tmp->linearboneindex) + sizeof(r5::mstudiolinearbone_v19_t) + (dataPerBone * tmp->boneCount));
 
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v19_2_t*>(data), 0, studioDataSize);
+			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v19_2_t*>(data), assetVersion, 0, studioDataSize);
 			break;
 		}
 		}
@@ -130,15 +135,12 @@ public:
 	void* data; // ptr to studiohdr & rrig buffer
 	char* name;
 
-	int numAnimSeqs;
 	AssetGuid_t* animSeqs;
-
-	ModelParsedData_t parsedData;
+	int numAnimSeqs;
 
 	eMDLVersion studioVersion;
+	ModelParsedData_t parsedData;
 
-	inline const studiohdr_generic_t& StudioHdr() const { return parsedData.studiohdr; }
-	inline const studiohdr_generic_t* const pStudioHdr() const { return &parsedData.studiohdr; }
 	inline ModelParsedData_t* const GetParsedData() { return &parsedData; }
-	inline const std::vector<ModelBone_t>* const GetRig() const { return &parsedData.bones; } // slerp them bones
+	inline const ModelParsedData_t* const GetRig() const { return &parsedData; } // slerp them bones
 };

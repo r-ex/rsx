@@ -1,7 +1,6 @@
 #pragma once
 #include <game/rtech/cpakfile.h>
 #include <game/rtech/utils/utils.h>
-#include <game/rtech/utils/studio/studio_generic.h>
 #include <game/rtech/assets/material.h>
 
 #include <core/mdl/modeldata.h>
@@ -190,12 +189,14 @@ enum class eMDLVersion : int
 	VERSION_19_3,
 	VERSION_20,
 
+	VERSION_PAK_COUNT,
+
 	// bleh
 	VERSION_52,
 	VERSION_53,
 };
 
-static const std::map<int, eMDLVersion> s_mdlVersionMap
+static const std::map<int, eMDLVersion> s_mdlVersionFromPak
 {
 	{ 8, eMDLVersion::VERSION_8 },
 	{ 9, eMDLVersion::VERSION_9 },
@@ -212,94 +213,74 @@ static const std::map<int, eMDLVersion> s_mdlVersionMap
 	{ 20, eMDLVersion::VERSION_20 },
 };
 
+static const int s_mdlVersionToPak_Major[static_cast<int>(eMDLVersion::VERSION_PAK_COUNT)] =
+{
+	8,	// eMDLVersion::VERSION_8
+	9,	// eMDLVersion::VERSION_9
+	10,	// eMDLVersion::VERSION_10
+	11,	// eMDLVersion::VERSION_11
+	12,	// eMDLVersion::VERSION_12
+	12,	// eMDLVersion::VERSION_12_1
+	12,	// eMDLVersion::VERSION_12_2
+	12,	// eMDLVersion::VERSION_12_3
+	12,	// eMDLVersion::VERSION_12_4
+	12,	// eMDLVersion::VERSION_12_5
+	13,	// eMDLVersion::VERSION_13
+	13,	// eMDLVersion::VERSION_13_1
+	14,	// eMDLVersion::VERSION_14
+	14,	// eMDLVersion::VERSION_14_1
+	15,	// eMDLVersion::VERSION_15
+	16,	// eMDLVersion::VERSION_16
+	17,	// eMDLVersion::VERSION_17
+	18,	// eMDLVersion::VERSION_18
+	19,	// eMDLVersion::VERSION_19
+	19,	// eMDLVersion::VERSION_19_1
+	19,	// eMDLVersion::VERSION_19_2
+	19,	// eMDLVersion::VERSION_19_3
+	20,	// eMDLVersion::VERSION_20
+};
+
+static const int s_mdlVersionToPak_Minor[static_cast<int>(eMDLVersion::VERSION_PAK_COUNT)] =
+{
+	0,	// eMDLVersion::VERSION_8
+	0,	// eMDLVersion::VERSION_9
+	0,	// eMDLVersion::VERSION_10
+	0,	// eMDLVersion::VERSION_11
+	0,	// eMDLVersion::VERSION_12
+	1,	// eMDLVersion::VERSION_12_1
+	2,	// eMDLVersion::VERSION_12_2
+	3,	// eMDLVersion::VERSION_12_3
+	4,	// eMDLVersion::VERSION_12_4
+	5,	// eMDLVersion::VERSION_12_5
+	0,	// eMDLVersion::VERSION_13
+	1,	// eMDLVersion::VERSION_13_1
+	0,	// eMDLVersion::VERSION_14
+	1,	// eMDLVersion::VERSION_14_1
+	0,	// eMDLVersion::VERSION_15
+	0,	// eMDLVersion::VERSION_16
+	0,	// eMDLVersion::VERSION_17
+	0,	// eMDLVersion::VERSION_18
+	0,	// eMDLVersion::VERSION_19
+	1,	// eMDLVersion::VERSION_19_1
+	2,	// eMDLVersion::VERSION_19_2
+	3,	// eMDLVersion::VERSION_19_3
+	0,	// eMDLVersion::VERSION_20
+};
+
+inline const AssetVersion_t GetAssetVersionFromMDL(const eMDLVersion version)
+{
+	const AssetVersion_t asset(s_mdlVersionToPak_Major[static_cast<int>(version)], s_mdlVersionToPak_Minor[static_cast<int>(version)]);
+
+	return asset;
+}
+
 constexpr uint64_t s_MdlTimeStamp_V19_1 = 0x01DC1DF805C28000; // 09/05/2025 00:00:00
 constexpr uint64_t s_MdlTimeStamp_V19_3 = 0x01DD1EED32D6C000; // 07/29/2026 00:00:00
 
+const eMDLVersion GetModelVersionFromAsset(CPakFile* const pak, const void* const studioBuffer, const int version, const int headerStructSize);
 inline const eMDLVersion GetModelVersionFromAsset(CPakAsset* const asset, CPakFile* const pak)
 {
-	eMDLVersion out = eMDLVersion::VERSION_UNK;
-
-	if (s_mdlVersionMap.count(asset->version()) == 1u)
-		out = s_mdlVersionMap.at(asset->version());
-
-	// pointer to the studiohdr is always the first entry in ModelAssetHeader regardless of versions (if this changes it won't affect this anyway)
-	// so get that pointer for our studiohdr pointer, probably a better way to snag this but if it works it works
-	const int* const pMDL = reinterpret_cast<int*>(reinterpret_cast<void**>(asset->header())[0]);
-
-	switch (out)
-	{
-	case eMDLVersion::VERSION_12:
-	{
-		// [rika]: love to see it
-		// each of these index to the position of sourceFilenameOffset, we check what value it has (should point to end of header) to see which iteration it is, and then verify the asset header's size is correct
-		if ((pMDL[97] == sizeof(r5::studiohdr_v8_t) || pMDL[41] == sizeof(r5::studiohdr_v8_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v9_t))
-			return eMDLVersion::VERSION_12;
-
-		if ((pMDL[101] == sizeof(r5::studiohdr_v12_1_t) || pMDL[41] == sizeof(r5::studiohdr_v8_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
-			return eMDLVersion::VERSION_12_1;
-
-		if ((pMDL[102] == sizeof(r5::studiohdr_v12_2_t) || pMDL[41] == sizeof(r5::studiohdr_v12_2_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
-			return eMDLVersion::VERSION_12_2;
-
-		if ((pMDL[102] == sizeof(r5::studiohdr_v12_4_t) || pMDL[41] == sizeof(r5::studiohdr_v12_4_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
-			return eMDLVersion::VERSION_12_4;
-
-		if ((pMDL[102] == sizeof(r5::studiohdr_v12_5_t) || pMDL[41] == sizeof(r5::studiohdr_v12_5_t)) && asset->data()->headerStructSize == sizeof(ModelAssetHeader_v12_1_t))
-			return eMDLVersion::VERSION_12_5;
-
-		return eMDLVersion::VERSION_UNK;
-	}
-	case eMDLVersion::VERSION_13:
-	{
-		const r5::studiohdr_v12_5_t* const pHdr = reinterpret_cast<const r5::studiohdr_v12_5_t* const>(pMDL);
-
-		if (pHdr->numbodyparts == 0)
-			return out;
-
-		const mstudiobodyparts_t* const pBodypart0 = pHdr->pBodypart(0);
-		const r5::mstudiomodel_v12_1_t* const pModel = pBodypart0->pModel<r5::mstudiomodel_v12_1_t>(0);
-
-		if (pModel->meshindex == 0)
-		{
-			assertm(false, "could not properly check version");
-			return out;
-		}
-
-		// get the start and end point for mstudiomodel_t structs
-		const int modelStart = static_cast<int>(reinterpret_cast<const char*>(pModel) - reinterpret_cast<const char*>(pMDL));
-		const int modelEnd = modelStart + pModel->meshindex;
-		const int modelSize = modelEnd - modelStart;
-		int modelCount = 0;
-
-		for (int i = 0; i < pHdr->numbodyparts; i++)
-			modelCount += pHdr->pBodypart(i)->nummodels;
-
-		const int modelSizeSingle = modelSize / modelCount;
-
-		if (modelSizeSingle == static_cast<int>(sizeof(r5::mstudiomodel_v13_1_t)))
-			return eMDLVersion::VERSION_13_1;
-
-		return out;
-	}
-	case eMDLVersion::VERSION_19:
-	{
-		if (pak->header()->createdTime >= s_MdlTimeStamp_V19_3)
-			return eMDLVersion::VERSION_19_3;
-
-		const r5::studiohdr_v19_2_t* const pHdr = reinterpret_cast<const r5::studiohdr_v19_2_t* const>(pMDL);
-		if (pHdr->sourceFilenameOffset == sizeof(r5::studiohdr_v19_2_t))
-			return eMDLVersion::VERSION_19_2;
-
-		if (pak->header()->createdTime >= s_MdlTimeStamp_V19_1)
-			return eMDLVersion::VERSION_19_1;
-
-		return out;
-	}
-	default:
-	{
-		return out;
-	}
-	}
+	return GetModelVersionFromAsset(pak, reinterpret_cast<void**>(asset->header())[0], asset->version(), asset->data()->headerStructSize);
 }
 
 // generic
@@ -342,15 +323,15 @@ class ModelAsset
 {
 public:
 	ModelAsset() = default;
-	ModelAsset(ModelAssetHeader_v8_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertexComponentData(hdr->vertexComponentData), staticStreamingData(nullptr), vertexStreamingData(streamedData), physics(hdr->physics),
+	ModelAsset(ModelAssetHeader_v8_t* hdr, AssetPtr_t streamedData, eMDLVersion ver, const AssetVersion_t assetVersion) : name(hdr->name), data(hdr->data), vertexComponentData(hdr->vertexComponentData), staticStreamingData(nullptr), vertexStreamingData(streamedData), physics(hdr->physics),
 		componentDataSize(hdr->componentDataSize), streamingDataSize(0u), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
-		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), parsedData(reinterpret_cast<r5::studiohdr_v8_t*>(data)) {};
+		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), parsedData(reinterpret_cast<const r5::studiohdr_v8_t* const>(data), assetVersion) {};
 
-	ModelAsset(ModelAssetHeader_v9_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertexComponentData(hdr->vertexComponentData), staticStreamingData(hdr->staticStreamingData), vertexStreamingData(streamedData), physics(hdr->physics),
+	ModelAsset(ModelAssetHeader_v9_t* hdr, AssetPtr_t streamedData, eMDLVersion ver, const AssetVersion_t assetVersion) : name(hdr->name), data(hdr->data), vertexComponentData(hdr->vertexComponentData), staticStreamingData(hdr->staticStreamingData), vertexStreamingData(streamedData), physics(hdr->physics),
 		componentDataSize(hdr->componentDataSize), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
-		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), parsedData(reinterpret_cast<r5::studiohdr_v8_t*>(data)) {};
+		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver), parsedData(reinterpret_cast<const r5::studiohdr_v8_t* const>(data), assetVersion) {};
 
-	ModelAsset(ModelAssetHeader_v12_1_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertexComponentData(hdr->vertexComponentData), staticStreamingData(hdr->staticStreamingData), vertexStreamingData(streamedData), physics(hdr->physics),
+	ModelAsset(ModelAssetHeader_v12_1_t* hdr, AssetPtr_t streamedData, eMDLVersion ver, const AssetVersion_t assetVersion) : name(hdr->name), data(hdr->data), vertexComponentData(hdr->vertexComponentData), staticStreamingData(hdr->staticStreamingData), vertexStreamingData(streamedData), physics(hdr->physics),
 		componentDataSize(hdr->componentDataSize), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
 		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver)
 	{
@@ -358,25 +339,25 @@ public:
 		{
 		case eMDLVersion::VERSION_12_1:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_1_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v12_1_t* const>(data), assetVersion);
 			break;
 		}
 		case eMDLVersion::VERSION_12_2:
 		case eMDLVersion::VERSION_12_3:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_2_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v12_2_t* const>(data), assetVersion);
 			break;
 		}
 		case eMDLVersion::VERSION_12_4:
 		case eMDLVersion::VERSION_12_5:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_4_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v12_4_t* const>(data), assetVersion);
 			break;
 		}
 		}
 	};
 
-	ModelAsset(ModelAssetHeader_v13_t* hdr, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertexComponentData(hdr->vertexComponentData), staticStreamingData(hdr->staticStreamingData), vertexStreamingData(streamedData), physics(hdr->physics),
+	ModelAsset(ModelAssetHeader_v13_t* hdr, AssetPtr_t streamedData, eMDLVersion ver, const AssetVersion_t assetVersion) : name(hdr->name), data(hdr->data), vertexComponentData(hdr->vertexComponentData), staticStreamingData(hdr->staticStreamingData), vertexStreamingData(streamedData), physics(hdr->physics),
 		componentDataSize(hdr->componentDataSize), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
 		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver)
 	{
@@ -385,32 +366,29 @@ public:
 		case eMDLVersion::VERSION_13:
 		case eMDLVersion::VERSION_13_1:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v12_4_t*>(data));
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v12_4_t* const>(data), assetVersion);
 			break;
 		}
 		case eMDLVersion::VERSION_14:
-		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v14_t*>(data), 0);
-			break;
-		}
 		case eMDLVersion::VERSION_14_1:
 		case eMDLVersion::VERSION_15:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v14_t*>(data), 1);
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v14_t* const>(data), assetVersion);
 			break;
 		}
 		}
 	};
 
-	ModelAsset(ModelAssetHeader_v16_t* hdr, ModelAssetCPU_v16_t* cpu, AssetPtr_t streamedData, eMDLVersion ver) : name(hdr->name), data(hdr->data), vertexComponentData(nullptr), staticStreamingData(hdr->staticStreamingData), vertexStreamingData(streamedData), physics(cpu->physics),
-		componentDataSize(0u), streamingDataSize(hdr->streamingDataSize), animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs),
-		numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs), version(ver)
+	ModelAsset(ModelAssetHeader_v16_t* hdr, ModelAssetCPU_v16_t* cpu, AssetPtr_t streamedData, eMDLVersion ver, const AssetVersion_t assetVersion) :name(hdr->name), data(hdr->data), physics(cpu->physics),
+		vertexComponentData(nullptr), staticStreamingData(hdr->staticStreamingData), vertexStreamingData(streamedData), componentDataSize(0u), streamingDataSize(hdr->streamingDataSize),
+		animRigs(hdr->animRigs), numAnimRigs(hdr->numAnimRigs), numAnimSeqs(hdr->numAnimSeqs), animSeqs(hdr->animSeqs),
+		version(ver)
 	{
-		switch (ver)
+		switch (version)
 		{
 		case eMDLVersion::VERSION_16:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v16_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel);
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v16_t* const>(data), assetVersion, cpu->dataSizePhys, cpu->dataSizeModel);
 			break;
 		}
 		case eMDLVersion::VERSION_17:
@@ -418,14 +396,14 @@ public:
 		case eMDLVersion::VERSION_19:
 		case eMDLVersion::VERSION_19_1:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v17_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel);
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v17_t* const>(data), assetVersion, cpu->dataSizePhys, cpu->dataSizeModel);
 			break;
 		}
 		case eMDLVersion::VERSION_19_2:
 		case eMDLVersion::VERSION_19_3:
 		case eMDLVersion::VERSION_20:
 		{
-			parsedData = ModelParsedData_t(reinterpret_cast<r5::studiohdr_v19_2_t*>(data), cpu->dataSizePhys, cpu->dataSizeModel);
+			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v19_2_t* const>(data), assetVersion, cpu->dataSizePhys, cpu->dataSizeModel);
 			break;
 		}
 		}
@@ -457,17 +435,10 @@ public:
 
 	eMDLVersion version; // like asset version, but takes between version revisions into consideration
 
-	inline const studiohdr_generic_t& StudioHdr() const { return parsedData.studiohdr; }
-	inline const studiohdr_generic_t* const pStudioHdr() const { return &parsedData.studiohdr; }
 	inline ModelParsedData_t* const GetParsedData() { return &parsedData; }
 	inline const ModelParsedData_t* const GetParsedData() const { return &parsedData; }
-	inline const std::vector<ModelBone_t>* const GetRig() const { return &parsedData.bones; } // slerp them bones
-
-	// get loose files from vertDataPermanent
-	const OptimizedModel::FileHeader_t* const GetVTX() const { return StudioHdr().vtxSize > 0 ? reinterpret_cast<const OptimizedModel::FileHeader_t* const>(vertexComponentData + StudioHdr().vtxOffset) : nullptr; }
-	const vvd::vertexFileHeader_t* const GetVVD() const { return StudioHdr().vvdSize > 0 ? reinterpret_cast<const vvd::vertexFileHeader_t* const>(vertexComponentData + StudioHdr().vvdOffset) : nullptr; }
-	const vvc::vertexColorFileHeader_t* const GetVVC() const { return StudioHdr().vvcSize > 0 ? reinterpret_cast<const vvc::vertexColorFileHeader_t* const>(vertexComponentData + StudioHdr().vvcOffset) : nullptr; }
-	const vvw::vertexBoneWeightsExtraFileHeader_t* const GetVVW() const { return StudioHdr().vvwSize > 0 ? reinterpret_cast<const vvw::vertexBoneWeightsExtraFileHeader_t* const>(vertexComponentData + StudioHdr().vvwOffset) : nullptr; }
+	inline const ModelParsedData_t* const GetRig() const { return &parsedData; } // slerp them bones
 };
 
-void ParseExternalSequences(ModelParsedData_t* const parsedData, const ModelAsset* const modelAsset);
+// [rika]: sets the external sequences variables in ModelParsedData_t and cycles through all the animseqs to set their rig
+void ParseExternalSequences(ModelParsedData_t* const parsedData, const uint32_t numAnimSeqs, AssetGuid_t* const animSeqs);

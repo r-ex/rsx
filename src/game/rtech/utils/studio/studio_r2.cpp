@@ -91,7 +91,7 @@ namespace r2
 		}
 	}
 
-	void CalcBoneQuaternion(int frame, float s, const mstudiobone_t* pBone, const r1::mstudiolinearbone_t* pLinearBones, const mstudio_rle_anim_t* panim, Quaternion& q)
+	void CalcBoneQuaternion(int frame, float s, const mstudiobone_t* pBone, const mstudiolinearbone_t* pLinearBones, const mstudio_rle_anim_t* panim, Quaternion& q)
 	{
 		if (pLinearBones)
 		{
@@ -143,7 +143,7 @@ namespace r2
 		assert(pos.IsValid());
 	}
 
-	void CalcBonePosition(int frame, float s, const mstudiobone_t* pBone, const r1::mstudiolinearbone_t* pLinearBones, const mstudio_rle_anim_t* panim, Vector& pos)
+	void CalcBonePosition(int frame, float s, const mstudiobone_t* pBone, const mstudiolinearbone_t* pLinearBones, const mstudio_rle_anim_t* panim, Vector& pos)
 	{
 		if (pLinearBones)
 		{

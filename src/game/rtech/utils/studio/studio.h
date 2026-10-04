@@ -474,7 +474,7 @@ namespace vg
 			// vvw::mstudioboneweightextra_t
 			int extraBoneWeightOffset;	// start offset for this mesh's extra bone weights
 			int extraBoneWeightSize;	// size or count of extra bone weights
-			inline const vvw::mstudioboneweightextra_t* const pBoneWeight(const VertexGroupHeader_t* const hdr) const { return extraBoneWeightSize > 0 ? hdr->pBoneWeights() + (extraBoneWeightOffset / sizeof(vvw::mstudioboneweightextra_t)) : nullptr; };
+			inline const vvw::mstudioboneweightextra_t* const pBoneWeights(const VertexGroupHeader_t* const hdr) const { return extraBoneWeightSize > 0 ? hdr->pBoneWeights() + (extraBoneWeightOffset / sizeof(vvw::mstudioboneweightextra_t)) : nullptr; };
 
 			// unsigned short
 			int indexOffset;		// index into indices
@@ -1000,7 +1000,7 @@ struct mstudio_meshvertexloddata_t
 struct mstudiobodyparts_t
 {
 	int sznameindex;
-	inline char* const pszName() const { return ((char*)this + sznameindex); }
+	inline const char* const pszName() const { return ((char*)this + sznameindex); }
 
 	int nummodels;
 	int base;
@@ -1126,7 +1126,8 @@ class StudioLooseData_t
 {
 public:
 	StudioLooseData_t(const std::filesystem::path& path, const char* const name, char* buffer, const size_t bufferSize, const bool hasIDCV = false, const char* const aniname = nullptr); // DO NOT call this without managing the allocated buffers.
-	StudioLooseData_t(const char* const file);
+	StudioLooseData_t(const char* const file); // v53
+	StudioLooseData_t(const char* const file, const char* const vertex, const char* const physics); // v54
 	~StudioLooseData_t()
 	{
 		if (vertexBufAllocated)
@@ -1263,5 +1264,23 @@ inline const char* StudioContentFlagString(const int contents)
 	};
 }
 
-// generic pre def
-struct studiohdr_generic_t;
+// previously in studio_generic
+// make x axis y axis, and y axis negative x axis
+void StaticPropFlipFlop(Vector& in);
+
+// shouldn't append on first lod if name doesn't have _lod%i in it
+inline void FixupExportLodNames(std::string& fileName, int lodLevel)
+{
+	char lodName[16]{};
+
+	if (fileName.rfind("_lod0") != std::string::npos || fileName.rfind("_LOD0") != std::string::npos)
+	{
+		snprintf(lodName, 8, "%i", lodLevel);
+		fileName.replace(fileName.length() - 1, 8, lodName);
+
+		return;
+	}
+
+	snprintf(lodName, 8, "_lod%i", lodLevel);
+	fileName.append(lodName);
+}

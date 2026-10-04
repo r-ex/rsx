@@ -97,8 +97,9 @@ void CGlobalAssetData::ProcessAssetsPostLoad()
 
     const uint32_t leftOverAssets = static_cast<uint32_t>(v_assets.size());
     assetIdx = typeRanges.empty() ? 0u : static_cast<uint32_t>(typeRanges.back().end); // last asset we processed after custom order.
+    assetIdx++; // we want the asset AFTER the last index, which would be the count if there are no others present
 
-    if (typeRanges.empty() || leftOverAssets != (assetIdx + 1))
+    if (typeRanges.empty() || leftOverAssets != assetIdx)
     {
         parallelTask.addTask([this, leftOverAssets, &assetIdx]
             {
@@ -110,6 +111,7 @@ void CGlobalAssetData::ProcessAssetsPostLoad()
                         continue;
 
                     AssetLookup_t* const pAssetLookup = &this->v_assets[assetToProcess];
+                    assertm(pAssetLookup->m_asset->GetPostLoadStatus() == false, "postload for asset was already handled");
                     if (auto it = m_assetTypeBindings.find(pAssetLookup->m_asset->GetAssetType()); it != m_assetTypeBindings.end() && it->second.postLoadFunc)
                     {
                         if (!it->second._loadAssetType)

@@ -2339,6 +2339,92 @@ std::unique_ptr<char[]> RTech::DecompressStreamedBuffer(std::unique_ptr<char[]> 
     unreachable();
 }
 
+void RTech::DecompressStreamedBuffer(const char* const in, char* const out, uint64_t& bufSize, const eCompressionType compType)
+{
+	switch (compType)
+	{
+	case eCompressionType::OODLE:
+	{
+		OodleLZDecoder* const decoder = OodleLZDecoder_Create(OodleLZ_Compressor::OodleLZ_Compressor_Invalid, bufSize, nullptr, 0);
+
+		int outPos = 0;
+		int bufPos = 0;
+
+		// Check if we are compressed first.
+		OodleLZ_DecodeSome_Out decodeOut = {};
+		if (!OodleLZDecoder_DecodeSome(decoder, &decodeOut, out, outPos, bufSize, bufSize - outPos, in + bufPos, bufSize - bufPos, OodleLZ_FuzzSafe_No, OodleLZ_CheckCRC_No, OodleLZ_Verbosity::OodleLZ_Verbosity_None, OodleLZ_Decode_ThreadPhaseAll))
+		{
+			// Not decompressed.
+			OodleLZDecoder_Destroy(decoder);
+			return;
+		}
+
+		// We already have an initial amount of decompressed data due to the first run.
+		while (true)
+		{
+			outPos += decodeOut.decodedCount;
+			bufPos += decodeOut.compBufUsed;
+
+			// Are we done with decompressing?
+			if (decodeOut.compBufUsed + decodeOut.decodedCount == 0)
+				break;
+
+			// We shouldn't ever exceed our initial bufSize..
+			if (outPos >= bufSize)
+				break;
+
+			// Continue decompressing.
+			OodleLZDecoder_DecodeSome(decoder, &decodeOut, out, outPos, bufSize, bufSize - outPos, in + bufPos, bufSize - bufPos, OodleLZ_FuzzSafe_No, OodleLZ_CheckCRC_No, OodleLZ_Verbosity::OodleLZ_Verbosity_None, OodleLZ_Decode_ThreadPhaseAll);
+		}
+
+		OodleLZDecoder_Destroy(decoder);
+		return;
+	}
+	case eCompressionType::PAKFILE:
+	{
+		RTech::PakDecompressContext_t context = {};
+		const uint64_t decodeSize = RTech::InitPakDecoder(&context, reinterpret_cast<const uint8_t* const>(in), PAK_DECODE_MASK, bufSize, 0, 0); // We don't want to skip any data here, hence why no headerSize.
+
+		context.m_outputMask = PAK_DECODE_MASK;
+		context.m_outputBuf = uint64_t(out);
+
+		DecompressPakFile(&context, bufSize, decodeSize);
+		assertm(decodeSize == context.m_decompSize, "Mismatch on decomp size.");
+		bufSize = context.m_decompSize;
+		return;
+	}
+	case eCompressionType::SNOWFLAKE: // Snowflake will be made prettier when it's working.
+	{
+		std::unique_ptr<char[]> decompState = std::make_unique<char[]>(0x25000);
+		InitSnowflakeDecompState((long long)&decompState.get()[0], reinterpret_cast<int64_t>(in), bufSize);
+
+		__int64* editDecompState = (__int64*)&decompState.get()[0];
+		__int64 decodeSize = editDecompState[0x48D3];
+
+		unsigned int v15 = *((unsigned int*)editDecompState + 0x91A4); // decomp pos?
+		*((uint32_t*)editDecompState + 0x91A2) = 0;
+		if (v15 < decodeSize)
+			decodeSize = v15;
+
+		editDecompState[0x48D4] = decodeSize;
+		editDecompState[0x48DA] = (__int64)out; // output buffer.
+		editDecompState[0x48DB] = 0;
+
+		DecompressSnowflake((long long)&decompState.get()[0], bufSize, decodeSize);
+		bufSize = editDecompState[0x48db];
+
+		return;
+	}
+	default:
+	{
+		assertm(false, "Unhandled compression type.");
+		return;
+	}
+	}
+
+	unreachable();
+}
+
 static uint64_t Pak_StringToGuidAligned(const char* string)
 {
 	uint64_t         v1; // r9

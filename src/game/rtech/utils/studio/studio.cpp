@@ -2,6 +2,7 @@
 #include <game/rtech/utils/studio/studio.h>
 #include <game/rtech/utils/studio/studio_r1.h>
 #include <game/rtech/utils/studio/studio_r2.h>
+#include <game/rtech/utils/studio/studio_r5.h>
 
 StudioLooseData_t::StudioLooseData_t(const std::filesystem::path& path, const char* name, char* buffer, const size_t bufferSize, const bool hasIDCV, const char* const aniname) : vertexDataBuffer(nullptr), vertexDataOffset(), vertexDataSize(),
 physicsDataBuffer(nullptr), physicsDataOffset(0), physicsDataSize(0), animDataBuffer(nullptr), animDataOffset(0), animDataSize(0), vertexBufAllocated(false), physicsBufAllocated(false), animBufAllocated(false)
@@ -134,6 +135,27 @@ StudioLooseData_t::StudioLooseData_t(const char* const file) : vertexDataBuffer(
     vertexDataSize[SLD_VVW] = 0;
 
     physicsDataOffset = pStudioHdr->phyOffset;
+    physicsDataSize = pStudioHdr->phySize;
+}
+
+StudioLooseData_t::StudioLooseData_t(const char* const file, const char* const vertex, const char* const physics) : vertexDataBuffer(vertex), physicsDataBuffer(physics), animDataBuffer(nullptr), animDataOffset(0), animDataSize(0), vertexBufAllocated(false), physicsBufAllocated(false), animBufAllocated(false)
+{
+    const r5::studiohdr_v8_t* const pStudioHdr = reinterpret_cast<const r5::studiohdr_v8_t* const>(file);
+
+    assertm(pStudioHdr->id == IDSTUDIOHEADER, "invalid file");
+    assertm(pStudioHdr->version == 54, "invalid file");
+
+    vertexDataOffset[SLD_VTX] = pStudioHdr->vtxOffset > -1 ? pStudioHdr->vtxOffset : 0;
+    vertexDataOffset[SLD_VVD] = pStudioHdr->vvdOffset;
+    vertexDataOffset[SLD_VVC] = pStudioHdr->vvcOffset;
+    vertexDataOffset[SLD_VVW] = pStudioHdr->vvwOffset;
+
+    vertexDataSize[SLD_VTX] = pStudioHdr->vtxSize;
+    vertexDataSize[SLD_VVD] = pStudioHdr->vvdSize;
+    vertexDataSize[SLD_VVC] = pStudioHdr->vvcSize;
+    vertexDataSize[SLD_VVW] = pStudioHdr->vvwSize;
+
+    physicsDataOffset = pStudioHdr->phyOffset > -1 ? pStudioHdr->phyOffset : 0;
     physicsDataSize = pStudioHdr->phySize;
 }
 
@@ -291,4 +313,13 @@ const mstudiosrcbonetransform_t* const GetSrcBoneTransform(const char* const bon
     }
 
     return nullptr;
+}
+
+// previously in studio_generic
+void StaticPropFlipFlop(Vector& in)
+{
+    const Vector tmp(in);
+
+    in.x = tmp.y;
+    in.y = -tmp.x;
 }

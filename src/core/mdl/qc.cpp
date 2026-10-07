@@ -2,7 +2,7 @@
 
 #include <core/mdl/qc.h>
 
-extern inline void StaticPropFlipFlop(Vector& in);
+extern void StaticPropFlipFlop(Vector& in);
 
 namespace qc
 {

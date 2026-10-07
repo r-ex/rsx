@@ -82,26 +82,17 @@ bool AnimSeq_ParseExtraData(CPakAsset* pakAsset)
 	AnimSeqAsset* const seqAsset = pakAsset->extraData<AnimSeqAsset*>();
 	// do not parse this animation if there is no skeleton, if we go to export a sequence from a model/rig that has not been parsed, we will have to parse on export.
 	// this also means this sequence will not export data when exported standalone
-	if (nullptr == seqAsset->parentRig && nullptr == seqAsset->parentModel)
+	if (nullptr == seqAsset->rig)
 		return false;
 
-	const std::vector<ModelBone_t>* bones = nullptr;
-
-	if (seqAsset->parentModel)
-	{
-		bones = seqAsset->parentModel->GetRig();
-	}
-	else if (seqAsset->parentRig)
-	{
-		bones = seqAsset->parentRig->GetRig();
-	}
-	assertm(!bones->empty(), "we should have bones at this point.");
+	const ModelParsedData_t* rig = seqAsset->rig;
+	assertm(rig->BoneCount(), "we should have bones at this point.");
 
 	switch (seqAsset->version)
 	{
 	case eSeqVersion::VERSION_7:
 	{
-		ParseSequence(&seqAsset->seqdesc, bones, AnimdataFuncType_t::ANIM_FUNC_NOSTALL);
+		ParseSequence(&seqAsset->seqdesc, rig, AnimdataFuncType_t::ANIM_FUNC_NOSTALL);
 
 		break;
 	}
@@ -110,7 +101,7 @@ bool AnimSeq_ParseExtraData(CPakAsset* pakAsset)
 	case eSeqVersion::VERSION_10:
 	case eSeqVersion::VERSION_11:
 	{
-		ParseSequence(&seqAsset->seqdesc, bones, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
+		ParseSequence(&seqAsset->seqdesc, rig, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
 
 		break;
 	}
@@ -118,9 +109,9 @@ bool AnimSeq_ParseExtraData(CPakAsset* pakAsset)
 	{
 		// [rika]: parse the animseq's raw data size in post load if we couldn't determine a bone count before.
 		if (seqAsset->dataSize == 0)
-			seqAsset->UpdateDataSize_V12(static_cast<int>(bones->size()));
+			seqAsset->UpdateDataSize_V12(rig->BoneCount());
 
-		ParseSequence(&seqAsset->seqdesc, bones, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
+		ParseSequence(&seqAsset->seqdesc, rig, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
 
 		break;
 	}
@@ -128,11 +119,11 @@ bool AnimSeq_ParseExtraData(CPakAsset* pakAsset)
 	{
 		// [rika]: parse the animseq's raw data size in post load if we couldn't determine a bone count before.
 		if (seqAsset->dataSize == 0)
-			seqAsset->UpdateDataSize_V12_1(static_cast<int>(bones->size()));
+			seqAsset->UpdateDataSize_V12_1(rig->BoneCount());
 
 		// [rika]: I love changing assets, but never ever would change a version!
-		ParseAnimSeqDataForSeq(&seqAsset->seqdesc, bones->size(), ANIM_BONEFLAG_BITS_4);
-		ParseSequence(&seqAsset->seqdesc, bones, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA);
+		ParseAnimSeqDataForSeq(&seqAsset->seqdesc, rig->BoneCount(), ANIM_BONEFLAG_BITS_4);
+		ParseSequence(&seqAsset->seqdesc, rig, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA);
 
 		break;
 	}
@@ -141,11 +132,11 @@ bool AnimSeq_ParseExtraData(CPakAsset* pakAsset)
 	{
 		// [rika]: parse the animseq's raw data size in post load if we couldn't determine a bone count before.
 		if (seqAsset->dataSize == 0)
-			seqAsset->UpdateDataSize_V12_1(static_cast<int>(bones->size()));
+			seqAsset->UpdateDataSize_V12_1(rig->BoneCount());
 
 		// [rika]: I love changing assets, but never ever would change a version!
-		ParseAnimSeqDataForSeq(&seqAsset->seqdesc, bones->size(), ANIM_BONEFLAG_BITS_6);
-		ParseSequence(&seqAsset->seqdesc, bones, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA, ANIM_BONEFLAG_BITS_6);
+		ParseAnimSeqDataForSeq(&seqAsset->seqdesc, rig->BoneCount(), ANIM_BONEFLAG_BITS_6);
+		ParseSequence(&seqAsset->seqdesc, rig, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA, ANIM_BONEFLAG_BITS_6);
 
 		break;
 	}
@@ -252,7 +243,7 @@ static bool ExportRawAnimSeqAsset(CPakAsset* const asset, const AnimSeqAsset* co
 	return true;
 }
 
-bool ExportAnimSeqAsset(CPakAsset* const asset, const int setting, const AnimSeqAsset* const animSeqAsset, const std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones)
+bool ExportAnimSeqAsset(CPakAsset* const asset, const int setting, const AnimSeqAsset* const animSeqAsset, const std::filesystem::path& exportPath, const char* const skelName, const ModelParsedData_t* const rig)
 {
 	std::filesystem::path exportPathCop = exportPath;
 
@@ -265,7 +256,7 @@ bool ExportAnimSeqAsset(CPakAsset* const asset, const int setting, const AnimSeq
 	case eAnimSeqExportSetting::ANIMSEQ_RMAX:
 	case eAnimSeqExportSetting::ANIMSEQ_SMD:
 	{
-		return ExportSeqDesc(setting, &animSeqAsset->seqdesc, exportPathCop, skelName, bones, asset->guid());
+		return ExportSeqDesc(setting, &animSeqAsset->seqdesc, exportPathCop, skelName, rig, asset->guid());
 	}
 	//	exporting asset
 	case eAnimSeqExportSetting::ANIMSEQ_RSEQ:
@@ -280,7 +271,7 @@ bool ExportAnimSeqAsset(CPakAsset* const asset, const int setting, const AnimSeq
 	}
 }
 
-bool ExportAnimSeqFromAsset(const std::filesystem::path& exportPath, const std::string& stem, const char* const name, const int numAnimSeqs, const AssetGuid_t* const animSeqs, const std::vector<ModelBone_t>* const bones)
+bool ExportAnimSeqFromAsset(const std::filesystem::path& exportPath, const std::string& stem, const char* const name, const int numAnimSeqs, const AssetGuid_t* const animSeqs, const ModelParsedData_t* const rig)
 {
 	auto aseqAssetBinding = g_assetData.m_assetTypeBindings.find('qesa');
 
@@ -325,7 +316,7 @@ bool ExportAnimSeqFromAsset(const std::filesystem::path& exportPath, const std::
 
 			outputPath.replace_filename(std::filesystem::path(animSeqAsset->name).filename());
 
-			ExportAnimSeqAsset(animSeq, aseqAssetBinding->second.e.exportSetting, animSeqAsset, outputPath, name, bones);
+			ExportAnimSeqAsset(animSeq, aseqAssetBinding->second.e.exportSetting, animSeqAsset, outputPath, name, rig);
 
 			++remainingSeqs;
 		}
@@ -382,16 +373,9 @@ bool ExportAnimSeqAsset(CAsset* const asset, const int setting)
 	// [rika]: only bother with this if we are going to use it!
 	if (!exportAsRaw)
 	{
-		if (animSeqAsset->parentModel)
-		{
-			parsedData = animSeqAsset->parentModel->GetParsedData();
-			rigName = animSeqAsset->parentModel->name;
-		}
-		else if (animSeqAsset->parentRig)
-		{
-			parsedData = animSeqAsset->parentRig->GetParsedData();
-			rigName = animSeqAsset->parentRig->name;
-		}
+		parsedData = animSeqAsset->rig;
+		rigName = parsedData->name;
+
 		assertm(parsedData && parsedData->BoneCount(), "we should have bones at this point.");
 	}
 
@@ -404,7 +388,7 @@ bool ExportAnimSeqAsset(CAsset* const asset, const int setting)
 		}
 	}
 
-	return ExportAnimSeqAsset(pakAsset, setting, animSeqAsset, exportPath, rigName, parsedData->GetRig());
+	return ExportAnimSeqAsset(pakAsset, setting, animSeqAsset, exportPath, rigName, parsedData);
 }
 
 void InitAnimSeqAssetType()

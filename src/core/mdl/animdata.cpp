@@ -34,6 +34,12 @@ ModelFrameMovement_t::ModelFrameMovement_t(const r1::mstudioframemovement_t* con
 	std::memcpy(this->offset, movement->offset, sizeof(short) * 4);
 }
 
+ModelFrameMovement_t::ModelFrameMovement_t(const r2::mstudioframemovement_t* const movement) : baseptr(movement), sectionframes(0), sectioncount(0)
+{
+	std::memcpy(this->scale, movement->scale, sizeof(float) * 4);
+	std::memcpy(this->offset, movement->offset, sizeof(short) * 4);
+}
+
 ModelFrameMovement_t::ModelFrameMovement_t(const r5::mstudioframemovement_t* const movement, const int frameCount, const bool indexType) : baseptr(movement), sectionframes(movement->sectionframes), sectioncount(movement->SectionCount(frameCount))
 {
 	std::memcpy(this->scale, movement->scale, sizeof(float) * 4);
@@ -926,9 +932,9 @@ void ParseAnimDesc_Origin(ModelAnim_t* const animdesc, CAnimData& animData, bool
 	}
 }
 
-void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr)
+void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, const ModelParsedData_t* const rig, const r2::studiohdr_t* const pStudioHdr)
 {
-	const int boneCount = static_cast<int>(bones->size());
+	const int boneCount = rig->BoneCount();
 
 	Vector positions[256]{};
 	Quaternion quats[256]{};
@@ -947,7 +953,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 	{
 		for (int i = 0; i < boneCount; i++)
 		{
-			const ModelBone_t* const bone = &bones->at(i);
+			const ModelBone_t* const bone = rig->pBone(i);
 
 			positions[i] = bone->pos;
 			quats[i] = bone->quat;
@@ -1027,22 +1033,25 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 	g_BufferManager.RelieveBuffer(buffer);
 }
 
-void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr)
+void ParseSequence(ModelSeq_t* const seqdesc, const ModelParsedData_t* const rig, const r2::studiohdr_t* const pStudioHdr)
 {
 	for (int i = 0; i < seqdesc->AnimCount(); i++)
 	{
 		ModelAnim_t* const animdesc = seqdesc->anims + i;
 
-		ParseAnimation(seqdesc, animdesc, bones, pStudioHdr);
+		ParseAnimation(seqdesc, animdesc, rig, pStudioHdr);
 	}
 }
 
-void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, const std::vector<ModelBone_t>* const bones, const AnimdataFuncType_t funcType, const uint32_t flagWidth)
+void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, const ModelParsedData_t* const rig, const AnimdataFuncType_t funcType, const uint32_t flagWidth)
 {
-	const int boneCount = static_cast<int>(bones->size());
+	const int boneCount = rig->BoneCount();
 
-	if (bones->size() > 1024)
+	if (boneCount > 1024)
+	{
+		assertm(false, "this will cause a crash");
 		Log("ParseAnimation: Animation %s exceeded 1024 bones.\n", animdesc->pszName());
+	}
 
 	std::vector<Vector> positions(boneCount);
 	std::vector<Quaternion> quats(boneCount);
@@ -1065,7 +1074,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 		{
 			for (int i = 0; i < boneCount; i++)
 			{
-				const ModelBone_t* const bone = &bones->at(i);
+				const ModelBone_t* const bone = rig->pBone(i);
 
 				positions[i].Init(0.0f, 0.0f, 0.0f);
 				quats[i].Init(0.0f, 0.0f, 0.0f, 1.0f);
@@ -1077,7 +1086,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 		{
 			for (int i = 0; i < boneCount; i++)
 			{
-				const ModelBone_t* const bone = &bones->at(i);
+				const ModelBone_t* const bone = rig->pBone(i);
 
 				positions[i] = bone->pos;
 				quats[i] = bone->quat;
@@ -1142,7 +1151,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 				// [rika]: non delta animations are stored like a delta? weird.
 				if (!(animdesc->flags & eStudioAnimFlags::ANIM_DELTA))
 				{
-					const ModelBone_t* const boneData = &bones->at(bone);
+					const ModelBone_t* const boneData = rig->pBone(bone);
 
 					// [rika]: adjust the rotation
 					QuaternionMult(boneData->quat, q, q);
@@ -1257,7 +1266,7 @@ void ParseAnimation(ModelSeq_t* const seqdesc, ModelAnim_t* const animdesc, cons
 	g_BufferManager.RelieveBuffer(buffer);
 }
 
-void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const AnimdataFuncType_t funcType, const uint32_t flagWidth)
+void ParseSequence(ModelSeq_t* const seqdesc, const ModelParsedData_t* const rig, const AnimdataFuncType_t funcType, const uint32_t flagWidth)
 {
 	// check flags
 	assertm(static_cast<uint8_t>(CAnimDataBone::ANIMDATA_POS) == static_cast<uint8_t>(r5::RleBoneFlags_t::STUDIO_ANIM_POS), "flag mismatch");
@@ -1275,211 +1284,122 @@ void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* co
 			continue;
 		}
 
-		ParseAnimation(seqdesc, animdesc, bones, funcType, flagWidth);
+		ParseAnimation(seqdesc, animdesc, rig, funcType, flagWidth);
 	}
 }
 
 // [rika]: this is for model internal sequence data (r5)
-void ParseModelSequenceData_NoStall(ModelParsedData_t* const parsedData, char* const baseptr)
+void ModelParsedData_t::ParseModelSequenceData_NoStall()
 {
-	assertm(parsedData->bones.size() > 0, "should have bones");
+	assertm(numBones > 0, "should have bones");
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	if (pStudioHdr->localSequenceCount == 0)
-		return;
-
-	parsedData->numLocalSequences = pStudioHdr->localSequenceCount;
-	parsedData->localSequences = new ModelSeq_t[pStudioHdr->localSequenceCount];
-
-	for (int i = 0; i < pStudioHdr->localSequenceCount; i++)
+	if (numLocalSequences == 0)
 	{
-		parsedData->localSequences[i] = ModelSeq_t(reinterpret_cast<r5::mstudioseqdesc_v8_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i);
+		INDEX_TO_NULL(localSequences);
 
-		ParseSequence(&parsedData->localSequences[i], &parsedData->bones, AnimdataFuncType_t::ANIM_FUNC_NOSTALL);
+		return;
+	}
+
+	const r5::mstudioseqdesc_v8_t* const pLocalSequences = reinterpret_cast<const r5::mstudioseqdesc_v8_t* const>(baseptr + INDEX_GET(localSequences, 0));
+	INDEX_TO_PTR(localSequences, numLocalSequences, ModelSeq_t);
+
+	for (int i = 0; i < numLocalSequences; i++)
+	{
+		localSequences[i] = ModelSeq_t(pLocalSequences + i);
+
+		ParseSequence(localSequences + i, this, AnimdataFuncType_t::ANIM_FUNC_NOSTALL);
 	}
 }
 
-void ParseModelSequenceData_Stall_V8(ModelParsedData_t* const parsedData, char* const baseptr)
-{
-	assertm(parsedData->bones.size() > 0, "should have bones");
+void ModelParsedData_t::ParseModelSequenceData_Stall_V8()
+{	
+	assertm(numBones > 0, "should have bones");
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	if (pStudioHdr->localSequenceCount == 0)
-		return;
-
-	parsedData->numLocalSequences = pStudioHdr->localSequenceCount;
-	parsedData->localSequences = new ModelSeq_t[pStudioHdr->localSequenceCount];
-
-	for (int i = 0; i < pStudioHdr->localSequenceCount; i++)
+	if (numLocalSequences == 0)
 	{
-		parsedData->localSequences[i] = ModelSeq_t(reinterpret_cast<r5::mstudioseqdesc_v8_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i, nullptr);
+		INDEX_TO_NULL(localSequences);
 
-		ParseSequence(&parsedData->localSequences[i], &parsedData->bones, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
+		return;
+	}
+
+	const r5::mstudioseqdesc_v8_t* const pLocalSequences = reinterpret_cast<const r5::mstudioseqdesc_v8_t* const>(baseptr + INDEX_GET(localSequences, 0));
+	INDEX_TO_PTR(localSequences, numLocalSequences, ModelSeq_t);
+
+	for (int i = 0; i < numLocalSequences; i++)
+	{
+		localSequences[i] = ModelSeq_t(pLocalSequences + i, nullptr);
+
+		ParseSequence(localSequences + i, this, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
 	}
 }
 
-void ParseModelSequenceData_Stall_V16(ModelParsedData_t* const parsedData, char* const baseptr)
+void ModelParsedData_t::ParseModelSequenceData_Stall_V16()
 {
-	assertm(parsedData->bones.size() > 0, "should have bones");
+	assertm(numBones > 0, "should have bones");
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	if (pStudioHdr->localSequenceCount == 0)
-		return;
-
-	parsedData->numLocalSequences = pStudioHdr->localSequenceCount;
-	parsedData->localSequences = new ModelSeq_t[pStudioHdr->localSequenceCount];
-
-	for (int i = 0; i < pStudioHdr->localSequenceCount; i++)
+	if (numLocalSequences == 0)
 	{
-		parsedData->localSequences[i] = ModelSeq_t(reinterpret_cast<r5::mstudioseqdesc_v16_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i, nullptr);
+		INDEX_TO_NULL(localSequences);
 
-		ParseSequence(&parsedData->localSequences[i], &parsedData->bones, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
+		return;
+	}
+
+	const r5::mstudioseqdesc_v16_t* const pLocalSequences = reinterpret_cast<const r5::mstudioseqdesc_v16_t* const>(baseptr + INDEX_GET(localSequences, 0));
+	INDEX_TO_PTR(localSequences, numLocalSequences, ModelSeq_t);
+
+	for (int i = 0; i < numLocalSequences; i++)
+	{
+		localSequences[i] = ModelSeq_t(pLocalSequences + i, nullptr);
+
+		ParseSequence(localSequences + i, this, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
 	}
 }
 
-void ParseModelSequenceData_Stall_V18(ModelParsedData_t* const parsedData, char* const baseptr)
+void ModelParsedData_t::ParseModelSequenceData_Stall_V18()
 {
-	assertm(parsedData->bones.size() > 0, "should have bones");
+	assertm(numBones > 0, "should have bones");
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	if (pStudioHdr->localSequenceCount == 0)
-		return;
-
-	parsedData->numLocalSequences = pStudioHdr->localSequenceCount;
-	parsedData->localSequences = new ModelSeq_t[pStudioHdr->localSequenceCount];
-
-	for (int i = 0; i < pStudioHdr->localSequenceCount; i++)
+	if (numLocalSequences == 0)
 	{
-		parsedData->localSequences[i] = ModelSeq_t(reinterpret_cast<r5::mstudioseqdesc_v18_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i, nullptr, 0u);
+		INDEX_TO_NULL(localSequences);
 
-		ParseSequence(&parsedData->localSequences[i], &parsedData->bones, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
+		return;
+	}
+
+	const r5::mstudioseqdesc_v18_t* const pLocalSequences = reinterpret_cast<const r5::mstudioseqdesc_v18_t* const>(baseptr + INDEX_GET(localSequences, 0));
+	INDEX_TO_PTR(localSequences, numLocalSequences, ModelSeq_t);
+
+	for (int i = 0; i < numLocalSequences; i++)
+	{
+		localSequences[i] = ModelSeq_t(pLocalSequences + i, nullptr, 0u);
+
+		ParseSequence(localSequences + i, this, AnimdataFuncType_t::ANIM_FUNC_STALL_BASEPTR);
 	}
 }
 
 extern void ParseAnimSeqDataForSeq(ModelSeq_t* const seqdesc, const size_t boneCount, const uint32_t flagWidth);
-void ParseModelSequenceData_Stall_V19_1(ModelParsedData_t* const parsedData, char* const baseptr, const uint32_t flagWidth)
+void ModelParsedData_t::ParseModelSequenceData_Stall_V19_1(const uint32_t flagWidth)
 {
-	assertm(parsedData->bones.size() > 0, "should have bones");
+	assertm(numBones > 0, "should have bones");
 
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
+	if (numLocalSequences == 0)
+	{
+		INDEX_TO_NULL(localSequences);
 
-	if (pStudioHdr->localSequenceCount == 0)
 		return;
-
-	parsedData->numLocalSequences = pStudioHdr->localSequenceCount;
-	parsedData->localSequences = new ModelSeq_t[pStudioHdr->localSequenceCount];
-
-	for (int i = 0; i < pStudioHdr->localSequenceCount; i++)
-	{
-		parsedData->localSequences[i] = ModelSeq_t(reinterpret_cast<r5::mstudioseqdesc_v18_t* const>(baseptr + pStudioHdr->localSequenceOffset) + i, nullptr, 1u);
-
-		ParseAnimSeqDataForSeq(parsedData->localSequences + i, parsedData->bones.size(), flagWidth);
-
-		ParseSequence(&parsedData->localSequences[i], &parsedData->bones, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA, flagWidth);
-	}
-}
-
-void ParseModelAnimTypes_V8(ModelParsedData_t* const parsedData)
-{
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	if (pStudioHdr->ikChainCount > 0)
-	{
-		parsedData->ikchains = new ModelIKChain_t[pStudioHdr->ikChainCount];
-		const r5::mstudioikchain_v8_t* const ikchains = reinterpret_cast<const r5::mstudioikchain_v8_t* const>(pStudioHdr->baseptr + pStudioHdr->ikChainOffset);
-
-		for (int i = 0; i < pStudioHdr->ikChainCount; i++)
-		{
-			const ModelIKChain_t ikchain(ikchains + i);
-			memcpy_s(parsedData->ikchains + i, sizeof(ModelIKChain_t), &ikchain, sizeof(ModelIKChain_t));
-		}
 	}
 
-	if (pStudioHdr->localPoseParamCount > 0)
+	const r5::mstudioseqdesc_v18_t* const pLocalSequences = reinterpret_cast<const r5::mstudioseqdesc_v18_t* const>(baseptr + INDEX_GET(localSequences, 0));
+	INDEX_TO_PTR(localSequences, numLocalSequences, ModelSeq_t);
+
+	for (int i = 0; i < numLocalSequences; i++)
 	{
-		parsedData->poseparams = new ModelPoseParam_t[pStudioHdr->localPoseParamCount];
-		const mstudioposeparamdesc_t* const poseparams = reinterpret_cast<const mstudioposeparamdesc_t* const>(pStudioHdr->baseptr + pStudioHdr->localPoseParamOffset);
+		localSequences[i] = ModelSeq_t(pLocalSequences + i, nullptr, 1u);
 
-		for (int i = 0; i < pStudioHdr->localPoseParamCount; i++)
-		{
-			const ModelPoseParam_t poseparam(poseparams + i);
-			memcpy_s(parsedData->poseparams + i, sizeof(ModelPoseParam_t), &poseparam, sizeof(ModelPoseParam_t));
-		}
+		ParseAnimSeqDataForSeq(localSequences + i, numBones, flagWidth);
+
+		ParseSequence(localSequences + i, this, AnimdataFuncType_t::ANIM_FUNC_STALL_ANIMDATA, flagWidth);
 	}
-
-	if (pStudioHdr->localNodeCount > 0)
-	{
-		parsedData->numLocalNodes = pStudioHdr->localNodeCount;
-		parsedData->localNodeNames = new const char*[pStudioHdr->localNodeCount]{};
-		const int* const nodeNameIndices = reinterpret_cast<const int* const>(pStudioHdr->baseptr + pStudioHdr->localNodeNameOffset);
-
-		for (int i = 0; i < pStudioHdr->localNodeCount; i++)
-		{
-			parsedData->localNodeNames[i] = pStudioHdr->baseptr + (pStudioHdr->localNodeNameOffset * pStudioHdr->localNodeNameType) + nodeNameIndices[i];
-		}
-	}
-
-	// technically supported but never used
-	if (pStudioHdr->localIkAutoPlayLockCount > 0)
-	{
-		//printf("wooowowww~~!! iklocks in: %s\n", pStudioHdr->pszName());
-
-		parsedData->iklocks = new ModelIKLock_t[pStudioHdr->localIkAutoPlayLockCount];
-		const r5::mstudioiklock_v8_t* const iklocks = reinterpret_cast<const r5::mstudioiklock_v8_t* const>(pStudioHdr->baseptr + pStudioHdr->localIkAutoPlayLockOffset);
-
-		for (int i = 0; i < pStudioHdr->localIkAutoPlayLockCount; i++)
-		{
-			const ModelIKLock_t iklock(iklocks + i);
-			memcpy_s(parsedData->iklocks + i, sizeof(ModelIKLock_t), &iklock, sizeof(ModelIKLock_t));
-		}
-	}
-}
-
-void ParseModelAnimTypes_V16(ModelParsedData_t* const parsedData)
-{
-	const studiohdr_generic_t* const pStudioHdr = parsedData->pStudioHdr();
-
-	if (pStudioHdr->ikChainCount > 0)
-	{
-		parsedData->ikchains = new ModelIKChain_t[pStudioHdr->ikChainCount];
-		const r5::mstudioikchain_v16_t* const ikchains = reinterpret_cast<const r5::mstudioikchain_v16_t* const>(pStudioHdr->baseptr + pStudioHdr->ikChainOffset);
-
-		for (int i = 0; i < pStudioHdr->ikChainCount; i++)
-		{
-			const ModelIKChain_t ikchain(ikchains + i);
-			memcpy_s(parsedData->ikchains + i, sizeof(ModelIKChain_t), &ikchain, sizeof(ModelIKChain_t));
-		}
-	}
-
-	if (pStudioHdr->localPoseParamCount > 0)
-	{
-		parsedData->poseparams = new ModelPoseParam_t[pStudioHdr->localPoseParamCount];
-		const r5::mstudioposeparamdesc_v16_t* const poseparams = reinterpret_cast<const r5::mstudioposeparamdesc_v16_t* const>(pStudioHdr->baseptr + pStudioHdr->localPoseParamOffset);
-
-		for (int i = 0; i < pStudioHdr->localPoseParamCount; i++)
-		{
-			const ModelPoseParam_t poseparam(poseparams + i);
-			memcpy_s(parsedData->poseparams + i, sizeof(ModelPoseParam_t), &poseparam, sizeof(ModelPoseParam_t));
-		}
-	}
-
-	if (pStudioHdr->localNodeCount > 0)
-	{
-		parsedData->numLocalNodes = pStudioHdr->localNodeCount;
-		parsedData->localNodeNames = new const char* [pStudioHdr->localNodeCount] {};
-		const uint16_t* const nodeNameIndices = reinterpret_cast<const uint16_t* const>(pStudioHdr->baseptr + pStudioHdr->localNodeNameOffset);
-
-		for (int i = 0; i < pStudioHdr->localNodeCount; i++)
-		{
-			parsedData->localNodeNames[i] = pStudioHdr->baseptr + (pStudioHdr->localNodeNameOffset * pStudioHdr->localNodeNameType) + FIX_OFFSET(nodeNameIndices[i]);
-		}
-	}
-
-	// no global iklocks in v16 and later	
 }
 
 // per version funcs that utilize generic data

@@ -151,6 +151,7 @@ struct ModelFrameMovement_t
 {
 	ModelFrameMovement_t(const ModelFrameMovement_t& movement);
 	ModelFrameMovement_t(const r1::mstudioframemovement_t* const movement);
+	ModelFrameMovement_t(const r2::mstudioframemovement_t* const movement);
 	ModelFrameMovement_t(const r5::mstudioframemovement_t* const movement, const int frameCount, const bool indexType);
 
 	~ModelFrameMovement_t()
@@ -537,15 +538,8 @@ struct ModelSeq_t
 	inline const int AnimCount() const { return numblends; }
 };
 
-void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const r2::studiohdr_t* const pStudioHdr);
-void ParseSequence(ModelSeq_t* const seqdesc, const std::vector<ModelBone_t>* const bones, const AnimdataFuncType_t funcType, const uint32_t flagWidth = ANIM_BONEFLAG_BITS_4);
-
-// [rika]: this is for model internal sequence data (r5)
-void ParseModelSequenceData_NoStall(ModelParsedData_t* const parsedData, char* const baseptr);
-void ParseModelSequenceData_Stall_V8(ModelParsedData_t* const parsedData, char* const baseptr);
-void ParseModelSequenceData_Stall_V16(ModelParsedData_t* const parsedData, char* const baseptr);
-void ParseModelSequenceData_Stall_V18(ModelParsedData_t* const parsedData, char* const baseptr);
-void ParseModelSequenceData_Stall_V19_1(ModelParsedData_t* const parsedData, char* const baseptr, const uint32_t flagWidth);
+void ParseSequence(ModelSeq_t* const seqdesc, const ModelParsedData_t* const rig, const r2::studiohdr_t* const pStudioHdr);
+void ParseSequence(ModelSeq_t* const seqdesc, const ModelParsedData_t* const rig, const AnimdataFuncType_t funcType, const uint32_t flagWidth = ANIM_BONEFLAG_BITS_4);
 
 namespace r1
 {

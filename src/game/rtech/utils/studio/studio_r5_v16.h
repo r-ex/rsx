@@ -37,6 +37,7 @@ namespace r5
 
 		uint8_t surfacepropLookup; // written on compile in v54
 		uint16_t surfacepropidx; // index into string table for property name
+		inline const char* const pszSurfaceProp() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(surfacepropidx); }
 
 		uint16_t physicsbone; // index into physically simulated bone
 
@@ -65,6 +66,7 @@ namespace r5
 
 		uint8_t proctype;
 		uint16_t procindex; // procedural rule
+		inline const void* const pProcedure() const { return procindex ? reinterpret_cast<const char* const>(this) + FIX_OFFSET(procindex) : nullptr; }
 	};
 
 	struct mstudiolinearbone_v16_t
@@ -515,8 +517,10 @@ namespace r5
 		uint16_t localposeparamindex;
 
 		uint16_t surfacepropindex;
+		inline const char* const pszSurfaceProp() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(surfacepropindex); }
 
 		uint16_t keyvalueindex;
+		inline const char* const KeyValueText() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(keyvalueindex); }
 
 		uint16_t virtualModel;
 
@@ -545,6 +549,7 @@ namespace r5
 
 		uint16_t numsrcbonetransform;
 		uint16_t srcbonetransformindex;
+		inline const mstudiosrcbonetransform_t* const SrcBoneTransform(int i) const { return reinterpret_cast<const mstudiosrcbonetransform_t* const>((char*)this + srcbonetransformindex) + i; }
 
 		// asset bakery strings if it has any
 		uint16_t sourceFilenameOffset;
@@ -652,8 +657,10 @@ namespace r5
 		uint16_t localposeparamindex;
 
 		uint16_t surfacepropindex;
+		inline const char* const pszSurfaceProp() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(surfacepropindex); }
 
 		uint16_t keyvalueindex;
+		inline const char* const KeyValueText() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(keyvalueindex); }
 
 		uint16_t virtualModel;
 
@@ -682,6 +689,7 @@ namespace r5
 
 		uint16_t numsrcbonetransform;
 		uint16_t srcbonetransformindex;
+		inline const mstudiosrcbonetransform_t* const SrcBoneTransform(int i) const { return reinterpret_cast<const mstudiosrcbonetransform_t* const>((char*)this + srcbonetransformindex) + i; }
 
 		// asset bakery strings if it has any
 		uint16_t sourceFilenameOffset;
@@ -835,6 +843,7 @@ namespace r5
 
 		uint8_t proctype;
 		uint16_t procindex; // procedural rule
+		inline const void* const pProcedure() const { return procindex ? reinterpret_cast<const char* const>(this) + FIX_OFFSET(procindex) : nullptr; }
 
 		int unk_C; // chance this is alignment for 16 bytes
 	};
@@ -897,6 +906,220 @@ namespace r5
 			return reinterpret_cast<Vector*>((char*)this + FIX_OFFSET(scaleindex)) + i;
 		}
 	};
+
+
+	//
+	// VERSION 19.1
+	//
+
+	struct mstudioanimdesc_v19_1_t
+	{
+		float fps; // frames per second	
+		int flags; // looping/non-looping flags
+
+		int numframes;
+
+		uint16_t sznameindex;
+		inline const char* const pszName() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(sznameindex); }
+
+		uint16_t framemovementindex; // new in v52
+		inline const mstudioframemovement_t* const pFrameMovement() const { return reinterpret_cast<const mstudioframemovement_t* const>((char*)this + FIX_OFFSET(framemovementindex)); }
+
+		uint16_t numikrules;
+
+		uint8_t unused_12[4]; // pad? unused? what the hell man
+
+		uint16_t ikruleindex; // non-zero when IK data is stored in the mdl
+		inline const mstudioikrule_v16_t* const pIKRule(const int i) const;
+
+		uint64_t animDataAsset; // guid in pak, should be pointer to asset on load. not set if STUDIO_HAS_ANIM is missing
+
+		char* sectionDataExternal; // set on pak asset load
+		uint16_t unk1; // maybe some sort of thread/mutic for the external data? set on pak asset load from unk_10
+
+		uint16_t sectionindex;
+		uint16_t sectionstallframes; // number of stall frames inside the animation, the reset excluding the final frame are stored externally. when external data is not loaded(?)/found(?) it falls back on the last frame of this as a stall
+		uint16_t sectionframes; // number of frames used in each fast lookup section, zero if not used
+		inline const mstudioanimsections_v16_t* const pSection(int i) const { return reinterpret_cast<const mstudioanimsections_v16_t* const>((char*)this + FIX_OFFSET(sectionindex)) + i; }
+		// numsections = ((numframes - sectionstallframes - 1) / sectionframes) + 2;
+		// numsections after stall section, if stall frames > zero add one section
+	};
+
+	//
+	// VERSION 19.2
+	//
+
+	//
+	// Studio Header
+	//
+
+	struct studiohdr_v19_2_t
+	{
+		int flags;
+		int checksum; // unsure if this is still checksum, there isn't any other files that have it still
+		uint16_t sznameindex; // No longer stored in string block, uses string in header.
+		inline const char* const pszName() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(sznameindex); }
+		char name[33]; // The internal name of the model, padding with null chars. last byte always null
+
+		uint8_t surfacepropLookup; // saved in the file (unsigned dl/fx/ferrofluid_ult_base_puddle)
+
+		float mass;
+
+		int contents;
+
+		uint16_t hitboxsetindex;
+		uint8_t numhitboxsets;
+		inline const r5::mstudiohitboxset_v16_t* const pHitboxSet(const uint8_t i) const
+		{
+			assert(i >= 0 && i < numhitboxsets);
+			return reinterpret_cast<const r5::mstudiohitboxset_v16_t* const>((char*)this + FIX_OFFSET(hitboxsetindex)) + i;
+		};
+
+		uint8_t illumpositionattachmentindex;
+
+		Vector illumposition;	// illumination center
+
+		Vector hull_min;		// ideal movement hull size
+		Vector hull_max;
+
+		Vector view_bbmin;		// clipping bounding box
+		Vector view_bbmax;
+
+		uint16_t boneCount; // bones
+		uint16_t boneHdrOffset;
+		uint16_t boneDataOffset;
+		inline const mstudiobonehdr_v16_t* const pBone(const uint16_t i) const { assert(i >= 0 && i < boneCount); return reinterpret_cast<mstudiobonehdr_v16_t*>((char*)this + FIX_OFFSET(boneHdrOffset)) + i; }
+		inline const mstudiobonedata_v19_t* const pBoneData(const uint16_t i) const { assert(i >= 0 && i < boneCount); return reinterpret_cast<mstudiobonedata_v19_t*>((char*)this + FIX_OFFSET(boneDataOffset)) + i; }
+
+		uint16_t numlocalseq; // sequences
+		uint16_t localseqindex;
+
+		// needs to be confirmed
+		uint16_t unk_7E[2]; // added in v13 -> v14
+
+		// needs to be confirmed
+		char activitylistversion; // initialization flag - have the sequences been indexed?
+
+		uint8_t numlocalattachments;
+		uint16_t localattachmentindex;
+		inline const r5::mstudioattachment_v16_t* const pLocalAttachment(const uint16_t i) const { assert(i >= 0 && i < numlocalattachments); return reinterpret_cast<const r5::mstudioattachment_v16_t* const>((char*)this + FIX_OFFSET(localattachmentindex)) + i; }
+
+		uint16_t numlocalnodes;
+		uint16_t localnodenameindex;
+		uint16_t localNodeDataOffset; // offset into an array of int sized offsets that read into the data for each node
+
+		uint16_t numikchains;
+		uint16_t ikchainindex;
+
+		uint16_t numtextures; // the material limit exceeds 128, probably 256.
+		uint16_t textureindex;
+		inline const uint64_t pTexture(const int i) const { return reinterpret_cast<const uint64_t* const>((char*)this + textureindex)[i]; }
+
+		// replaceable textures tables
+		uint16_t numskinref;
+		uint16_t numskinfamilies;
+		uint16_t skinindex;
+		inline const int16_t* const pSkinref(const int i) const { return reinterpret_cast<const int16_t* const>((char*)this + skinindex) + i; }
+		inline const int16_t* const pSkinFamily(const int i) const { return pSkinref(numskinref * i); };
+		inline const char* const pSkinName(const int i) const
+		{
+			// only stored for index 1 and up
+			// [rika]: in code this actually returns '\0'
+			if (i == 0)
+			{
+				return STUDIO_DEFAULT_SKIN_NAME;
+			}
+
+			const uint16_t skinnameindex = *(reinterpret_cast<const uint16_t* const>(pSkinFamily(numskinfamilies)) + (i - 1));
+			const char* const skinname = reinterpret_cast<const char* const>(this) + FIX_OFFSET(skinnameindex);
+
+			if (IsStringZeroLength(skinname))
+			{
+				return STUDIO_NULL_SKIN_NAME;
+			}
+
+			return skinname;
+		}
+
+
+		uint16_t numbodyparts;
+		uint16_t bodypartindex;
+		inline const mstudiobodyparts_v16_t* const pBodypart(const uint16_t i) const { assert(i >= 0 && i < numbodyparts); return reinterpret_cast<mstudiobodyparts_v16_t*>((char*)this + FIX_OFFSET(bodypartindex)) + i; }
+
+		// this is rui meshes
+		uint16_t uiPanelCount;
+		uint16_t uiPanelOffset;
+
+		uint16_t numlocalposeparameters;
+		uint16_t localposeparamindex;
+
+		uint16_t surfacepropindex;
+		inline const char* const pszSurfaceProp() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(surfacepropindex); }
+
+		uint16_t keyvalueindex;
+		inline const char* const KeyValueText() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(keyvalueindex); }
+
+		uint16_t virtualModel;
+
+		// hw data lookup from rmdl
+		uint16_t meshCount; // number of meshes per lod
+
+		uint16_t bonetablebynameindex; // bonetable is u16[] since v19.2
+
+		uint16_t boneStateOffset;
+		uint16_t boneStateCount;
+		inline const uint16_t* pBoneStates() const { return boneStateCount > 0 ? reinterpret_cast<uint16_t*>((char*)this + offsetof(studiohdr_v19_2_t, boneStateOffset) + FIX_OFFSET(boneStateOffset)) : nullptr; }
+		uint16_t boneStatePerLOD[MAX_NUM_LODS]; // number of bones, size of bonesates, per lod
+
+		// sets of lods
+		uint16_t groupHeaderOffset;
+		uint16_t groupHeaderCount;
+		const studio_hw_groupdata_v16_t* const pLODGroup(const uint16_t i) const { return reinterpret_cast<const studio_hw_groupdata_v16_t* const>((char*)this + offsetof(studiohdr_v19_2_t, groupHeaderOffset) + FIX_OFFSET(groupHeaderOffset)) + i; }
+
+		uint16_t lodOffset;
+		uint16_t lodCount;
+		const float* const pLODThreshold(const uint16_t i) const { return reinterpret_cast<const float* const>((char*)this + offsetof(studiohdr_v19_2_t, lodOffset) + FIX_OFFSET(lodOffset)) + i; }
+		const float LODThreshold(const uint16_t i) const { return *pLODThreshold(i); }
+
+		// 
+		float fadeDistance;
+		float gatherSize; // what. from r5r struct
+
+		uint16_t numsrcbonetransform;
+		uint16_t srcbonetransformindex;
+		inline const mstudiosrcbonetransform_t* const SrcBoneTransform(int i) const { return reinterpret_cast<const mstudiosrcbonetransform_t* const>((char*)this + srcbonetransformindex) + i; }
+
+		// asset bakery strings if it has any
+		uint16_t sourceFilenameOffset;
+
+		uint16_t linearboneindex;
+		inline mstudiolinearbone_v19_t* const pLinearBones() const { return linearboneindex ? reinterpret_cast<mstudiolinearbone_v19_t*>((char*)this + FIX_OFFSET(linearboneindex)) : nullptr; }
+
+		// used for adjusting weights in sequences, quick lookup into bones that have procbones, unsure what else uses this.
+		uint16_t procBoneCount;
+		uint16_t procBoneOffset; // in order array of procbones and their parent bone indice
+		uint16_t linearProcBoneOffset; // byte per bone with indices into each bones procbone, 0xff if no procbone is present
+
+		// mostly seen on '_animated' suffixed models
+		// manually declared bone followers are no longer stored in kvs under 'bone_followers', they are now stored in an array of ints with the bone index.
+		uint16_t boneFollowerCount;
+		uint16_t boneFollowerOffset;
+
+		uint16_t bvhOffset;
+
+		char bvhUnk[2]; // collision detail for bvh (?)
+
+		// perhaps these are t he same varibles added in v12.3? cannot find any models that use them previously (pre-v16).
+		// UnkDataType_0_t
+		uint16_t unkDataCount; // unk_0xDA
+		uint16_t unkDataOffset; // unk_0xDC
+		// UnkDataType_1_t
+		uint16_t unkStrcOffset; // unk_0xDE
+
+		int unk_E0;
+	};
+
+	static_assert(offsetof(studiohdr_v19_2_t, groupHeaderOffset) == 0xC4);
 
 
 	//
@@ -1014,44 +1237,6 @@ namespace r5
 		uint16_t numInterpFrames : 7; // frame gap between this and the next valid data
 
 		static void Unpack(Vector& pos, const AnimPos64 packedPos, const AxisFixup_t* const axisFixup);
-	};
-
-
-	//
-	// VERSION 19.1
-	//
-
-	struct mstudioanimdesc_v19_1_t
-	{
-		float fps; // frames per second	
-		int flags; // looping/non-looping flags
-
-		int numframes;
-
-		uint16_t sznameindex;
-		inline const char* const pszName() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(sznameindex); }
-
-		uint16_t framemovementindex; // new in v52
-		inline const mstudioframemovement_t* const pFrameMovement() const { return reinterpret_cast<const mstudioframemovement_t* const>((char*)this + FIX_OFFSET(framemovementindex)); }
-
-		uint16_t numikrules;
-
-		uint8_t unused_12[4]; // pad? unused? what the hell man
-
-		uint16_t ikruleindex; // non-zero when IK data is stored in the mdl
-		inline const mstudioikrule_v16_t* const pIKRule(const int i) const;
-
-		uint64_t animDataAsset; // guid in pak, should be pointer to asset on load. not set if STUDIO_HAS_ANIM is missing
-
-		char* sectionDataExternal; // set on pak asset load
-		uint16_t unk1; // maybe some sort of thread/mutic for the external data? set on pak asset load from unk_10
-
-		uint16_t sectionindex;
-		uint16_t sectionstallframes; // number of stall frames inside the animation, the reset excluding the final frame are stored externally. when external data is not loaded(?)/found(?) it falls back on the last frame of this as a stall
-		uint16_t sectionframes; // number of frames used in each fast lookup section, zero if not used
-		inline const mstudioanimsections_v16_t* const pSection(int i) const { return reinterpret_cast<const mstudioanimsections_v16_t* const>((char*)this + FIX_OFFSET(sectionindex)) + i; }
-		// numsections = ((numframes - sectionstallframes - 1) / sectionframes) + 2;
-		// numsections after stall section, if stall frames > zero add one section
 	};
 
 
@@ -1241,140 +1426,5 @@ namespace r5
 		}
 		}
 	}
-
-	// VERSION 19.2
-
-	struct studiohdr_v19_2_t
-	{
-		int flags;
-		int checksum; // unsure if this is still checksum, there isn't any other files that have it still
-		uint16_t sznameindex; // No longer stored in string block, uses string in header.
-		inline const char* const pszName() const { return reinterpret_cast<const char* const>(this) + FIX_OFFSET(sznameindex); }
-		char name[33]; // The internal name of the model, padding with null chars. last byte always null
-
-		uint8_t surfacepropLookup; // saved in the file (unsigned dl/fx/ferrofluid_ult_base_puddle)
-
-		float mass;
-
-		int contents;
-
-		uint16_t hitboxsetindex;
-		uint8_t numhitboxsets;
-
-		uint8_t illumpositionattachmentindex;
-
-		Vector illumposition;	// illumination center
-
-		Vector hull_min;		// ideal movement hull size
-		Vector hull_max;
-
-		Vector view_bbmin;		// clipping bounding box
-		Vector view_bbmax;
-
-		uint16_t boneCount; // bones
-		uint16_t boneHdrOffset;
-		uint16_t boneDataOffset;
-
-		uint16_t numlocalseq; // sequences
-		uint16_t localseqindex;
-
-		// needs to be confirmed
-		uint16_t unk_7E[2]; // added in v13 -> v14
-
-		// needs to be confirmed
-		char activitylistversion; // initialization flag - have the sequences been indexed?
-
-		uint8_t numlocalattachments;
-		uint16_t localattachmentindex;
-
-		uint16_t numlocalnodes;
-		uint16_t localnodenameindex;
-		uint16_t localNodeDataOffset; // offset into an array of int sized offsets that read into the data for each node
-
-		uint16_t numikchains;
-		uint16_t ikchainindex;
-
-		uint16_t numtextures; // the material limit exceeds 128, probably 256.
-		uint16_t textureindex;
-
-		// replaceable textures tables
-		uint16_t numskinref;
-		uint16_t numskinfamilies;
-		uint16_t skinindex;
-
-		uint16_t numbodyparts;
-		uint16_t bodypartindex;
-		inline const mstudiobodyparts_v16_t* const pBodypart(const uint16_t i) const { assert(i >= 0 && i < numbodyparts); return reinterpret_cast<mstudiobodyparts_v16_t*>((char*)this + FIX_OFFSET(bodypartindex)) + i; }
-
-		// this is rui meshes
-		uint16_t uiPanelCount;
-		uint16_t uiPanelOffset;
-
-		uint16_t numlocalposeparameters;
-		uint16_t localposeparamindex;
-
-		uint16_t surfacepropindex;
-
-		uint16_t keyvalueindex;
-
-		uint16_t virtualModel;
-
-		// hw data lookup from rmdl
-		uint16_t meshCount; // number of meshes per lod
-
-		uint16_t bonetablebynameindex; // bonetable is u16[] since v19.2
-
-		uint16_t boneStateOffset;
-		uint16_t boneStateCount;
-		inline const uint16_t* pBoneStates() const { return boneStateCount > 0 ? reinterpret_cast<uint16_t*>((char*)this + offsetof(studiohdr_v19_2_t, boneStateOffset) + FIX_OFFSET(boneStateOffset)) : nullptr; }
-		uint16_t boneStatePerLOD[MAX_NUM_LODS]; // number of bones, size of bonesates, per lod
-
-		// sets of lods
-		uint16_t groupHeaderOffset;
-		uint16_t groupHeaderCount;
-		const studio_hw_groupdata_v16_t* const pLODGroup(const uint16_t i) const { return reinterpret_cast<const studio_hw_groupdata_v16_t* const>((char*)this + offsetof(studiohdr_v19_2_t, groupHeaderOffset) + FIX_OFFSET(groupHeaderOffset)) + i; }
-
-		uint16_t lodOffset;
-		uint16_t lodCount;
-		const float* const pLODThreshold(const uint16_t i) const { return reinterpret_cast<const float* const>((char*)this + offsetof(studiohdr_v19_2_t, lodOffset) + FIX_OFFSET(lodOffset)) + i; }
-		const float LODThreshold(const uint16_t i) const { return *pLODThreshold(i); }
-
-		// 
-		float fadeDistance;
-		float gatherSize; // what. from r5r struct
-
-		uint16_t numsrcbonetransform;
-		uint16_t srcbonetransformindex;
-
-		// asset bakery strings if it has any
-		uint16_t sourceFilenameOffset;
-
-		uint16_t linearboneindex;
-
-		// used for adjusting weights in sequences, quick lookup into bones that have procbones, unsure what else uses this.
-		uint16_t procBoneCount;
-		uint16_t procBoneOffset; // in order array of procbones and their parent bone indice
-		uint16_t linearProcBoneOffset; // byte per bone with indices into each bones procbone, 0xff if no procbone is present
-
-		// mostly seen on '_animated' suffixed models
-		// manually declared bone followers are no longer stored in kvs under 'bone_followers', they are now stored in an array of ints with the bone index.
-		uint16_t boneFollowerCount;
-		uint16_t boneFollowerOffset;
-
-		uint16_t bvhOffset;
-
-		char bvhUnk[2]; // collision detail for bvh (?)
-
-		// perhaps these are t he same varibles added in v12.3? cannot find any models that use them previously (pre-v16).
-		// UnkDataType_0_t
-		uint16_t unkDataCount; // unk_0xDA
-		uint16_t unkDataOffset; // unk_0xDC
-		// UnkDataType_1_t
-		uint16_t unkStrcOffset; // unk_0xDE
-
-		int unk_E0;
-	};
-
-	static_assert(offsetof(studiohdr_v19_2_t, groupHeaderOffset) == 0xC4);
 }
 #pragma pack(pop)

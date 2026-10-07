@@ -1,10 +1,11 @@
 #pragma once
-#include <game/rtech/utils/studio/studio_generic.h>
 
 #include <game/rtech/cpakfile.h>
 #include <game/rtech/assets/texture.h>
 #include <game/rtech/assets/material.h>
 #include <core/mdl/animdata.h>
+
+extern CBufferManager g_BufferManager;
 
 //
 // File contains data for exporting and storing 3D assets
@@ -97,7 +98,8 @@ static_assert(offsetof(Vertex_t, blendData) == 32);
 //
 struct ModelMeshData_t
 {
-	ModelMeshData_t() : meshVertexDataIndex(invalidNoodleIdx), rawVertexData(nullptr), rawVertexLayoutFlags(0ull), indexCount(0), vertCount(0), vertCacheSize(0), weightsPerVert(0), weightsCount(0), texcoordCount(0), texcoodIndices(0), materialId(0), materialAsset(nullptr), bodyPartIndex(-1), extraBoneWeights(nullptr), extraBoneWeightsSize(0) {};
+	ModelMeshData_t() : meshVertexDataIndex(invalidNoodleIdx), rawVertexData(nullptr), rawVertexLayoutFlags(0ull), indexCount(0), vertCount(0), vertCacheSize(0),
+		weightsPerVert(0), weightsCount(0), texcoordCount(0), texcoodIndices(0), materialId(0), materialAsset(nullptr),bodyPartIndex(-1), extraBoneWeights(nullptr), extraBoneWeightsSize(0) {};
 	ModelMeshData_t(const ModelMeshData_t& mesh) : meshVertexDataIndex(mesh.meshVertexDataIndex), rawVertexData(mesh.rawVertexData), rawVertexLayoutFlags(mesh.rawVertexLayoutFlags), indexCount(mesh.indexCount), vertCount(mesh.vertCount), vertCacheSize(mesh.vertCacheSize),
 		weightsPerVert(mesh.weightsPerVert), weightsCount(mesh.weightsCount), texcoordCount(mesh.texcoordCount), texcoodIndices(mesh.texcoodIndices), materialId(mesh.materialId), materialAsset(mesh.materialAsset), bodyPartIndex(mesh.bodyPartIndex), extraBoneWeights(nullptr), extraBoneWeightsSize(0) {
 	};
@@ -142,94 +144,376 @@ struct ModelMeshData_t
 	void ParseMaterial(ModelParsedData_t* const parsed, const int material);
 
 	inline MaterialAsset* const GetMaterialAsset() const { return reinterpret_cast<MaterialAsset* const>(materialAsset->extraData()); }
+
+	void ParseMesh_VTX(const OptimizedModel::FileHeader_t* const pVTX, const int partIndex, const int flags)
+	{
+		// is this correct?
+		rawVertexLayoutFlags |= (VERT_LEGACY | ((flags & STUDIOHDR_FLAGS_USES_VERTEX_COLOR) ? VERT_COLOR : 0x0));
+		vertCacheSize = static_cast<uint16_t>(pVTX->vertCacheSize);
+
+		// do we have a section texcoord
+		rawVertexLayoutFlags |= (flags & STUDIOHDR_FLAGS_USES_UV2) ? VERT_TEXCOORDn_FMT(2, 0x2) : 0x0;
+
+		// has to be parsed per strip
+		vertCount = 0u;
+		indexCount = 0u;
+
+		bodyPartIndex = partIndex;
+
+		// how to handle this here?
+		extraBoneWeights = nullptr;
+		extraBoneWeightsSize = 0;
+
+		ParseTexcoords();
+	}
+
+	void ParseMesh_HW1(const vg::rev1::MeshHeader_t* pLODMesh, const int partIndex, const vg::rev1::VertexGroupHeader_t* const vgHdr)
+	{
+		rawVertexLayoutFlags |= pLODMesh->flags;
+
+		vertCacheSize = static_cast<uint16_t>(pLODMesh->vertCacheSize);
+		vertCount = pLODMesh->vertCount;
+		indexCount = pLODMesh->indexCount;
+
+		bodyPartIndex = partIndex;
+
+		if (pLODMesh->extraBoneWeightSize)
+		{
+			char* ebw = new char[pLODMesh->extraBoneWeightSize];
+			memcpy_s(ebw, pLODMesh->extraBoneWeightSize, pLODMesh->pBoneWeights(vgHdr), pLODMesh->extraBoneWeightSize);
+
+			extraBoneWeights = ebw;
+			extraBoneWeightsSize = pLODMesh->extraBoneWeightSize;
+		}
+		else
+		{
+			extraBoneWeights = nullptr;
+			extraBoneWeightsSize = 0;
+		}
+
+		ParseTexcoords();
+	}
+
+	void ParseMesh_HW2(const vg::rev2::MeshHeader_t* pLODMesh, const int partIndex)
+	{
+		rawVertexLayoutFlags |= pLODMesh->flags;
+
+		vertCacheSize = static_cast<uint16_t>(pLODMesh->vertCacheSize);
+		vertCount = static_cast<uint32_t>(pLODMesh->vertCount);
+		indexCount = static_cast<uint32_t>(pLODMesh->indexCount);
+
+		bodyPartIndex = partIndex;
+
+		if (pLODMesh->extraBoneWeightSize)
+		{
+			char* ebw = new char[pLODMesh->extraBoneWeightSize];
+			memcpy_s(ebw, pLODMesh->extraBoneWeightSize, pLODMesh->pBoneWeights(), pLODMesh->extraBoneWeightSize);
+
+			extraBoneWeights = ebw;
+			extraBoneWeightsSize = pLODMesh->extraBoneWeightSize;
+		}
+		else
+		{
+			extraBoneWeights = nullptr;
+			extraBoneWeightsSize = 0;
+		}
+
+		ParseTexcoords();
+	}
+
+	void ParseMesh_HW3(const vg::rev3::MeshHeader_t* pLODMesh, const int partIndex)
+	{
+		rawVertexLayoutFlags |= pLODMesh->flags;
+
+		vertCacheSize = static_cast<uint16_t>(pLODMesh->vertCacheSize);
+		vertCount = pLODMesh->vertCount;
+		indexCount = pLODMesh->indexCount;
+
+		bodyPartIndex = partIndex;
+
+		if (pLODMesh->extraBoneWeightSize)
+		{
+			char* ebw = new char[pLODMesh->extraBoneWeightSize];
+			memcpy_s(ebw, pLODMesh->extraBoneWeightSize, pLODMesh->pBoneWeights(), pLODMesh->extraBoneWeightSize);
+
+			extraBoneWeights = ebw;
+			extraBoneWeightsSize = pLODMesh->extraBoneWeightSize;
+		}
+		else
+		{
+			extraBoneWeights = nullptr;
+			extraBoneWeightsSize = 0;
+		}
+
+		ParseTexcoords();
+	}
+
+	void ParseMesh_HW4(const vg::rev4::MeshHeader_t* pLODMesh, const uint16_t partIndex)
+	{
+		rawVertexLayoutFlags = pLODMesh->flags;
+
+		vertCacheSize = pLODMesh->vertCacheSize;
+		vertCount = pLODMesh->vertCount;
+		indexCount = pLODMesh->indexCount;
+
+		bodyPartIndex = partIndex;
+
+		if (pLODMesh->extraBoneWeightSize)
+		{
+			char* ebw = new char[pLODMesh->extraBoneWeightSize];
+			memcpy_s(ebw, pLODMesh->extraBoneWeightSize, pLODMesh->pBoneWeights(), pLODMesh->extraBoneWeightSize);
+
+			extraBoneWeights = ebw;
+			extraBoneWeightsSize = pLODMesh->extraBoneWeightSize;
+		}
+		else
+		{
+			extraBoneWeights = nullptr;
+			extraBoneWeightsSize = 0;
+		}
+
+		ParseTexcoords();
+	}
 };
 
 struct ModelModelData_t
 {
-	ModelModelData_t() : meshes(nullptr), meshIndex(0), meshCount(0), vertCount(0) {}
+	ModelModelData_t() : name(nullptr), nameInMem(false), meshes(nullptr), meshCount(0u), vertCount(0u) {}
+	ModelModelData_t(ModelMeshData_t* const modelMeshes, uint32_t numMeshes) : name(nullptr), nameInMem(false), meshes(modelMeshes), meshCount(static_cast<uint16_t>(numMeshes)), vertCount(0u)
+	{
 
-	std::string name;
+	}
+	~ModelModelData_t()
+	{
+		if (nameInMem)
+		{
+			FreeAllocArray(name);
+		}
+	}
+
+	const char* name;
 	ModelMeshData_t* meshes;
-	size_t meshIndex;
-	uint32_t meshCount;
+	uint16_t meshCount;
+
+	bool nameInMem;
 
 	uint32_t vertCount; // used to determine if this model is disabled in a LOD, as traditional methods (via VTX) will not work for most apex models
+
+	ModelModelData_t& operator=(const ModelModelData_t&) = delete;
+	ModelModelData_t& operator=(ModelModelData_t&& model) noexcept
+	{
+		if (this != &model)
+		{
+			name = model.name;
+			meshes = model.meshes;
+			meshCount = model.meshCount;
+
+			nameInMem = model.nameInMem;
+
+			vertCount = model.vertCount;
+
+			model.name = nullptr;
+			model.nameInMem = false;
+		}
+
+		return *this;
+	}
+
+	void GenerateName(const char* const part, const int localIndex, const int lodLevel)
+	{
+		constexpr size_t bufSize = 80ull;
+
+		char* nameBuf = new char[bufSize];
+		snprintf(nameBuf, bufSize, "%s_%i_LOD%i\0", part, localIndex, lodLevel);
+
+		const size_t length = strnlen(nameBuf, bufSize) + 1ull;
+		char* tmp = new char[length]{};
+		strncpy_mem(tmp, length, nameBuf, bufSize);
+
+		name = tmp;
+	}
+};
+
+struct ModelHWGroup_t
+{
+	ModelHWGroup_t() = default;
+	ModelHWGroup_t(const r5::studio_hw_groupdata_v16_t* const group) : dataOffset(group->dataOffset), dataSizeCompressed(group->dataSizeCompressed), dataSizeDecompressed(group->dataSizeDecompressed), dataCompression(group->dataCompression),
+		lodIndex(group->lodIndex), lodCount(group->lodCount), lodMap(group->lodMap) {}
+	ModelHWGroup_t(const r5::studio_hw_groupdata_v12_1_t* const group) : dataOffset(group->dataOffset), dataSizeCompressed(-1), dataSizeDecompressed(group->dataSize), dataCompression(eCompressionType::NONE),
+		lodIndex(static_cast<uint8_t>(group->lodIndex)), lodCount(static_cast<uint8_t>(group->lodCount)), lodMap(static_cast<uint8_t>(group->lodMap)) {}
+
+	int dataOffset;				// offset to this section in compressed vg
+	int dataSizeCompressed;		// compressed size of this lod buffer in hwData
+	int dataSizeDecompressed;	// decompressed size of this lod buffer in hwData
+
+	eCompressionType dataCompression; // none and oodle, haven't seen anything else used.
+
+	//
+	uint8_t lodIndex;		// base lod idx?
+	uint8_t lodCount;		// number of lods contained within this group
+	uint8_t lodMap;		// lods in this group, each bit is a lod
 };
 
 struct ModelLODData_t
 {
-	std::vector<ModelModelData_t> models;
-	std::vector<ModelMeshData_t> meshes;
-	size_t vertexCount;
-	size_t indexCount;
+	ModelLODData_t() = default;
+	~ModelLODData_t()
+	{
+		FreeAllocArray(models);
+		FreeAllocArray(meshes);
+	}
+
+	ModelModelData_t* models;
+	uint32_t numModels;
+
+	uint32_t numMeshes;
+	ModelMeshData_t* meshes;
+
+	uint32_t vertexCount;
+	uint32_t indexCount;
 	float switchPoint;
 
 	// for exporting
 	uint16_t texcoordsPerVert; // max texcoords used in any mesh from this lod
 	uint16_t weightsPerVert; // max weights used in any mesh from this lod
 
-	inline const int GetMeshCount() const { return static_cast<int>(meshes.size()); }
-	inline const int GetModelCount() const { return static_cast<int>(models.size()); }
+	inline const uint32_t GetMeshCount() const { return static_cast<int>(numMeshes); }
+	inline const uint32_t GetModelCount() const { return static_cast<int>(numModels); }
 
-	inline const ModelModelData_t* const pModel(const size_t i) const { return &models.at(i); }
+	inline const ModelModelData_t* const pModel(const uint32_t i) const { return models + i; }
+	inline const ModelMeshData_t* const pMesh(const uint32_t i) const { return meshes + i; }
+	inline const ModelMeshData_t& Mesh(const uint32_t i) const { return meshes[i]; }
+
+	void ParseLOD_VTX(const uint32_t modelCount, const uint32_t meshCount)
+	{
+		ParseLOD(0.0f, modelCount);
+
+		numMeshes = meshCount;
+		meshes = new ModelMeshData_t[numMeshes]{};
+	}
+
+	void ParseLOD_HW1(const vg::rev1::ModelLODHeader_t* const pLOD, const uint32_t modelCount, const vg::rev1::VertexGroupHeader_t* const vgHdr)
+	{
+		ParseLOD(pLOD->switchPoint, modelCount);
+
+		numMeshes = 0u; // excludes empty ones, saves some memory
+		for (uint8_t meshIdx = 0; meshIdx < pLOD->meshCount; meshIdx++)
+		{
+			if (pLOD->pMesh(vgHdr, meshIdx)->flags == 0)
+			{
+				continue;
+			}
+
+			numMeshes++;
+		}
+
+		meshes = new ModelMeshData_t[numMeshes]{};
+	}
+
+	void ParseLOD_HW2(const vg::rev2::ModelLODHeader_t* const pLOD, const uint32_t modelCount)
+	{
+		ParseLOD(pLOD->switchPoint, modelCount);
+
+		numMeshes = 0u; // excludes empty ones, saves some memory
+		for (uint8_t meshIdx = 0; meshIdx < pLOD->meshCount; meshIdx++)
+		{
+			if (pLOD->pMesh(meshIdx)->flags == 0)
+			{
+				continue;
+			}
+
+			numMeshes++;
+		}
+
+		meshes = new ModelMeshData_t[numMeshes]{};
+	}
+
+	// [rika]: this struct is the same
+	void ParseLOD_HW3(const vg::rev3::ModelLODHeader_t* const pLOD, const uint32_t modelCount)
+	{
+		ParseLOD_HW2(reinterpret_cast<const vg::rev2::ModelLODHeader_t* const>(pLOD), modelCount);
+	}
+
+	void ParseLOD_HW4(const vg::rev4::ModelLODHeader_t* const pLOD, const float threshold, const uint32_t modelCount)
+	{
+		ParseLOD(threshold, modelCount);
+
+		numMeshes = 0u; // excludes empty ones, saves some memory
+		for (uint8_t meshIdx = 0; meshIdx < pLOD->meshCount; meshIdx++)
+		{
+			if (pLOD->pMesh(meshIdx)->flags == 0)
+			{
+				continue;
+			}
+
+			numMeshes++;
+		}
+
+		meshes = new ModelMeshData_t[numMeshes]{};
+	}
+
+	private:
+
+		inline void ParseLOD(const float threshold, const uint32_t modelCount)
+		{
+			// set our lod up
+			switchPoint = threshold;
+			numModels = modelCount;
+			models = new ModelModelData_t[numModels]{};
+
+			vertexCount = 0u;
+			indexCount = 0u;
+			texcoordsPerVert = 0u;
+			weightsPerVert = 0u;
+		}
 };
 
 struct ModelBone_t
 {
 	ModelBone_t() = default;
 
-	ModelBone_t(const r1::mstudiobone_t* const bone) : baseptr(reinterpret_cast<const char* const>(bone)), name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procindex(bone->procindex), physicsbone(bone->physicsbone), surfacepropidx(bone->surfacepropidx), contents(bone->contents),
+	ModelBone_t(const r1::mstudiobone_t* const bone) : name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procBone(bone->pProcedure()), physicsbone(bone->physicsbone), surfaceProp(bone->pszSurfaceProp()), contents(bone->contents),
 		poseToBone(&bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
 
-	ModelBone_t(const r2::mstudiobone_t* const bone) : baseptr(reinterpret_cast<const char* const>(bone)), name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procindex(bone->procindex), physicsbone(bone->physicsbone), surfacepropidx(bone->surfacepropidx), contents(bone->contents),
+	ModelBone_t(const r2::mstudiobone_t* const bone) : name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procBone(bone->pProcedure()), physicsbone(bone->physicsbone), surfaceProp(bone->pszSurfaceProp()), contents(bone->contents),
 		poseToBone(&bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
 
-	ModelBone_t(const r5::mstudiobone_v8_t* const bone) : baseptr(reinterpret_cast<const char* const>(bone)), name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procindex(bone->procindex), physicsbone(bone->physicsbone), surfacepropidx(bone->surfacepropidx), contents(bone->contents),
+	ModelBone_t(const r5::mstudiobone_v8_t* const bone) : name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procBone(bone->pProcedure()), physicsbone(bone->physicsbone), surfaceProp(bone->pszSurfaceProp()), contents(bone->contents),
 		poseToBone(&bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
 
-	ModelBone_t(const r5::mstudiobone_v12_1_t* const bone) : baseptr(reinterpret_cast<const char* const>(bone)), name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procindex(bone->procindex), physicsbone(bone->physicsbone), surfacepropidx(bone->surfacepropidx), contents(bone->contents),
+	ModelBone_t(const r5::mstudiobone_v12_1_t* const bone) : name(bone->pszName()), parent(bone->parent), flags(bone->flags), proctype(bone->proctype), procBone(bone->pProcedure()), physicsbone(bone->physicsbone), surfaceProp(bone->pszSurfaceProp()), contents(bone->contents),
 		poseToBone(&bone->poseToBone), pos(bone->pos), quat(bone->quat), rot(bone->rot), scale(bone->scale) {};
 
-	ModelBone_t(const r5::mstudiobonehdr_v16_t* const bonehdr, const r5::mstudiobonedata_v16_t* const bonedata) : baseptr(reinterpret_cast<const char* const>(bonehdr)), name(bonehdr->pszName()), parent(bonedata->parent), flags(bonedata->flags), proctype(bonedata->proctype), procindex(bonedata->procindex),
-		physicsbone(bonehdr->physicsbone), surfacepropidx(bonehdr->surfacepropidx), contents(bonehdr->contents),
-		poseToBone(&bonedata->poseToBone), pos(bonedata->pos), quat(bonedata->quat), rot(bonedata->rot), scale(bonedata->scale)
-	{
-		const int64_t tmpOffset = reinterpret_cast<const char* const>(bonedata) - reinterpret_cast<const char* const>(bonehdr);
-		procindex += static_cast<int>(tmpOffset); // adjust procindex to be based off the bone header
-	};
+	ModelBone_t(const r5::mstudiobonehdr_v16_t* const pBoneHdr, const r5::mstudiobonedata_v16_t* const pBoneData) : name(pBoneHdr->pszName()), parent(pBoneData->parent), flags(pBoneData->flags), proctype(pBoneData->proctype), procBone(pBoneData->pProcedure()),
+		physicsbone(pBoneHdr->physicsbone), surfaceProp(pBoneHdr->pszSurfaceProp()), contents(pBoneHdr->contents),
+		poseToBone(&pBoneData->poseToBone), pos(pBoneData->pos), quat(pBoneData->quat), rot(pBoneData->rot), scale(pBoneData->scale) {}
 
-	ModelBone_t(const r5::mstudiobonehdr_v16_t* const bonehdr, const r5::mstudiobonedata_v19_t* const bonedata, const r5::mstudiolinearbone_v19_t* const linearbone, const int bone) : baseptr(reinterpret_cast<const char* const>(bonehdr)), name(bonehdr->pszName()), parent(bonedata->parent), flags(bonedata->flags), proctype(bonedata->proctype), procindex(bonedata->procindex),
-		physicsbone(bonehdr->physicsbone), surfacepropidx(bonehdr->surfacepropidx), contents(bonehdr->contents),
-		poseToBone(linearbone->pPoseToBone(bone)), pos(*linearbone->pPos(bone)), quat(*linearbone->pQuat(bone)), rot(*linearbone->pRot(bone)), scale(*linearbone->pScale(bone))
-	{
-		const int64_t tmpOffset = reinterpret_cast<const char* const>(bonedata) - reinterpret_cast<const char* const>(bonehdr);
-		procindex += static_cast<int>(tmpOffset); // adjust procindex to be based off the bone header
-	};
-
-	const char* baseptr;
+	ModelBone_t(const r5::mstudiobonehdr_v16_t* const pBoneHdr, const r5::mstudiobonedata_v19_t* const pBoneData, const r5::mstudiolinearbone_v19_t* const linearbone, const int bone) : name(pBoneHdr->pszName()), parent(pBoneData->parent), flags(pBoneData->flags), proctype(pBoneData->proctype), procBone(pBoneData->pProcedure()),
+		physicsbone(pBoneHdr->physicsbone), surfaceProp(pBoneHdr->pszSurfaceProp()), contents(pBoneHdr->contents),
+		poseToBone(linearbone->pPoseToBone(bone)), pos(*linearbone->pPos(bone)), quat(*linearbone->pQuat(bone)), rot(*linearbone->pRot(bone)), scale(*linearbone->pScale(bone)) {}
 
 	const char* name;
 	inline const char* const pszName() const { return name; }
 
 	int parent;
 
+	int physicsbone; // index into physically simulated bone
 	int flags;
 	int proctype;
-	int procindex; // procedural rule offset
-	int physicsbone; // index into physically simulated bone
-	inline const void* const pProcedure() const { return procindex ? reinterpret_cast<const void* const>(baseptr + procindex) : nullptr; };
+	const void* procBone; // procedural rule offset
+	inline const void* const pProcedure() const { return procBone; };
 
-	int surfacepropidx; // index into string tablefor property name
-	inline const char* const pszSurfaceProp() const { return baseptr + surfacepropidx; }
+	const char* surfaceProp; // index into string tablefor property name
+	inline const char* const pszSurfaceProp() const { return surfaceProp; }
 
 	int contents; // See BSPFlags.h for the contents flags
-
-	const matrix3x4_t* poseToBone; // use a pointer for this type since it's very large
 
 	const Vector pos;
 	const Quaternion quat;
 	const RadianEuler rot;
 	const Vector scale;
+
+	const matrix3x4_t* poseToBone; // use a pointer for this type since it's very large
 
 	ModelBone_t& operator=(const ModelBone_t& bone)
 	{
@@ -272,6 +556,7 @@ struct ModelHitbox_t
 
 struct ModelHitboxSet_t
 {
+	ModelHitboxSet_t() = default;
 	ModelHitboxSet_t(const mstudiohitboxset_t* const hitboxset, const mstudiobbox_t* const bboxes) : name(hitboxset->pszName()), hitboxes(nullptr), numHitboxes(hitboxset->numhitboxes)
 	{
 		if (!numHitboxes)
@@ -326,9 +611,25 @@ struct ModelHitboxSet_t
 		FreeAllocArray(hitboxes);
 	}
 
+	ModelHitboxSet_t& operator=(const ModelHitboxSet_t&) = delete;
+	ModelHitboxSet_t& operator=(ModelHitboxSet_t&& set) noexcept
+	{
+		if (this != &set)
+		{
+			name = set.name;
+			hitboxes = set.hitboxes;
+			numHitboxes = set.numHitboxes;
+
+			set.hitboxes = nullptr;
+		}
+
+		return *this;
+	}
+
 	const char* name;
 	ModelHitbox_t* hitboxes;
 	int numHitboxes;
+	inline const ModelHitbox_t* const pHitbox(const int i) const { return hitboxes + i; }
 };
 
 struct ModelMaterialData_t
@@ -381,6 +682,7 @@ struct ModelMaterialData_t
 
 struct ModelSkinData_t
 {
+	ModelSkinData_t() = default;
 	ModelSkinData_t(const char* nameIn, const int16_t* indiceIn) : name(nameIn), indices(indiceIn) {};
 
 	const char* name;
@@ -389,19 +691,16 @@ struct ModelSkinData_t
 
 struct ModelBodyPart_t
 {
-	ModelBodyPart_t() : partName(), modelIndex(-1), numModels(0), previewEnabled(true) {};
+	ModelBodyPart_t() : name(nullptr), modelIndex(-1), numModels(0) {};
+	ModelBodyPart_t(const char* const bodypart, const int modelIdx, const int modelCount) : name(bodypart), modelIndex(modelIdx), numModels(modelCount) {};
 
-	std::string partName; // c string?
+	const char* name;
 
 	int modelIndex;
 	int numModels;
 
-	bool previewEnabled;
-
-	FORCEINLINE void SetName(const std::string& name) { partName = name; };
-	FORCEINLINE std::string GetName() const { return partName; };
-	FORCEINLINE const char* GetNameCStr() const { return partName.c_str(); };
-	FORCEINLINE bool IsPreviewEnabled() const { return previewEnabled; };
+	inline const char* const GetName() const { return name; }
+	inline const int GetModelCount() const { return numModels; }
 };
 
 struct ModelPoseParam_t
@@ -422,6 +721,7 @@ struct ModelIKLock_t
 {
 	ModelIKLock_t() = default;
 	ModelIKLock_t(const mstudioiklock_t* const iklock) : chain(iklock->chain), flPosWeight(iklock->flPosWeight), flLocalQWeight(iklock->flLocalQWeight), flags(iklock->flags) {}
+	ModelIKLock_t(const r2::mstudioiklock_t* const iklock) : chain(iklock->chain), flPosWeight(iklock->flPosWeight), flLocalQWeight(iklock->flLocalQWeight), flags(iklock->flags) {}
 	ModelIKLock_t(const r5::mstudioiklock_v8_t* const iklock) : chain(iklock->chain), flPosWeight(iklock->flPosWeight), flLocalQWeight(iklock->flLocalQWeight), flags(iklock->flags) {}
 	ModelIKLock_t(const r5::mstudioiklock_v16_t* const iklock) : chain(iklock->chain), flPosWeight(iklock->flPosWeight), flLocalQWeight(iklock->flLocalQWeight), flags(iklock->flags) {}
 
@@ -435,6 +735,7 @@ struct ModelIKLink_t
 {
 	ModelIKLink_t() = default;
 	ModelIKLink_t(const mstudioiklink_t* const iklink) : bone(iklink->bone), kneeDir(iklink->kneeDir) {}
+	ModelIKLink_t(const r2::mstudioiklink_t* const iklink) : bone(iklink->bone), kneeDir(iklink->kneeDir) {}
 	ModelIKLink_t(const r5::mstudioiklink_v8_t* const iklink) : bone(iklink->bone), kneeDir(iklink->kneeDir) {}
 	ModelIKLink_t(const r5::mstudioiklink_v16_t* const iklink) : bone(iklink->bone), kneeDir(iklink->kneeDir) {}
 
@@ -494,51 +795,58 @@ struct ModelIKChain_t
 	const char* name;
 	float unk_10;
 
-	uint32_t pad;
-
 	// while this could be dynamic, it's hardcoded throughout all of source and reSource to assume it's 3
 	// I'd imagine the original intent was to add more types with varied links, but that never happened
 	ModelIKLink_t links[IKLINK_COUNT];
 };
 
+// [rika]: cool stuff to eliminate storing the indices!
+constexpr int STORE_INDEX_FLAG = 1 << 31;
+constexpr int STORE_INDEX_MASK = ~STORE_INDEX_FLAG;
+#define INDEX_STORE_16_OFS(ptr, num, srcIndex, srcOfs, srcNum, idx) assertm(idx >= 0 && idx < 2, "out of bounds"); reinterpret_cast<uint32_t*>(&ptr)[idx] = (FIX_OFFSET(srcIndex) + srcOfs); num = srcNum // [rika]: because of fix offset, it will give bad values otherwise
+#define INDEX_STORE_16(ptr, num, srcIndex, srcNum, idx) assertm(idx >= 0 && idx < 2, "out of bounds"); reinterpret_cast<uint32_t*>(&ptr)[idx] = FIX_OFFSET(srcIndex); num = srcNum
+#define INDEX_STORE_32(ptr, num, srcIndex, srcNum, idx) assertm(idx >= 0 && idx < 2, "out of bounds"); reinterpret_cast<uint32_t*>(&ptr)[idx] = srcIndex; num = srcNum
+#define INDEX_GET(ptr, idx) reinterpret_cast<uint32_t*>(&ptr)[idx]
+#define INDEX_TO_PTR(ptr, num, data) ptr = new data[num]{} 
+#define INDEX_TO_NULL(ptr) ptr = nullptr 
+
 class ModelParsedData_t
 {
 public:
 	ModelParsedData_t() = default;
-	ModelParsedData_t(r1::studiohdr_t* const hdr, StudioLooseData_t* const data) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr, data) {};
-	ModelParsedData_t(r2::studiohdr_t* const hdr) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v8_t* const hdr) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v12_1_t* const hdr) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v12_2_t* const hdr) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v12_4_t* const hdr) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr) {};
-	ModelParsedData_t(r5::studiohdr_v14_t* const hdr, const int version) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr, version) {};
-	ModelParsedData_t(r5::studiohdr_v16_t* const hdr, const int dataSizePhys, const int dataSizeModel) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr, dataSizePhys, dataSizeModel) {};
-	ModelParsedData_t(r5::studiohdr_v17_t* const hdr, const int dataSizePhys, const int dataSizeModel) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr, dataSizePhys, dataSizeModel) {};
-	ModelParsedData_t(r5::studiohdr_v19_2_t* const hdr, const int dataSizePhys, const int dataSizeModel) : localSequences(nullptr), numLocalSequences(0), externalSequences(nullptr), numExternalSequences(0), externalIncludeModels(nullptr), numExternalIncludeModels(0),
-		localNodeNames(nullptr), numLocalNodes(0), poseparams(nullptr), ikchains(nullptr), iklocks(nullptr), studiohdr(hdr, dataSizePhys, dataSizeModel) {
-	};
-
+	ModelParsedData_t(const r1::studiohdr_t* const pHdr, const AssetVersion_t& fileVersion, StudioLooseData_t* const looseData);
+	ModelParsedData_t(const r2::studiohdr_t* const pHdr, const AssetVersion_t& fileVersion);
+	ModelParsedData_t(const r5::studiohdr_v8_t* const pHdr, const AssetVersion_t& fileVersion);
+	ModelParsedData_t(const r5::studiohdr_v12_1_t* const pHdr, const AssetVersion_t& fileVersion);
+	ModelParsedData_t(const r5::studiohdr_v12_2_t* const pHdr, const AssetVersion_t& fileVersion);
+	ModelParsedData_t(const r5::studiohdr_v12_4_t* const pHdr, const AssetVersion_t& fileVersion);
+	ModelParsedData_t(const r5::studiohdr_v14_t* const pHdr, const AssetVersion_t& fileVersion);
+	ModelParsedData_t(const r5::studiohdr_v16_t* const pHdr, const AssetVersion_t& fileVersion, const int dataSizePhys, const int dataSizeModel);
+	ModelParsedData_t(const r5::studiohdr_v17_t* const pHdr, const AssetVersion_t& fileVersion, const int dataSizePhys, const int dataSizeModel);
+	ModelParsedData_t(const r5::studiohdr_v19_2_t* const pHdr, const AssetVersion_t& fileVersion, const int dataSizePhys, const int dataSizeModel);
 
 	~ModelParsedData_t()
 	{
+		FreeAllocArray(bones);
+		FreeAllocArray(attachments);
+		FreeAllocArray(hitboxSets);
+
+		FreeAllocArray(materials);
+		FreeAllocArray(skins);
+		FreeAllocArray(cdMaterials);
+
+		FreeAllocArray(hwGroups);
+		FreeAllocArray(lods);
+		FreeAllocArray(bodyparts);
+
 		FreeAllocArray(localSequences);
 		FreeAllocArray(localNodeNames);
-
-		FreeAllocArray(poseparams);
-		FreeAllocArray(ikchains);
-		FreeAllocArray(iklocks);
+		FreeAllocArray(poseParams);
+		FreeAllocArray(ikChains);
+		FreeAllocArray(ikLocks);
 	}
 
-	ModelParsedData_t& operator=(ModelParsedData_t&& parsed)
+	/*ModelParsedData_t& operator=(ModelParsedData_t&& parsed)
 	{
 		if (this != &parsed)
 		{
@@ -578,87 +886,497 @@ public:
 		}
 
 		return *this;
+	}*/
+
+	const char* baseptr;
+	AssetVersion_t version;
+
+	int length;
+	int flags;
+	inline const bool IsStaticProp() const { return (flags & STUDIOHDR_FLAGS_STATIC_PROP) ? true : false; }
+
+	const char* name; // The internal name of the model, padding with null chars. last byte always null
+
+	float mass;
+	int contents;
+
+	Vector eyeposition;		// ideal eye position
+	Vector illumposition;	// illumination center
+
+	Vector hull_min;	// ideal movement hull size
+	Vector hull_max;	// ideal movement hull size
+
+	Vector view_bbmin;	// clipping bounding box
+	Vector view_bbmax;	// clipping bounding box
+
+	const char* linearBone;
+	ModelBone_t* bones;
+	int numBones;
+	inline const int BoneCount() const { return numBones; }
+	inline const ModelBone_t* const pBone(const int i) const { return bones + i; }
+
+	int numSrcBoneTransforms;
+	const mstudiosrcbonetransform_t* srcBoneTransforms;
+
+	ModelAttachment_t* attachments;
+	int numAttachments;
+	inline const ModelAttachment_t* const pAttachment(const size_t i) const { return attachments + i; }
+
+	int numHitboxSets;
+	ModelHitboxSet_t* hitboxSets;
+	inline const int HitboxSetCount() const { return numHitboxSets; }
+	inline const ModelHitboxSet_t* const pHitboxSet(const size_t i) const { return hitboxSets + i; }
+
+	ModelLODData_t* lods;
+	int numLODs;
+	inline const int LODCount() const { return numLODs; }
+	inline const ModelLODData_t* const pLOD(const size_t i) const { return lods + i; }
+
+	int numHwGroups;
+	ModelHWGroup_t* hwGroups;
+	inline const int GroupCount() const { return numHwGroups; }
+	inline const ModelHWGroup_t* const pLODGroup(const int i) const { return hwGroups + i; }
+
+	const void* boneStates; // uint8_t or uint16_t
+	int numBoneStates;
+
+	int numBodyparts;
+	ModelBodyPart_t* bodyparts;
+	inline const int BodypartCount() const { return numBodyparts; }
+	inline const ModelBodyPart_t* const pBodypart(const size_t i) const { return bodyparts + i; }
+
+	ModelMaterialData_t* materials;
+	int numMaterials;
+	inline const int MaterialCount() const { return numMaterials; }
+	inline const ModelMaterialData_t* const pMaterial(const int i) const { return materials + i; }
+
+	int numSkins;
+	ModelSkinData_t* skins;
+	inline const int SkinCount() const { return numSkins; }
+	inline const ModelSkinData_t* const pSkin(const int i) const { return skins + i; }
+
+	inline const int16_t* const pSkinref(const int i, int skinindex) const { return reinterpret_cast<const int16_t* const>(baseptr + skinindex) + i; }
+	inline const int16_t* const pSkinFamily(const int i, int skinindex) const { return pSkinref(numMaterials * i, skinindex); };
+	template<typename T>
+	const char* const pSkinName(const int i, int skinindex) const
+	{
+		// only stored for index 1 and up
+		// [rika]: in code this actually returns '\0'
+		if (i == 0)
+		{
+			return STUDIO_DEFAULT_SKIN_NAME;
+		}
+
+		const T skinnameindex = *(reinterpret_cast<const T* const>(pSkinFamily(numSkins, skinindex)) + (i - 1));
+		const char* const skinname = baseptr + FIX_OFFSET(skinnameindex);
+
+		if (IsStringZeroLength(skinname))
+		{
+			return STUDIO_NULL_SKIN_NAME;
+		}
+
+		return skinname;
 	}
+
+	const char** cdMaterials;
+	int numCdMaterials;
+	inline const int CDMaterialCount() const { return numCdMaterials; }
+	inline const char* const CDMaterial(const int i) const { return cdMaterials[i]; }
+
+	int numLocalSequences;
+	ModelSeq_t* localSequences;
+	inline const int LocalSeqCount() const { return numLocalSequences; }
+	inline const ModelSeq_t* const pLocalSeq(const int i) const { return localSequences + i; }
+
+	const AssetGuid_t* externalSequences;
+	int numExternalSequences;
+	inline const int ExternalSeqCount() const { return numExternalSequences; }
+
+	int numExternalIncludeModels;
+	const AssetGuid_t* externalIncludeModels;
+
+	const mstudiomodelgroup_t* includeModels;
+	int numIncludeModels;
+	inline const int IncludeModelCount() const { return numIncludeModels; }
+	inline const mstudiomodelgroup_t* const pIncludeModel(const int i) const { return includeModels + i; }
+
+	int numLocalNodes;
+	const char** localNodeNames;
+	inline const int NodeCount() const { return numLocalNodes; }
+	inline const char* const pszNodeName(const int i) const { return localNodeNames[i]; }
+
+	ModelPoseParam_t* poseParams;
+	int numPoseParm;
+	inline const int PoseParamCount() const { return numPoseParm; }
+	inline const ModelPoseParam_t* const pPoseParam(const int i) const { return poseParams + i; }
+
+	int numIkChains;
+	ModelIKChain_t* ikChains;
+	inline const int IKChainCount() const { return numIkChains; };
+	inline const ModelIKChain_t* const pIKChain(const int i) const { return ikChains + i; }
+
+	ModelIKLock_t* ikLocks;
+	int numIkLocks;
+	inline const int IKLockCount() const { return numIkLocks; }
+	inline const ModelIKLock_t* const pIKLock(const int i) const { return ikLocks + i; }
+
+	uint8_t constdirectionallightdot;
+	uint8_t rootLOD;
+	uint8_t numAllowedRootLODs;
+
+	uint8_t pad;
+
+	float fadeDistance; // set to -1 to never fade. set above 0 if you want it to fade out, distance is in feet.
+	float gatherSize;
+
+	int	illumpositionattachmentindex;
+
+	float flMaxEyeDeflection;
+
+	const char* surfaceProp;	// offset to surface prop string
+
+	const char* keyValues;		// offset to keyvalues
+	int keyValueSize;		// removed in later rmdl, keyvalues are null terminated
+
+	int vtxOffset; // VTX
+	int vvdOffset; // VVD / IDSV
+	int vvcOffset; // VVC / IDCV
+	int vvwOffset; // index will come last after other vertex files
+	int phyOffset; // VPHY / IVPS
+
+	int vtxSize;
+	int vvdSize;
+	int vvcSize;
+	int vvwSize;
+	int phySize; // still used in models using vg
+
+	size_t hwDataSize;
+
+	const void* bvhData;
 
 	CRamen meshVertexData;
 
-	std::vector<ModelBone_t> bones;
-	std::vector<ModelAttachment_t> attachments;
-	std::vector<ModelHitboxSet_t> hitboxsets;
-
-	std::vector<ModelLODData_t> lods;
-	std::vector<ModelMaterialData_t> materials;
-	std::vector<ModelSkinData_t> skins;
-
-	std::vector<ModelBodyPart_t> bodyParts;
-
-	ModelSeq_t* localSequences;
-	int numLocalSequences;
-	int numExternalSequences;
-	const AssetGuid_t* externalSequences;
-
-	const AssetGuid_t* externalIncludeModels;
-	int numExternalIncludeModels;
-	int numLocalNodes;
-	const char** localNodeNames;
-
-	ModelPoseParam_t* poseparams;
-	ModelIKChain_t* ikchains;
-	ModelIKLock_t* iklocks;
-
-	studiohdr_generic_t studiohdr;
-
-	inline const studiohdr_generic_t* const pStudioHdr() const { return &studiohdr; }
-	inline const ModelBone_t* const pBone(const int i) const { return &bones.at(i); }
-	inline const ModelAttachment_t* const pAttachment(const size_t i) const { return &attachments.at(i); }
-	inline const ModelHitboxSet_t* const pHitboxSet(const size_t i) const { return &hitboxsets.at(i); }
-	inline const ModelMaterialData_t* const pMaterial(const int i) const { return &materials.at(i); }
-	inline const ModelBodyPart_t* const pBodypart(const size_t i) const { return &bodyParts.at(i); }
-	inline const ModelLODData_t* const pLOD(const size_t i) const { return &lods.at(i); }
-
-	inline const int BoneCount() const { return studiohdr.boneCount; }
-	inline const std::vector<ModelBone_t>* const GetRig() const { return &bones; } // slerp them bones
-
-	inline const int NumLocalAnim() const { return studiohdr.localAnimationCount; }
-
-	inline const int NumLocalSeq() const { return numLocalSequences; }
-	inline const int NumExternalSeq() const { return numExternalSequences; }
-	inline const ModelSeq_t* const LocalSeq(const int i) const { return localSequences + i; }
-
-	inline const char* const pszNodeName(const int i) const { return localNodeNames[i]; }
-
-	inline const int NumIkChain() const { return studiohdr.ikChainCount; };
-	inline const ModelIKChain_t* const pIKChain(const int i) const { return ikchains + i; }
-
-	inline const ModelPoseParam_t* const pPoseParam(const int i) const { return poseparams + i; }
-
-	FORCEINLINE void SetupBodyPart(int i, const char* partName, const int modelIndex, const int numModels)
+	ModelParsedData_t& operator=(const ModelParsedData_t&) = delete;
+	ModelParsedData_t& operator=(ModelParsedData_t&& parsed) noexcept
 	{
-		ModelBodyPart_t& part = bodyParts.at(i);
-		if (part.partName.empty())
+		if (this != &parsed)
 		{
-			part.SetName(partName);
-			part.modelIndex = modelIndex;
-			part.numModels = numModels;
-		};
-	};
+			memcpy_s(this, sizeof(ModelParsedData_t), &parsed, sizeof(ModelParsedData_t));
+
+			parsed.bones = nullptr;
+			parsed.attachments = nullptr;
+			parsed.hitboxSets = nullptr;
+			parsed.materials = nullptr;
+			parsed.skins = nullptr;
+
+			parsed.lods = nullptr;
+			parsed.bodyparts = nullptr;
+			parsed.hwGroups = nullptr;
+
+			parsed.localSequences = nullptr;
+			parsed.localNodeNames = nullptr;
+
+			parsed.poseParams = nullptr;
+			parsed.ikChains = nullptr;
+			parsed.ikLocks = nullptr;
+		}
+
+		return *this;
+	}
+
+	template<typename mstudiobone_t> void ParseModelBoneData();
+	void ParseModelBoneData_v16();
+	void ParseModelBoneData_v19();
+
+	template<typename mstudioattachment> void ParseModelAttachmentData();
+
+	template<typename mstudiobbox_t> void ParseModelHitboxData();
+	void ParseModelHitboxData_v16();
+
+	void ParseModelTextureData_v8();
+	void ParseModelTextureData_v16();
+
+	template<typename mstudiomodel_t, typename mstudiomesh_t> void ParseModelVertexData_VTX(StudioLooseData_t* const looseData);
+	void ParseModelVertexData_v9(const char* const vertexData);
+	void ParseModelVertexData_v12_1(const char* const vertexData);
+	void ParseModelVertexData_v14(const char* const vertexData);
+	void ParseModelVertexData_v16(const char* const vertexData, const uint8_t parseFlags = 0x0);
+
+	void ParseModelAnimTypes_V8();
+	void ParseModelAnimTypes_V16();
+
+	// [rika]: this is for model internal sequence data (r5)
+	void ParseModelSequenceData_NoStall();
+	void ParseModelSequenceData_Stall_V8();
+	void ParseModelSequenceData_Stall_V16();
+	void ParseModelSequenceData_Stall_V18();
+	void ParseModelSequenceData_Stall_V19_1(const uint32_t flagWidth);
+
+private:
+	void GetHWBuffer(char* const dcmpBuf, const char* const hwBuf, const int groupIndex);
+	void ParseMeshData_VTX(ModelMeshData_t* const pMeshData, Vertex_t* const parseVertices, Vector2D* const parseTexcoords, uint16_t* const parseIndices, VertexWeight_t* const parseWeights, char* const meshBuffer);
+	void ParseHWVertices(ModelMeshData_t* const pMeshData, char* const meshParseBuffer, const char* const vertexData, const vvw::mstudioboneweightextra_t* const extraWeightData, const uint16_t* const indiceData, const int material, const uint8_t vertexParseFlags);
 };
 
-void ParseModelBoneData_v8(ModelParsedData_t* const parsedData);
-void ParseModelBoneData_v12_1(ModelParsedData_t* const parsedData);
-void ParseModelBoneData_v16(ModelParsedData_t* const parsedData);
-void ParseModelBoneData_v19(ModelParsedData_t* const parsedData);
+// bones
+template<typename mstudiobone_t>
+void ModelParsedData_t::ParseModelBoneData()
+{
+	if (numBones == 0)
+	{
+		INDEX_TO_NULL(bones);
 
-void ParseModelAttachmentData_v8(ModelParsedData_t* const parsedData);
-void ParseModelAttachmentData_v16(ModelParsedData_t* const parsedData);
+		return;
+	}
 
-void ParseModelHitboxData_v8(ModelParsedData_t* const parsedData);
-void ParseModelHitboxData_v16(ModelParsedData_t* const parsedData);
+	const r5::mstudiobone_v8_t* const pBones = reinterpret_cast<const r5::mstudiobone_v8_t* const>(baseptr + INDEX_GET(bones, 0));
+
+	INDEX_TO_PTR(bones, numBones, ModelBone_t);
+
+	for (uint16_t i = 0; i < numBones; i++)
+	{
+		bones[i] = ModelBone_t(pBones + i);
+	}
+}
+
+template<typename mstudioattachment_t>
+void ModelParsedData_t::ParseModelAttachmentData()
+{
+	if (numAttachments == 0)
+	{
+		INDEX_TO_NULL(attachments);
+
+		return;
+	}
+
+	const mstudioattachment_t* const pAttachments = reinterpret_cast<const mstudioattachment_t* const>(baseptr + INDEX_GET(attachments, 0));
+
+	INDEX_TO_PTR(attachments, numAttachments, ModelAttachment_t);
+
+	for (int i = 0; i < numAttachments; i++)
+	{
+		attachments[i] = ModelAttachment_t(pAttachments + i);
+	}
+}
+
+template<typename mstudiobbox_t>
+void ModelParsedData_t::ParseModelHitboxData()
+{
+	if (numHitboxSets == 0)
+	{
+		INDEX_TO_NULL(hitboxSets);
+
+		return;
+	}
+
+	const mstudiohitboxset_t* const pHitboxSets = reinterpret_cast<const mstudiohitboxset_t* const>(baseptr + INDEX_GET(hitboxSets, 0));
+
+	INDEX_TO_PTR(hitboxSets, numHitboxSets, ModelHitboxSet_t);
+
+	for (int i = 0; i < numHitboxSets; i++)
+	{
+		hitboxSets[i] = ModelHitboxSet_t(pHitboxSets + i, pHitboxSets[i].pHitbox<mstudiobbox_t>(0));
+	}
+}
+
+// vertex
+template<typename mstudiomodel_t, typename mstudiomesh_t>
+void ModelParsedData_t::ParseModelVertexData_VTX(StudioLooseData_t* const looseData)
+{
+	const OptimizedModel::FileHeader_t* const pVTX = looseData->GetVTX();
+	const vvd::vertexFileHeader_t* const pVVD = looseData->GetVVD();
+	const vvc::vertexColorFileHeader_t* const pVVC = looseData->GetVVC();
+	const vvw::vertexBoneWeightsExtraFileHeader_t* const pVVW = looseData->GetVVW();
+
+	numLODs = pVTX->numLODs;
+
+	INDEX_TO_NULL(hwGroups);
+
+	if (numLODs == 0 || numBodyparts == 0)
+	{
+		assertm(false, "model without LODs");
+
+		INDEX_TO_NULL(lods);
+		INDEX_TO_NULL(bodyparts);
+
+		return;
+	}
+
+	// no valid vertex data
+	if (!pVTX || !pVVD)
+		return;
+
+	if (looseData->VerifyFileIntegrity(reinterpret_cast<const studiohdr_short_t* const>(baseptr)) == false)
+	{
+		assertm(false, "loose data had mismatched files");
+		return;
+	}
+
+	// [rika]: handle bodypart parsing and setup lods
+	const mstudiobodyparts_t* const pBodyparts = reinterpret_cast<const mstudiobodyparts_t* const>(baseptr + INDEX_GET(bodyparts, 0));
+
+	INDEX_TO_PTR(bodyparts, numBodyparts, ModelBodyPart_t);
+
+	uint32_t numModels = 0u;
+	uint32_t numMeshes = 0u;
+
+	for (int i = 0; i < numBodyparts; i++)
+	{
+		const mstudiobodyparts_t* const pBodypart = pBodyparts + i;
+
+		bodyparts[i] = ModelBodyPart_t(pBodypart->pszName(), numModels, pBodypart->nummodels);
+
+		numModels += bodyparts[i].numModels;
+
+		for (int j = 0; j < pBodypart->nummodels; j++)
+		{
+			const mstudiomodel_t* const pModel = pBodypart->pModel<mstudiomodel_t>(j);
+
+			numMeshes += pModel->nummeshes;
+		}
+	}
+
+	INDEX_TO_PTR(lods, numLODs, ModelLODData_t);
+
+	CManagedBuffer* const meshBuffer = g_BufferManager.ClaimBuffer();
+
+	// [rika]: fixed sizes per vertex
+	constexpr size_t maxVertexDataSize = sizeof(vvd::mstudiovertex_t) + sizeof(Vector4D) + sizeof(Vector2D) + sizeof(Color32);
+	constexpr size_t maxVertexBufferSize = maxVertexDataSize * s_MaxStudioVerts;
+
+	// needed due to how vtx is parsed!
+	CManagedBuffer* const   parseBuf = g_BufferManager.ClaimBuffer();
+
+	Vertex_t* const         parseVertices = reinterpret_cast<Vertex_t*>         (parseBuf->Buffer() + maxVertexBufferSize);
+	Vector2D* const         parseTexcoords = reinterpret_cast<Vector2D*>        (&parseVertices[s_MaxStudioVerts]);
+	uint16_t* const         parseIndices = reinterpret_cast<uint16_t*>          (&parseTexcoords[s_MaxStudioVerts * 2]);
+	VertexWeight_t* const   parseWeights = reinterpret_cast<VertexWeight_t*>    (&parseIndices[s_MaxStudioTriIndices]); // ~8mb for weights
+
+	for (uint16_t lodLevel = 0; lodLevel < numLODs; lodLevel++)
+	{
+		ModelLODData_t* const pLODData = lods + lodLevel;
+
+		pLODData->ParseLOD_VTX(numModels, numMeshes);
+
+		uint32_t currentMeshIndex = 0u;
+
+		// parse models via bodyparts
+		for (int bodypartIdx = 0; bodypartIdx < numBodyparts; bodypartIdx++)
+		{
+			const mstudiobodyparts_t* const pBodypart = pBodyparts + bodypartIdx; // [rika]: messy but do what you got to
+			const OptimizedModel::BodyPartHeader_t* const pVertBodyPart = pVTX->pBodyPart(bodypartIdx);
+			const ModelBodyPart_t& bodypart = bodyparts[bodypartIdx];
+
+			for (int modelIdx = 0; modelIdx < pBodypart->nummodels; modelIdx++)
+			{
+				const mstudiomodel_t* const pStudioModel = pBodypart->pModel<mstudiomodel_t>(modelIdx);
+				const OptimizedModel::ModelHeader_t* const pVertModel = pVertBodyPart->pModel(modelIdx);
+				ModelModelData_t* const pModel = pLODData->models + (bodypart.modelIndex + modelIdx);
+
+				const OptimizedModel::ModelLODHeader_t* const pVertLOD = pVertModel->pLOD(lodLevel);
+				pLODData->switchPoint = pVertLOD->switchPoint;
+
+				*pModel = ModelModelData_t(pLODData->meshes + currentMeshIndex, pStudioModel->nummeshes);
+				pModel->GenerateName(pBodypart->pszName(), modelIdx, lodLevel);
+
+				for (int meshIdx = 0; meshIdx < pStudioModel->nummeshes; ++meshIdx)
+				{
+					const mstudiomesh_t* const pStudioMesh = pStudioModel->pMesh(meshIdx);
+					const OptimizedModel::MeshHeader_t* const pVertMesh = pVertLOD->pMesh(meshIdx);
+
+					const int baseVertexOffset = (pStudioModel->vertexindex / sizeof(vvd::mstudiovertex_t)) + pStudioMesh->vertexoffset;
+					const int studioVertCount = pStudioMesh->vertexloddata.numLODVertexes[lodLevel];
+
+					if (pVertMesh->numStripGroups == 0)
+					{
+						pModel->meshCount--; // this mesh was skipped so remove it from our total
+						continue;
+					}
+
+					// [rika]: grabs the vertex data
+					vvd::mstudiovertex_t* rawVertices = reinterpret_cast<vvd::mstudiovertex_t*>(parseBuf->Buffer());
+					Vector4D* rawTangents = reinterpret_cast<Vector4D*>(&rawVertices[studioVertCount]);
+					Color32* rawColors = reinterpret_cast<Color32*>(&rawTangents[studioVertCount]);
+					Vector2D* rawTexcoords = reinterpret_cast<Vector2D*>(&rawColors[studioVertCount]);
+
+					pVVD->PerLODVertexBuffer(lodLevel, rawVertices, rawTangents, baseVertexOffset, baseVertexOffset + studioVertCount);
+
+					if (pVVC)
+					{
+						pVVC->PerLODVertexBuffer(lodLevel, pVVD->numFixups, pVVD->GetFixupData(0), rawColors, rawTexcoords, baseVertexOffset, baseVertexOffset + studioVertCount);
+					}
+
+					ModelMeshData_t* const pMeshData = pLODData->meshes + currentMeshIndex;
+					pMeshData->ParseMesh_VTX(pVTX, bodypartIdx, flags);
+
+					// parsing more than one is unfun and not a single model from respawn has two
+					int weightIdx = 0;
+					assertm(pVertMesh->numStripGroups == 1, "model had more than one strip group");
+					for (int stripGrpIdx = 0; stripGrpIdx < 1; stripGrpIdx++)
+					{
+						OptimizedModel::StripGroupHeader_t* pStripGrp = pVertMesh->pStripGroup(stripGrpIdx);
+						const bool isHwSkinned = pStripGrp->IsHWSkinned();
+
+						pMeshData->vertCount += pStripGrp->numVerts;
+						pLODData->vertexCount += pStripGrp->numVerts;
+
+						pMeshData->indexCount += pStripGrp->numIndices;
+						pLODData->indexCount += pStripGrp->numIndices;
+
+						assertm(s_MaxStudioTriIndices >= pMeshData->indexCount, "too many triangles");
+
+						for (int stripIdx = 0; stripIdx < pStripGrp->numStrips; stripIdx++)
+						{
+							OptimizedModel::StripHeader_t* pStrip = pStripGrp->pStrip(stripIdx);
+							const OptimizedModel::BoneStateChangeHeader_t* const pBoneStates = pStrip->pBoneStateChange(0);
+
+							for (int vertIdx = 0; vertIdx < pStrip->numVerts; vertIdx++)
+							{
+								OptimizedModel::Vertex_t* pVert = pStripGrp->pVertex(pStrip->vertOffset + vertIdx);
+
+								Vector2D* const texcoords = pMeshData->texcoordCount > 1 ? &parseTexcoords[(pStrip->vertOffset + vertIdx) * (pMeshData->texcoordCount - 1)] : nullptr;
+
+								// [rika]: basically check if it's r5 using this instance
+								if constexpr (sizeof(mstudiomodel_t) == sizeof(r5::mstudiomodel_v8_t))
+								{
+									Vertex_t::ParseVertexFromVTX(&parseVertices[pStrip->vertOffset + vertIdx], &parseWeights[weightIdx], texcoords, pMeshData, pVert, rawVertices, rawTangents, rawColors, rawTexcoords, pVVW, weightIdx);
+								}
+								else
+								{
+									Vertex_t::ParseVertexFromVTX(&parseVertices[pStrip->vertOffset + vertIdx], &parseWeights[weightIdx], texcoords, pMeshData, pVert, rawVertices, rawTangents, rawColors, rawTexcoords, weightIdx, isHwSkinned, pBoneStates);
+								}
+
+							}
+
+							memcpy(&parseIndices[pStrip->indexOffset], pStripGrp->pIndex(pStrip->indexOffset), pStrip->numIndices * sizeof(uint16_t));
+						}
+
+					}
+					pMeshData->weightsCount = weightIdx;
+
+					pMeshData->ParseMaterial(this, pStudioMesh->material);
+
+					pModel->vertCount += pMeshData->vertCount;
+
+					ParseMeshData_VTX(pMeshData, parseVertices, parseTexcoords, parseIndices, parseWeights, meshBuffer->Buffer());
+
+					// for export
+					pLODData->weightsPerVert = pMeshData->weightsPerVert > pLODData->weightsPerVert ? pMeshData->weightsPerVert : pLODData->weightsPerVert;
+					pLODData->texcoordsPerVert = pMeshData->texcoordCount > pLODData->texcoordsPerVert ? pMeshData->texcoordCount : pLODData->texcoordsPerVert;
+
+					currentMeshIndex++;
+				}
+
+			}
+		}
+	}
+
+	g_BufferManager.RelieveBuffer(meshBuffer);
+	g_BufferManager.RelieveBuffer(parseBuf);
+}
 
 void CreateBuffersForModelDrawData(ModelParsedData_t* const parsedData, CDXDrawData* const drawData, const uint64_t lod);
 
-void ParseModelAnimTypes_V8(ModelParsedData_t* const parsedData);
-void ParseModelAnimTypes_V16(ModelParsedData_t* const parsedData);
 
 // 
 // COMPDATA
@@ -863,7 +1581,7 @@ bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem:
 bool ExportModelSMD(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath);
 bool ExportModelQC(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const int setting, const int version);
 
-bool ExportSeqDesc(const int setting, const ModelSeq_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const std::vector<ModelBone_t>* const bones, const uint64_t guid);
+bool ExportSeqDesc(const int setting, const ModelSeq_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const ModelParsedData_t* const rig, const uint64_t guid);
 bool ExportSeqQC(const ModelParsedData_t* const parsedData, const ModelSeq_t* const sequence, std::filesystem::path& exportPath, const int setting, const int version);
 
 void UpdateModelBoneMatrix(CDXDrawData* const drawData);
@@ -882,7 +1600,7 @@ struct SeqPreviewEntry_t
 	uint64_t guid; // local seqs do not have a guid so this is zero
 
 	const ModelSeq_t* seqdesc;
-	const std::vector<ModelBone_t>* srcBones; // the skeleton that belongs to this sequence's parent (i.e., model or rig)
+	const ModelParsedData_t* srcBones; // the skeleton that belongs to this sequence's parent (i.e., model or rig)
 
 	PreviewSeqType_e type;
 
@@ -935,7 +1653,7 @@ struct ModelPreviewInfo_t
 	AnimState_t animState;
 };
 
-void* PreviewParsedData(ModelPreviewInfo_t* const info, ModelParsedData_t* const parsedData, char* const assetName, const uint64_t assetGUID, const bool firstFrameForAsset);
+void* PreviewParsedData(ModelPreviewInfo_t* const info, ModelParsedData_t* const parsedData, const char* const assetName, const uint64_t assetGUID, const bool firstFrameForAsset);
 void PreviewSeqDesc(const ModelSeq_t* const seqdesc);
 
 // returns true if the user requested a refresh of the sequence list

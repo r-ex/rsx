@@ -141,7 +141,7 @@ namespace r5
 	struct mstudiobone_v8_t
 	{
 		int sznameindex;
-		inline char* const pszName() const { return ((char*)this + sznameindex); }
+		inline const char* const pszName() const { return ((char*)this + sznameindex); }
 
 		int parent; // parent bone
 		int bonecontroller[6]; // bone controller index, -1 == none
@@ -158,6 +158,8 @@ namespace r5
 		int flags;
 		int proctype;
 		int procindex; // procedural rule offset
+		inline const void* const pProcedure() const { return procindex ? reinterpret_cast<const char* const>(this) + procindex : nullptr; }
+
 		int physicsbone; // index into physically simulated bone
 		// from what I can tell this is the section that is parented to this bone, and if this bone is not the parent of any sections, it goes up the bone chain to the nearest bone that does and uses that section index
 		int surfacepropidx; // index into string tablefor property name
@@ -793,7 +795,7 @@ namespace r5
 	struct mstudiotexture_v8_t
 	{
 		int sznameindex;
-		inline char* const pszName() const { return ((char*)this + sznameindex); }
+		inline const char* const pszName() const { return ((char*)this + sznameindex); }
 
 		uint64_t texture; // guid/hash of this material
 	};
@@ -810,7 +812,7 @@ namespace r5
 		int version; // Format version number, such as 54 (0x36,0x00,0x00,0x00)
 		int checksum; // This has to be the same in the phy and vtx files to load!
 		int sznameindex; // This has been moved from studiohdr2 to the front of the main header.
-		inline char* const pszName() const { return ((char*)this + sznameindex); }
+		inline const char* const pszName() const { return ((char*)this + sznameindex); }
 		char name[64]; // The internal name of the model, padding with null chars.
 		int length; // Data size of MDL file in chars.
 
@@ -902,9 +904,11 @@ namespace r5
 		int localposeparamindex;
 
 		int surfacepropindex;
+		inline const char* const pszSurfaceProp() const { return reinterpret_cast<const char* const>(this) + surfacepropindex; }
 
 		int keyvalueindex;
 		int keyvaluesize;
+		inline const char* const KeyValueText() const { return reinterpret_cast<const char* const>(this) + keyvalueindex; }
 
 		int numlocalikautoplaylocks;
 		int localikautoplaylockindex;
@@ -961,6 +965,7 @@ namespace r5
 
 		int numsrcbonetransform;
 		int srcbonetransformindex;
+		const mstudiosrcbonetransform_t* const SrcBoneTransform(int i) const { return reinterpret_cast<const mstudiosrcbonetransform_t* const>((char*)this + srcbonetransformindex) + i; }
 
 		int	illumpositionattachmentindex;
 

@@ -564,6 +564,9 @@
     <ClInclude Include="thirdparty\libopusenc\include\opusenc.h">
       <Filter>thirdparty\libopusenc\include</Filter>
     </ClInclude>
+    <ClInclude Include="game\bsp\bvh.h">
+      <Filter>game\bsp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp">

@@ -1,6 +1,8 @@
 #pragma once
 #include <game/asset.h>
+
 #include "entities.h"
+#include "bvh.h"
 
 // todo
 //class CBSPFile : public CAssetContainer
@@ -76,6 +78,18 @@ struct dmesh_t
 	char luxelOfsMax[2];
 	short mtlSortIdx;
 	int flags;
+};
+
+struct dportal_t
+{
+	bool isReversed;
+	char type;
+	char numRefs;
+	char padding;
+
+	short firstRef;
+	short cell;
+	int plane;
 };
 
 class CPakAsset;

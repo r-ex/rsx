@@ -27,7 +27,7 @@ void Preview_Model(CDXDrawData* drawData, float dt)
 
     ctx->OMSetRenderTargets(1, &previewRTV, g_dxHandler->GetPreviewDSV());
     ctx->ClearRenderTargetView(previewRTV, clear_color_with_alpha);
-    ctx->ClearDepthStencilView(g_dxHandler->GetPreviewDSV(), D3D11_CLEAR_DEPTH, 1, 0);
+    ctx->ClearDepthStencilView(g_dxHandler->GetPreviewDSV(), D3D11_CLEAR_DEPTH, 0, 0);
 
     const D3D11_VIEWPORT vp = {
         0, 0,

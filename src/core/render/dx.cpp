@@ -628,7 +628,7 @@ bool CDXParentHandler::CreateMainView(const uint16_t w, const uint16_t h)
         D3D11_DEPTH_STENCIL_DESC desc = {};
         desc.DepthEnable = true;
         desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-        desc.DepthFunc = D3D11_COMPARISON_LESS;
+        desc.DepthFunc = D3D11_COMPARISON_GREATER;
 
         if (FAILED(m_pDevice->CreateDepthStencilState(&desc, &m_pDepthStencilState)))
             assertm(false, "Failed to create depth stencil state.");
@@ -638,7 +638,7 @@ bool CDXParentHandler::CreateMainView(const uint16_t w, const uint16_t h)
         D3D11_DEPTH_STENCIL_DESC desc = {};
         desc.DepthEnable = false;
         desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-        desc.DepthFunc = D3D11_COMPARISON_LESS;
+        desc.DepthFunc = D3D11_COMPARISON_GREATER;
 
         if (FAILED(m_pDevice->CreateDepthStencilState(&desc, &m_pDepthStencilStateNoDepthTest)))
             assertm(false, "Failed to create non-depth stencil state.");
@@ -746,7 +746,10 @@ bool CDXParentHandler::CreateViewForSceneWindow(const uint16_t w, const uint16_t
 
 void CDXParentHandler::UpdateProjectionMatrix()
 {
-    m_projectionMatrix = XMMatrixPerspectiveFovLH(0.25f * XM_PI, static_cast<float>(renderWidth) / renderHeight, 0.1f, g_PreviewSettings.previewCullDistance);
+    m_projectionMatrix = XMMatrixPerspectiveFovLH(
+        0.25f * XM_PI,
+        static_cast<float>(renderWidth) / renderHeight,
+        g_PreviewSettings.previewCullDistance, 0.1f);
 }
 
 bool CDXParentHandler::CreateDepthBuffer(ID3D11Texture2D* const frameBuffer, ID3D11Texture2D** depthBuffer, ID3D11DepthStencilView** depthStencilView)

@@ -13,7 +13,7 @@
 // [GENERAL FEATURES]
 #define ADVANCED_MODEL_PREVIEW false
 #define HAS_BRIDGE false
-#define PREVIEW_FIRST_PERSON true // this will become a runtime option soontm
+#define PREVIEW_FIRST_PERSON false // this will become a runtime option soontm
 
 // [DEBUG FEATURES]
 //#define DEBUG_NO_ASEQ_POSTLOAD // - DEBUG ONLY - disables (very) slow postloading for animseq assets

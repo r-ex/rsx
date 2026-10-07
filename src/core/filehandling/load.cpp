@@ -56,7 +56,7 @@ static void CLI_HandleAssetTypeWhitelist(const CCommandLine* const cli)
 
 }
 
-static void HandleFileLoad(std::vector<std::string> filePaths, HandleFileLoadCallback_t cb = nullptr, const CCommandLine* const cli = nullptr)
+static void HandleFileLoad(const std::vector<std::string>& filePaths, HandleFileLoadCallback_t cb = nullptr, const CCommandLine* const cli = nullptr)
 {
     PathExtensionArray_t pathsByExtension;
 
@@ -263,7 +263,13 @@ void HandleLoadFromCommandLine(const CCommandLine* const cli)
         }
     }
 
-    CThread thread = CThread(HandleFileLoad, std::move(filePaths), OnCLILoadComplete, cli);
+
+    CThread thread = CThread([](const std::vector<std::string>& filePaths, const CCommandLine* const cli)
+        {
+            inJobAction = true;
+            HandleFileLoad(filePaths, OnCLILoadComplete, cli);
+            inJobAction = false;
+        }, filePaths, cli);
 
     // If this gets detached when running without the usual windows msg loop to hold up main thread, the main thread will exit
     // and clean up static vars before the other threads have finished execution. This will cause a crash when accessing anything static
@@ -316,7 +322,7 @@ void HandleOpenFileDialog(const HWND windowHandle)
         }
 
         // We are moving the whole vector out of here into HandlePakLoad.
-        HandleFileLoad(std::move(filePaths));
+        HandleFileLoad(filePaths);
     }
 
     g_BufferManager.RelieveBuffer(fileNames);
@@ -328,6 +334,6 @@ void HandleOpenFileDialog(const HWND windowHandle)
 void Bridge_HandleLoad(std::vector<std::string> filePaths)
 {
     inJobAction = true;
-    HandleFileLoad(std::move(filePaths));
+    HandleFileLoad(filePaths);
     inJobAction = false;
 }

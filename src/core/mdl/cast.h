@@ -49,19 +49,23 @@ namespace cast
 		Root = 0x746F6F72,
 		Model = 0x6C646F6D,
 		Mesh = 0x6873656D,
-		BlendShape = 0x68736C62, // unneeded
+		Hair = 0x72696168,
+		BlendShape = 0x68736C62,
 		Skeleton = 0x6C656B73,
 		Bone = 0x656E6F62,
-		IKHandle = 0x64686B69, // unneeded
-		Constraint = 0x74736E63, // unneeded
+		IKHandle = 0x64686B69,
+		Constraint = 0x74736E63,
 		Animation = 0x6D696E61,
 		Curve = 0x76727563,
+		CurveModeOverride = 0x564F4D43,
 		NotificationTrack = 0x6669746E,
 		Material = 0x6C74616D,
 		File = 0x656C6966,
-		Instance = 0x74736E69, // unneeded
+		Color = 0x726C6F63,
+		Instance = 0x74736E69,
+		Metadata = 0x6174656D,
 
-		_Count = 14,
+		_Count = 18,
 	};
 
 	struct CastNodeHeader
@@ -235,12 +239,19 @@ namespace cast
 		CastProperty* AddProperty(const CastPropertyId idIn, const int propNameIn, const uint32_t sizeIn, const void* ptrIn, const bool strFormat = false, const uint16_t strIndex = 0xffff);
 		CastProperty* AddProperty(const CastPropertyId idIn, const int propNameIn, std::vector<const void*>& vectorIn);
 
-		void SetString(const std::string& strIn) { str = std::move(strIn); };
+		void SetString(const std::string& strIn) { str = strIn; };
 		const char* GetString() const { return str.c_str(); };
 
 		// reserve to prevent allocations
 		void ReserveChildren(const size_t count) { children.reserve(count); }
 		void ReserveProperties(const size_t count) { properties.reserve(count); }
+
+		void Reset()
+		{
+			str.clear();
+			children.clear();
+			properties.clear();
+		}
 
 
 	private:
@@ -623,20 +634,45 @@ namespace cast
 	class CastExporter
 	{
 	public:
-		CastExporter(const std::filesystem::path& pathIn) : path(pathIn)
+		CastExporter(const std::filesystem::path& pathIn, const char* const nameIn, const uint64_t guidIn) : filePath(pathIn), fileName(nameIn), skeleton(nullptr), guid(guidIn)
 		{
-			rootNodes.emplace_back(CastId::Root);
+			nodes.emplace_back(CastId::Root);
 		};
+		~CastExporter()
+		{
+			FreeAllocVar(skeleton);
+		}
+
+		inline void SetName(const char* const name) { fileName = name; }
+		inline void SetPath(const std::filesystem::path& path) { filePath = path; }
+		inline void SetSkeleton(CastNode* const skel) // should be allocated
+		{
+			FreeAllocVar(skeleton);
+			skeleton = skel;
+		}
 
 		CastNode* GetChild(const uint64_t hash);
-		CastNode* GetChild(const int idx) { return &rootNodes.at(idx); };
+		CastNode* GetChild(const int idx) { return &nodes.at(idx); };
+		inline const uint64_t GetGUID() const { return guid; }
+		inline const CastNode& GetSkeleton() const { return *skeleton; }
 
+		void ToFile(char* const buffer) const;
 		void ToFile() const;
 
-	private:
-		std::filesystem::path path;
+		void Reset(const size_t idx)
+		{
+			CastNode* const node = &nodes.at(idx);
+			node->Reset();
+		}
 
-		std::vector<CastNode> rootNodes;
+	private:
+		std::filesystem::path filePath;
+		std::string fileName;
+
+		std::vector<CastNode> nodes;
+
+		CastNode* skeleton;
+		uint64_t guid;
 	};
 }
 

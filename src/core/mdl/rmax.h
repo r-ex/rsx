@@ -426,6 +426,7 @@ namespace rmax
 
 		inline Vertex_t* const GetVertex(const size_t index) { return &vertices.at(index); };
 
+		inline const size_t MaterialCount() const { return materials.size(); };
 		inline const size_t CollectionCount() const { return collections.size(); };
 		inline const size_t WeightCount() const { return weights.size(); };
 

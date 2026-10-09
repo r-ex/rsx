@@ -304,21 +304,15 @@ bool ExportAnimRigAsset(CAsset* const asset, const int setting)
 
     switch (setting)
     {
-    case eAnimRigExportSetting::ANIMRIG_CAST:
+    case eModelExportSetting::MODEL_CAST:
+    case eModelExportSetting::MODEL_RMAX:
+    case eModelExportSetting::MODEL_SMD:
     {
-        return ExportModelCast(parsedData, exportPath, asset->GetAssetGUID());
-    }
-    case eAnimRigExportSetting::ANIMRIG_RMAX:
-    {
-        return ExportModelRMAX(parsedData, exportPath);
+        return ExportModelMeshes(parsedData, exportPath, setting, 54);
     }
     case eAnimRigExportSetting::ANIMRIG_RRIG:
     {
         return ExportRawAnimRigAsset(pakAsset, animRigAsset, exportPath);
-    }
-    case eAnimRigExportSetting::ANIMRIG_SMD:
-    {
-        return ExportModelSMD(parsedData, exportPath) && ExportModelQC(parsedData, exportPath, setting, 54);
     }
     default:
     {

@@ -1509,8 +1509,10 @@ enum eModelExportSetting : int
 {
 	MODEL_CAST,
 	MODEL_RMAX,
-	MODEL_RMDL,
 	MODEL_SMD,
+	MODEL_FMT_3D_COUNT,
+
+	MODEL_RMDL = MODEL_FMT_3D_COUNT,
 
 	// rmdl only for now, but can support sourcemodelasset in the future
 	MODEL_STL_VALVE_PHYSICS,
@@ -1518,15 +1520,17 @@ enum eModelExportSetting : int
 	
 	MODEL_HITBOXES,
 
-	MODEL_COUNT,
+	MODEL_FMT_COUNT,
 };
 
 static const char* s_ModelExportSettingNames[] =
 {
 	"CAST",
 	"RMAX",
-	"RMDL",
 	"SMD",
+
+	"RMDL",
+
 	"STL (Valve Physics)", 
 	"STL (Respawn Physics)",
 	"OBJ (Hitboxes only)"
@@ -1536,49 +1540,52 @@ static const char* s_ModelExportExtensions[] =
 {
 	".cast",
 	".rmax",
-	".rmdl",
 	".smd",
+
+	".rmdl",
 };
 
 enum eAnimRigExportSetting : int
 {
 	ANIMRIG_CAST,
 	ANIMRIG_RMAX,
-	ANIMRIG_RRIG,
 	ANIMRIG_SMD,
 
-	ANIMRIG_COUNT,
+	ANIMRIG_RRIG,
+
+	ANIMRIG_FMT_COUNT,
 };
 
 static const char* s_AnimRigExportSettingNames[] =
 {
 	"CAST",
 	"RMAX",
-	"RRIG",
 	"SMD",
+
+	"RRIG",
 };
 
 enum eAnimSeqExportSetting : int
 {
 	ANIMSEQ_CAST,
 	ANIMSEQ_RMAX,
-	ANIMSEQ_RSEQ,
 	ANIMSEQ_SMD,
 
-	ANIMSEQ_COUNT,
+	ANIMSEQ_RSEQ,
+
+	ANIMSEQ_FMT_COUNT,
 };
 
 static const char* s_AnimSeqExportSettingNames[] =
 {
 	"CAST",
 	"RMAX",
-	"RSEQ",
 	"SMD",
+
+	"RSEQ",
 };
 
-bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath);
-bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const uint64_t guid);
-bool ExportModelSMD(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath);
+bool ExportModelMeshes(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const int setting, const int version);
 bool ExportModelQC(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const int setting, const int version);
 
 bool ExportSeqDesc(const int setting, const ModelSeq_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const ModelParsedData_t* const rig, const uint64_t guid);

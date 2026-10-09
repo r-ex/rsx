@@ -320,7 +320,7 @@ void QC_ParseStudioBodypart(qc::QCFile* const qc, const ModelParsedData_t* const
 		return;
 	}
 
-	assertm(parsedData->LODCount() == 0, "model had bodyparts but no lods");
+	assertm(parsedData->LODCount() > 0, "model had bodyparts but no lods");
 
 	const ModelLODData_t* const lodData0 = parsedData->pLOD(0);
 

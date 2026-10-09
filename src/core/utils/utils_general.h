@@ -17,6 +17,16 @@
 // one liners to make it Look Fancy
 #define FreeAllocArray(var) if (nullptr != var) { delete[] var; }
 #define FreeAllocVar(var) if (nullptr != var) { delete var; }
+#define FreeAllocVector(var) for (auto& v : var) { if (nullptr != v) delete v; }
+#define FreeAllocPtrArray(var, count)	\
+{										\
+	for (int64_t i = 0; i < count; i++)	\
+	{									\
+		FreeAllocArray(var[i]);			\
+	}									\
+										\
+	FreeAllocArray(var);				\
+}
 
 #define SWAP32(n) (((uint32_t)n & 0xff) << 24 | ((uint32_t)n & 0xff00) << 8 | ((uint32_t)n & 0xff0000) >> 8 | ((uint32_t)n >> 24))
 #define ISWAP32(n) n = SWAP32(n)

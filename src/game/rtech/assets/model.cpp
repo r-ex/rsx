@@ -881,51 +881,44 @@ bool ExportModelAsset(CAsset* const asset, const int setting)
 
     exportPath.append(std::format("{}.rmdl", modelStem));
 
-
     switch (setting)
     {
-        case eModelExportSetting::MODEL_RMDL:
-        {
-            return ExportRawModelAsset(modelAsset, exportPath, streamedData.get());
-        }
-        case eModelExportSetting::MODEL_STL_VALVE_PHYSICS:
-        {
-            if (modelAsset->version >= eMDLVersion::VERSION_16)
-                return ExportPhysicsModelPhy<irps::phyheader_v16_t>(modelAsset, exportPath);
-            else
-                return ExportPhysicsModelPhy<irps::phyheader_t>(modelAsset, exportPath);
-        }
-        case eModelExportSetting::MODEL_STL_RESPAWN_PHYSICS:
-        {
-            // [amos]: the high detail bvh4 mesh seems encased in a mesh that is
-            // more or less identical to the vphysics one. The polygon winding
-            // order of the vphysics replica is however always inverted.
-            if (modelAsset->version >= eMDLVersion::VERSION_12_1)
-                return ExportPhysicsModelBVH<r5::mstudiocollmodel_v8_t, r5::mstudiocollheader_v12_t>(modelAsset, exportPath);
-            else
-                return ExportPhysicsModelBVH<r5::mstudiocollmodel_v8_t, r5::mstudiocollheader_v8_t>(modelAsset, exportPath);
-        }
-        case eModelExportSetting::MODEL_HITBOXES:
-        {
-            return ExportModelHitboxes(modelAsset, exportPath);
-        }
-        case eModelExportSetting::MODEL_CAST:
-        {
-            return ExportModelCast(parsedData, exportPath, asset->GetAssetGUID());
-        }
-        case eModelExportSetting::MODEL_RMAX:
-        {
-            return ExportModelRMAX(parsedData, exportPath);
-        }
-        case eModelExportSetting::MODEL_SMD:
-        {
-            return ExportModelSMD(parsedData, exportPath) && ExportModelQC(parsedData, exportPath, setting, 54);
-        }
-        default:
-        {
-            assertm(false, "Export setting is not handled.");
-            return false;
-        }
+    case eModelExportSetting::MODEL_CAST:
+    case eModelExportSetting::MODEL_RMAX:
+    case eModelExportSetting::MODEL_SMD:
+    {
+        return ExportModelMeshes(parsedData, exportPath, setting, 54);
+    }
+    case eModelExportSetting::MODEL_RMDL:
+    {
+        return ExportRawModelAsset(modelAsset, exportPath, streamedData.get());
+    }
+    case eModelExportSetting::MODEL_STL_VALVE_PHYSICS:
+    {
+        if (modelAsset->version >= eMDLVersion::VERSION_16)
+            return ExportPhysicsModelPhy<irps::phyheader_v16_t>(modelAsset, exportPath);
+        else
+            return ExportPhysicsModelPhy<irps::phyheader_t>(modelAsset, exportPath);
+    }
+    case eModelExportSetting::MODEL_STL_RESPAWN_PHYSICS:
+    {
+        // [amos]: the high detail bvh4 mesh seems encased in a mesh that is
+        // more or less identical to the vphysics one. The polygon winding
+        // order of the vphysics replica is however always inverted.
+        if (modelAsset->version >= eMDLVersion::VERSION_12_1)
+            return ExportPhysicsModelBVH<r5::mstudiocollmodel_v8_t, r5::mstudiocollheader_v12_t>(modelAsset, exportPath);
+        else
+            return ExportPhysicsModelBVH<r5::mstudiocollmodel_v8_t, r5::mstudiocollheader_v8_t>(modelAsset, exportPath);
+    }
+    case eModelExportSetting::MODEL_HITBOXES:
+    {
+        return ExportModelHitboxes(modelAsset, exportPath);
+    }
+    default:
+    {
+        assertm(false, "Export setting is not handled.");
+        return false;
+    }
     }
 
     unreachable();

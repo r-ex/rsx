@@ -2467,9 +2467,10 @@ struct ModelMaterialExport_t
 	MaterialAsset* asset;
 	int id;
 };
+typedef std::unordered_map<int, ModelMaterialExport_t> ModelMaterialExportMap_t;
 
 // export materials from parsed data
-void HandleModelMaterials(const ModelParsedData_t* const parsedData, std::unordered_map<int, ModelMaterialExport_t>& materials, const std::filesystem::path& exportPath)
+void HandleModelMaterials(const ModelParsedData_t* const parsedData, ModelMaterialExportMap_t& materials, const std::filesystem::path& exportPath)
 {
 	// [rika]: this will decide if we want textures/materials local to the model, or to use full paths in the future.
 	const bool useFullPaths = false; // temp
@@ -2554,436 +2555,516 @@ void HandleModelMaterials(const ModelParsedData_t* const parsedData, std::unorde
 	g_pImGuiHandler->FinishProgressBarEvent(materialExportProgress);
 }
 
-// [rika]: todo also fix this up
-// export parsed data to rmax
-bool ExportModelRMAX(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath)
+void* ExportModelSetupCAST(const ModelParsedData_t* const parsedData, const char* const filePath, const char* const fileStem)
 {
-	std::string fileNameBase = exportPath.stem().string();
-	const std::filesystem::path filePath(exportPath.parent_path());
-
-	rmax::RMAXExporter rmaxFile(filePath, fileNameBase.c_str(), fileNameBase.c_str());
-
-	// do bones
-	rmaxFile.ReserveBones(parsedData->BoneCount());
-	for (int i = 0; i < parsedData->BoneCount(); i++)
-	{
-		const ModelBone_t* const pBone = parsedData->pBone(i);
-		rmaxFile.AddBone(pBone->name, pBone->parent, pBone->pos, pBone->quat, pBone->scale);
-	}
-
-	// [rika]: model is skin and bones, no meat
-	if (parsedData->LODCount() == 0)
-	{
-		const std::string tmpName(std::format("{}.rmax", fileNameBase));
-		rmaxFile.SetName(tmpName.c_str());
-
-		rmaxFile.ToFile();
-
-		return true;
-	}
-
-	const std::filesystem::path texturePath(std::format("{}/{}", filePath.string(), fileNameBase)); // todo, remove duplicate code
-	std::unordered_map<int, ModelMaterialExport_t> materials;
-	HandleModelMaterials(parsedData, materials, texturePath);
-
-	// [rika]: now we parse lods
-	for (int lodIdx = 0; lodIdx < parsedData->LODCount(); lodIdx++)
-	{
-		const ModelLODData_t* const pLODData = parsedData->pLOD(lodIdx);
-
-		const std::string tmpName = std::format("{}_LOD{}.rmax", fileNameBase, lodIdx);
-		rmaxFile.SetName(tmpName.c_str());		
-
-		// do materials
-		rmaxFile.ReserveMaterials(parsedData->MaterialCount());
-		for (int matIdx = 0; matIdx < parsedData->MaterialCount(); matIdx++)
-		{
-			const ModelMaterialData_t* const pMaterialData = parsedData->pMaterial(matIdx);
-			const int materialId = static_cast<int>(matIdx);
-
-			// [rika]: if it's unloaded, or unused we will just write a stub material
-			if (!pMaterialData->asset)
-			{
-				rmaxFile.AddMaterial(pMaterialData->GetName(true));
-				continue;
-			}
-
-			assert(pMaterialData->GetMaterialAsset());
-			const MaterialAsset* const matlAsset = pMaterialData->GetMaterialAsset();
-			rmaxFile.AddMaterial(matlAsset->name);
-
-			// [rika]: write stub material (unused material)
-			if (!materials.contains(materialId) || !matlAsset->resourceBindings.size())
-				continue;
-
-			const ModelMaterialExport_t& materialExport = materials.find(materialId)->second;
-
-			rmax::RMAXMaterial* const matl = rmaxFile.GetMaterialLast();
-
-			for (const TextureAssetEntry_t& entry : matlAsset->txtrAssets)
-			{
-				// [rika]: we don't have a resource binding or we don't have a name for the texture
-				if (!matlAsset->resourceBindings.count(entry.index) || !materialExport.textures.contains(entry.index))
-					continue;
-
-				const std::string resource = matlAsset->resourceBindings.find(entry.index)->second.name;
-
-				// [rika]: do we need this resource?
-				if (!rmax::s_TextureTypeMap.count(resource))
-					continue;
-
-				const MaterialTextureExportInfo_s& info = materialExport.textures.find(entry.index)->second;
-				const std::string path = std::format("{}/{}", info.exportPath.string(), info.exportName);
-
-				matl->AddTexture(path.c_str(), rmax::s_TextureTypeMap.find(resource)->second);
-			}
-		}
-
-		// do models
-		rmaxFile.ReserveCollections(pLODData->GetModelCount());
-		rmaxFile.ReserveMeshes(pLODData->GetMeshCount());
-		rmaxFile.ReserveVertices(pLODData->vertexCount, pLODData->texcoordsPerVert, pLODData->weightsPerVert);
-		rmaxFile.ReserveIndices(pLODData->indexCount);
-		for (uint32_t modelIdx = 0; modelIdx < pLODData->GetModelCount(); modelIdx++)
-		{
-			const ModelModelData_t* const pModel = pLODData->pModel(modelIdx);
-
-			if (pModel->meshCount == 0)
-				continue;
-
-			rmaxFile.AddCollection(pModel->name, pModel->meshCount);
-
-			for (uint32_t meshIdx = 0; meshIdx < pModel->meshCount; meshIdx++)
-			{
-				const ModelMeshData_t& meshData = pModel->meshes[meshIdx];
-
-				assertm(materials.contains(meshData.materialId), "material should be parsed as it is used");
-				const ModelMaterialExport_t& material = materials.find(meshData.materialId)->second;
-
-				assertm(meshData.meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
-
-				std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(meshData.meshVertexDataIndex);
-				const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
-
-				rmaxFile.AddMesh(static_cast<int16_t>(rmaxFile.CollectionCount() - 1), static_cast<int16_t>(material.id), meshData.texcoordCount, meshData.texcoodIndices, (meshData.rawVertexLayoutFlags & VERT_COLOR));
-
-				rmax::RMAXMesh* const mesh = rmaxFile.GetMeshLast();
-
-				// data parsing
-				for (uint32_t i = 0; i < meshData.vertCount; i++)
-				{
-					const Vertex_t* const vertData = &parsedVertexData->GetVertices()[i];
-
-					Vector normal;
-					Vector tangent;
-					vertData->normalPacked.UnpackNormal(normal, tangent);
-
-					mesh->AddVertex(vertData->position, normal);
-
-					if (meshData.rawVertexLayoutFlags & VERT_COLOR)
-						mesh->AddColor(vertData->color);
-
-					for (uint16_t texcoordIdx = 0; texcoordIdx < meshData.texcoordCount; texcoordIdx++)
-						mesh->AddTexcoord(*vertData->GetTexcoordForVertex(texcoordIdx, meshData.texcoordCount, parsedVertexData->GetTexcoords(), i));
-
-					for (uint32_t weightIdx = 0; weightIdx < vertData->weightCount; weightIdx++)
-					{
-						const VertexWeight_t* const weight = &parsedVertexData->GetWeights()[vertData->weightIndex + weightIdx];
-						mesh->AddWeight(i, weight->bone, weight->weight);
-					}
-				}
-
-				for (uint32_t i = 0; i < meshData.indexCount; i += 3)
-					mesh->AddIndice(parsedVertexData->GetIndices()[i], parsedVertexData->GetIndices()[i + 1], parsedVertexData->GetIndices()[i + 2]);
-			}
-		}
-
-		rmaxFile.ToFile();
-		rmaxFile.ResetMeshData();
-	}
-
-	return true;
-}
-
-// export parsed data to cast
-// [rika]: todo rewrite this soon tm (it is so bad)
-bool ExportModelCast(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const uint64_t guid)
-{
-	std::string fileNameBase = exportPath.stem().string();
+	cast::CastExporter* const cast = new cast::CastExporter(filePath, fileStem, RTech::StringToGuid(parsedData->name));
 
 	// [rika]: build the skeleton once, and reuse it
-	cast::CastNode skelNode(cast::CastId::Skeleton, RTech::StringToGuid(fileNameBase.c_str()));
+	cast::CastNode* const skeleton = new cast::CastNode(cast::CastId::Skeleton, RTech::StringToGuid(fileStem));
 	{
 		const size_t boneCount = parsedData->BoneCount();
-		skelNode.ReserveChildren(boneCount);
+		skeleton->ReserveChildren(boneCount);
 
 		// uses hashes for lookup, still gets bone parents by index :clown:
 		for (int i = 0; i < boneCount; i++)
 		{
 			const ModelBone_t* const boneData = parsedData->pBone(i);
 
-			cast::CastNodeBone boneNode(&skelNode);
+			cast::CastNodeBone boneNode(skeleton);
 			boneNode.MakeBone(boneData->name, boneData->parent, &boneData->pos, &boneData->quat, false);
 		}
 	}
-	const cast::CastNode& skelNodeConst = skelNode;
+	cast->SetSkeleton(skeleton);
 
 	// [rika]: model is skin and bones, no meat
 	if (parsedData->LODCount() == 0)
 	{
-		const std::string tmpName(std::format("{}.cast", fileNameBase));
-		exportPath.replace_filename(tmpName);
-
-		cast::CastExporter cast(exportPath.string());
-
 		// cast
-		cast::CastNode* const rootNode = cast.GetChild(0); // we only have one root node, no hash
-		cast::CastNode* const modelNode = rootNode->AddChild(cast::CastId::Model, guid);
+		cast::CastNode* const rootNode = cast->GetChild(0); // we only have one root node, no hash
+		cast::CastNode* const modelNode = rootNode->AddChild(cast::CastId::Model, cast->GetGUID());
 
-		// [rika]: we can predict how big this vector needs to be, however resizing it will make adding new members a pain.
-		const size_t modelChildrenCount = 1; // skeleton (one)
-		modelNode->ReserveChildren(modelChildrenCount);
+		// [rika]: utilize the pre parsed skeleton
+		modelNode->AddChild(cast->GetSkeleton());
 
-		// do skeleton
-		modelNode->AddChild(skelNode); // one time use
-
-		cast.ToFile();
-
-		return true;
+		cast->ToFile();
 	}
 
-	const std::filesystem::path texturePath(std::format("{}/{}", exportPath.parent_path().string(), fileNameBase)); // todo, remove duplicate code
-	std::unordered_map<int, ModelMaterialExport_t> materials;
-	HandleModelMaterials(parsedData, materials, texturePath);
+	return cast;
+}
 
-	for (size_t lodIdx = 0; lodIdx < parsedData->LODCount(); lodIdx++)
+void* ExportModelSetupRMAX(const ModelParsedData_t* const parsedData, const char* const filePath, const char* const fileStem)
+{
+	rmax::RMAXExporter* const rmax = new rmax::RMAXExporter(filePath, fileStem, fileStem);
+
+	// do bones
+	rmax->ReserveBones(parsedData->BoneCount());
+	for (int i = 0; i < parsedData->BoneCount(); i++)
 	{
-		const ModelLODData_t* const lodData = parsedData->pLOD(lodIdx);
-
-		std::string tmpName(std::format("{}_LOD{}.cast", fileNameBase, std::to_string(lodIdx)));
-		exportPath.replace_filename(tmpName);
-
-		cast::CastExporter cast(exportPath.string());
-
-		// cast
-		cast::CastNode* rootNode = cast.GetChild(0); // we only have one root node, no hash
-		cast::CastNode* modelNode = rootNode->AddChild(cast::CastId::Model, guid);
-
-		// [rika]: we can predict how big this vector needs to be, however resizing it will make adding new members a pain.
-		const size_t modelChildrenCount = 1 + parsedData->MaterialCount() + lodData->GetMeshCount(); // skeleton (one), materials (varies), meshes (varies)
-		modelNode->ReserveChildren(modelChildrenCount);
-
-		// do skeleton
-		modelNode->AddChild(skelNodeConst);
-
-		// do materials
-		for (const auto& it : materials)
-		{
-			const ModelMaterialExport_t& material = it.second;
-			const ModelMaterialData_t* const materialData = parsedData->pMaterial(material.id);
-
-			// [rika]: a cast material has at least two properties, name and material type (pbr in our case)
-			cast::CastNode matlNode(cast::CastId::Material, 2, materialData->guid);
-			matlNode.SetProperty(1, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMaterial::Type), "pbr", 1u);
-
-			if (!material.asset)
-			{
-				matlNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMaterial::Name), GetStringAfterLastSlash(materialData->name), 1u); // unsure why it does this but we're rolling with it!
-				modelNode->AddChild(matlNode);
-				continue;
-			}
-
-			const MaterialAsset* const materialAsset = material.asset;
-
-			matlNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMaterial::Name), GetStringAfterLastSlash(materialAsset->name), 1u);
-
-			// [rika]: parse out our textures if we have bindings for them, don't if not
-			// [rika]: exit early if no textures
-			if (materialAsset->resourceBindings.empty())
-			{
-				modelNode->AddChild(matlNode);
-				continue;
-			}
-
-			for (const TextureAssetEntry_t& entry : materialAsset->txtrAssets)
-			{
-				// [rika]: texture cannot be accurately identified, skip it
-				if (!materialAsset->resourceBindings.count(entry.index))
-					continue;
-
-				const std::string resource(materialAsset->resourceBindings.find(entry.index)->second.name);
-
-				// [rika]: texture type isn't supported, skip it
-				if (!cast::s_TextureTypeMap.count(resource))
-					continue;
-
-				// [rika]: if MaterialTextureExportInfo_s doesn't exist for this texture it's not loaded, and by extension is not exported
-				if (!material.textures.contains(entry.index))
-				{
-					// todo: store a name in parsed data
-					//Log("Material %s for model %s did not have a valid texture pointer for res idx %i\n", materialAsset->name, name, entry.index);
-
-					continue;
-				}
-
-				const MaterialTextureExportInfo_s& info = material.textures.find(entry.index)->second;
-
-				const uint64_t textureGuid = entry.asset->data()->guid; // texture guid
-
-				const cast::CastPropsMaterial matlTxtrProp = cast::s_TextureTypeMap.find(resource)->second;
-
-				matlNode.AddProperty(cast::CastPropertyId::Integer64, static_cast<int>(matlTxtrProp), textureGuid);
-
-				cast::CastNode fileNode(cast::CastId::File, 1, textureGuid);
-
-				// [rika]: need to figure out how this works more
-				const std::string filePath(std::format("{}/{}.png", fileNameBase, info.exportName));
-				fileNode.SetString(filePath); // materials exported from models always use png, as blender support for dds is bad, todo: make it so we can use ALL formats!
-				fileNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsFile::Path), fileNode.GetString(), 1u);
-
-				matlNode.AddChild(fileNode);
-			}
-
-			modelNode->AddChild(matlNode);
-		}
-
-		// !!! TODO !!!
-		// this needs to get cleaned up, but if I don't push I am gonna be stuck forever
-
-		// [rika]: a system to have these allocated to each node would be cleaner, but more expensive.
-		struct DataPtrs_t {
-			Vector* positions;
-			Vector* normals;
-			Color32* colors;
-			Vector2D* texcoords; // all uvs stored here
-			uint8_t* blendIndices;
-			float* blendWeights;
-
-			uint16_t* indices;
-		};
-
-		DataPtrs_t vertexData{ nullptr };
-
-		//                                    Postion & Normal       Color
-		constexpr size_t castMinSizePerVert = (sizeof(Vector) * 2) + sizeof(Color32);
-
-		char* vertDataBlockBuf = new char[(castMinSizePerVert + (sizeof(Vector2D) * lodData->texcoordsPerVert)) * lodData->vertexCount] {};
-
-		vertexData.positions = reinterpret_cast<Vector*>(vertDataBlockBuf);
-		vertexData.normals = &vertexData.positions[lodData->vertexCount];
-		vertexData.colors = reinterpret_cast<Color32*>(&vertexData.normals[lodData->vertexCount]); // discarded if unneeded
-		vertexData.texcoords = reinterpret_cast<Vector2D*>(&vertexData.colors[lodData->vertexCount]);
-		vertexData.blendIndices = new uint8_t[lodData->vertexCount * lodData->weightsPerVert]{};
-		vertexData.blendWeights = new float[lodData->vertexCount * lodData->weightsPerVert] {};
-
-		vertexData.indices = new uint16_t[lodData->indexCount];
-
-		size_t curIndex = 0; // current index into vertex data
-		size_t idxIndex = 0; // shit format
-
-		// do meshes
-		for (uint32_t modelIdx = 0; modelIdx < lodData->GetModelCount(); modelIdx++)
-		{
-			const ModelModelData_t* const modelData = lodData->pModel(modelIdx);
-
-			for (size_t i = 0; i < modelData->meshCount; i++)
-			{
-				const ModelMeshData_t& meshData = modelData->meshes[i];
-
-				assertm(materials.contains(meshData.materialId), "material should be parsed as it is used");
-				const uint64_t materialGuid = parsedData->pMaterial(materials.find(meshData.materialId)->second.id)->guid;
-
-				assertm(meshData.meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
-
-				std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(meshData.meshVertexDataIndex);
-				const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
-
-				std::string matl = nullptr != meshData.materialAsset ? GetStringAfterLastSlash(meshData.GetMaterialAsset()->name) : std::to_string(materialGuid);
-				std::string meshName = std::format("{}_{}", modelData->name, matl);
-				cast::CastNode meshNode(cast::CastId::Mesh, 1, RTech::StringToGuid(meshName.c_str())); // name
-
-				// name, pos, normal, blendweight, blendindices, indices, uv count, max blends, material, texcoords, color
-				const size_t meshPropertiesCount = 9 + meshData.texcoordCount + (meshData.rawVertexLayoutFlags & VERT_COLOR ? 1 : 0);
-				meshNode.ReserveProperties(meshPropertiesCount);
-
-				// works on files but not here, why?
-				// update: now it works after changing how the string is formed, lovely.
-				meshNode.SetString(meshName);
-				meshNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMesh::Name), meshNode.GetString(), 1u);
-
-				meshNode.AddProperty(cast::CastPropertyId::Vector3, static_cast<int>(cast::CastPropsMesh::Vertex_Postion_Buffer), &vertexData.positions[curIndex], meshData.vertCount);
-				meshNode.AddProperty(cast::CastPropertyId::Vector3, static_cast<int>(cast::CastPropsMesh::Vertex_Normal_Buffer), &vertexData.normals[curIndex], meshData.vertCount);
-
-				if (meshData.rawVertexLayoutFlags & VERT_COLOR)
-					meshNode.AddProperty(cast::CastPropertyId::Integer32, static_cast<int>(cast::CastPropsMesh::Vertex_Color_Buffer), &vertexData.colors[curIndex], meshData.vertCount);
-
-				// cast cries if we use the proper index
-				for (int16_t texcoordIdx = 0; texcoordIdx < meshData.texcoordCount; texcoordIdx++)
-					meshNode.AddProperty(cast::CastPropertyId::Vector2, static_cast<int>(cast::CastPropsMesh::Vertex_UV_Buffer), &vertexData.texcoords[(lodData->vertexCount * texcoordIdx) + curIndex], meshData.vertCount, true, texcoordIdx);
-
-				meshNode.AddProperty(cast::CastPropertyId::Byte, static_cast<int>(cast::CastPropsMesh::Vertex_Weight_Bone_Buffer), &vertexData.blendIndices[lodData->weightsPerVert * curIndex], (meshData.vertCount * meshData.weightsPerVert));
-				meshNode.AddProperty(cast::CastPropertyId::Float, static_cast<int>(cast::CastPropsMesh::Vertex_Weight_Value_Buffer), &vertexData.blendWeights[lodData->weightsPerVert * curIndex], (meshData.vertCount * meshData.weightsPerVert));
-
-				// parse our vertices into the buffer, so cringe!
-				for (uint32_t vertIdx = 0; vertIdx < meshData.vertCount; vertIdx++)
-				{
-					const Vertex_t& vert = parsedVertexData->GetVertices()[vertIdx];
-
-					Vector tangent;
-
-					vertexData.positions[curIndex + vertIdx] = vert.position;
-					vert.normalPacked.UnpackNormal(vertexData.normals[curIndex + vertIdx], tangent);
-					vertexData.colors[curIndex + vertIdx] = vert.color;
-
-					for (uint16_t texcoordIdx = 0; texcoordIdx < meshData.texcoordCount; texcoordIdx++)
-					{
-						const Vector2D* const texcoord = vert.GetTexcoordForVertex(texcoordIdx, meshData.texcoordCount, parsedVertexData->GetTexcoords(), vertIdx);
-						vertexData.texcoords[(lodData->vertexCount * texcoordIdx) + curIndex + vertIdx] = *texcoord;
-					}
-
-					for (uint32_t weightIdx = 0; weightIdx < vert.weightCount; weightIdx++)
-					{
-						vertexData.blendIndices[(lodData->weightsPerVert * curIndex) + (meshData.weightsPerVert * vertIdx) + weightIdx] = static_cast<uint8_t>(parsedVertexData->GetWeights()[vert.weightIndex + weightIdx].bone);
-						vertexData.blendWeights[(lodData->weightsPerVert * curIndex) + (meshData.weightsPerVert * vertIdx) + weightIdx] = parsedVertexData->GetWeights()[vert.weightIndex + weightIdx].weight;
-					}
-				}
-
-				// parse our indices into the buffer, and shuffle them! extra cringe!
-				const uint32_t indexCount = meshData.indexCount;
-				meshNode.AddProperty(cast::CastPropertyId::Short, static_cast<int>(cast::CastPropsMesh::Face_Buffer), &vertexData.indices[idxIndex], indexCount);
-
-				for (uint32_t idxIdx = 0; idxIdx < indexCount; idxIdx += 3)
-				{
-					vertexData.indices[idxIndex + idxIdx] = parsedVertexData->GetIndices()[idxIdx + 2];
-					vertexData.indices[idxIndex + idxIdx + 1] = parsedVertexData->GetIndices()[idxIdx + 1];
-					vertexData.indices[idxIndex + idxIdx + 2] = parsedVertexData->GetIndices()[idxIdx];
-				}
-
-				meshNode.AddProperty(cast::CastPropertyId::Short, static_cast<int>(cast::CastPropsMesh::UV_Layer_Count), meshData.texcoordCount);
-				meshNode.AddProperty(cast::CastPropertyId::Short, static_cast<int>(cast::CastPropsMesh::Max_Weight_Influence), meshData.weightsPerVert);
-
-				meshNode.AddProperty(cast::CastPropertyId::Integer64, static_cast<int>(cast::CastPropsMesh::Material), materialGuid);
-
-				modelNode->AddChild(meshNode);
-
-				curIndex += meshData.vertCount;
-				idxIndex += indexCount;
-			}
-		}
-
-		cast.ToFile();
-
-		// cleanup our allocated buffers
-		delete[] vertDataBlockBuf;
-		delete[] vertexData.blendIndices;
-		delete[] vertexData.blendWeights;
-
-		delete[] vertexData.indices;
+		const ModelBone_t* const pBone = parsedData->pBone(i);
+		rmax->AddBone(pBone->name, pBone->parent, pBone->pos, pBone->quat, pBone->scale);
 	}
+
+	// [rika]: model is skin and bones, no meat
+	if (parsedData->LODCount() == 0)
+	{
+		rmax->SetName(fileStem);
+		rmax->ToFile();
+	}
+
+	return rmax;
+}
+
+void* ExportModelSetupSMD(const ModelParsedData_t* const parsedData, const char* const filePath, const char* const fileStem)
+{
+	smd::CStudioModelData* const smd = new smd::CStudioModelData(filePath, parsedData->BoneCount(), 1ull);
+
+	// [rika]: initialize the nodes, and in this case the frames since we should only have one
+	for (int i = 0; i < parsedData->BoneCount(); i++)
+	{
+		const ModelBone_t* const pBone = parsedData->pBone(i);
+		const int ibone = static_cast<int>(i);
+
+		smd->InitNode(pBone->name, ibone, pBone->parent);
+		smd->InitFrameBone(0, ibone, pBone->pos, pBone->rot);
+	}
+
+	// [rika]: model is skin and bones, no meat
+	if (parsedData->LODCount() == 0)
+	{
+		smd->SetName(fileStem);
+		smd->Write();
+	}
+
+	return smd;
+}
+
+// [rika]: figure out and store how much data is needed for each model
+struct ModelExportInfo_t
+{
+	ModelExportInfo_t(const ModelModelData_t* const models, const int numModels) : numVertices(0u), numIndices(0u), numMeshes(0u), texcoordsPerVert(0u), weightsPerVert(0u)
+	{
+		for (int i = 0; i < numModels; i++)
+		{
+			const ModelModelData_t* const pModel = models + i;
+
+			for (int j = 0; j < pModel->meshCount; j++)
+			{
+				const ModelMeshData_t* const pMesh = pModel->meshes + j;
+
+				if (pMesh->vertCount == 0)
+					continue;
+
+				numVertices += pMesh->vertCount;
+				numIndices += pMesh->indexCount;
+				numMeshes++;
+
+				texcoordsPerVert = pMesh->texcoordCount > texcoordsPerVert ? pMesh->texcoordCount : texcoordsPerVert;
+				weightsPerVert = pMesh->weightsPerVert > weightsPerVert ? pMesh->weightsPerVert : weightsPerVert;
+			}
+		}
+	}
+
+	// [rika]: calculate how many of each type we got to allocate in one big go
+	uint32_t numVertices;
+	uint32_t numIndices;
+	uint32_t numMeshes;
+
+	// [rika]: once upon a time we pulled this from LOD (might be useless now actually), but going with this system to allow ModelModelData_t to be used for different types of data prevents us from specifically using the LOD
+	uint16_t texcoordsPerVert;
+	uint16_t weightsPerVert;
+};
+
+// rmax
+void ParseMaterialIntoRMAX(const ModelParsedData_t* const parsedData, const ModelMaterialExportMap_t* const materials, rmax::RMAXExporter* const rmax)
+{
+	rmax->ReserveMaterials(parsedData->MaterialCount());
+
+	for (int materialId = 0; materialId < parsedData->MaterialCount(); materialId++)
+	{
+		const ModelMaterialData_t* const pMaterialData = parsedData->pMaterial(materialId);
+
+		// [rika]: if it's unloaded, or unused we will just write a stub material
+		if (!pMaterialData->asset)
+		{
+			rmax->AddMaterial(pMaterialData->GetName(true));
+			continue;
+		}
+
+		assert(pMaterialData->GetMaterialAsset());
+		const MaterialAsset* const materialAsset = pMaterialData->GetMaterialAsset();
+		rmax->AddMaterial(materialAsset->name);
+
+		// [rika]: write stub material (unused material)
+		if (!materials->contains(materialId) || !materialAsset->resourceBindings.size())
+			continue;
+
+		const ModelMaterialExport_t& materialExport = materials->find(materialId)->second;
+
+		rmax::RMAXMaterial* const matl = rmax->GetMaterialLast();
+
+		for (const TextureAssetEntry_t& entry : materialAsset->txtrAssets)
+		{
+			// [rika]: we don't have a resource binding or we don't have a name for the texture
+			if (!materialAsset->resourceBindings.count(entry.index) || !materialExport.textures.contains(entry.index))
+				continue;
+
+			const std::string resource = materialAsset->resourceBindings.find(entry.index)->second.name;
+
+			// [rika]: do we need this resource?
+			if (!rmax::s_TextureTypeMap.count(resource))
+				continue;
+
+			const MaterialTextureExportInfo_s& info = materialExport.textures.find(entry.index)->second;
+			const std::string filePath = std::format("{}/{}", info.exportPath.string(), info.exportName);
+
+			matl->AddTexture(filePath.c_str(), rmax::s_TextureTypeMap.find(resource)->second);
+		}
+	}
+}
+
+bool ExportModelRMAX(const ModelParsedData_t* const parsedData, const ModelMaterialExportMap_t* const materials, const ModelModelData_t* const models, const int numModels, void* const file, const char* const fileName)
+{
+	rmax::RMAXExporter* const rmax = reinterpret_cast<rmax::RMAXExporter* const>(file);
+	rmax->SetName(fileName);
+
+	// [rika]: parse materials in to file if they have not been already
+	if (rmax->MaterialCount() == 0ull)
+	{
+		ParseMaterialIntoRMAX(parsedData, materials, rmax);
+	}
+
+	const ModelExportInfo_t modelInfo(models, numModels);
+
+	// [rika]: RMAXExporter uses std::vector (old and not updating), allocate all at once to avoid performance hits from allocating over and over
+	rmax->ReserveCollections(numModels);
+	rmax->ReserveMeshes(modelInfo.numMeshes);
+	rmax->ReserveVertices(modelInfo.numVertices, modelInfo.texcoordsPerVert, modelInfo.weightsPerVert);
+	rmax->ReserveIndices(modelInfo.numIndices);
+
+	for (int modelIdx = 0; modelIdx < numModels; modelIdx++)
+	{
+		const ModelModelData_t* const pModel = models + modelIdx;
+
+		if (pModel->meshCount == 0)
+			continue;
+
+		rmax->AddCollection(pModel->name, pModel->meshCount);
+
+		for (int meshIdx = 0; meshIdx < pModel->meshCount; meshIdx++)
+		{
+			const ModelMeshData_t* const pMesh = pModel->meshes + meshIdx;
+
+			assertm(pMesh->meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
+
+			std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(pMesh->meshVertexDataIndex);
+			const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
+
+			const uint16_t* const indices = parsedVertexData->GetIndices();
+			const Vertex_t* const vertices = parsedVertexData->GetVertices();
+			const VertexWeight_t* const weights = parsedVertexData->GetWeights();
+			const Vector2D* const texcoords = parsedVertexData->GetTexcoords();
+
+			// [rika]: get the material for the skin in that index
+			assertm(materials->contains(pMesh->materialId), "material should be parsed as it is used");
+			const ModelMaterialExport_t* const materialExportInfo = &materials->find(pMesh->materialId)->second;
+
+			rmax->AddMesh(static_cast<int16_t>(modelIdx), static_cast<int16_t>(materialExportInfo->id), pMesh->texcoordCount, pMesh->texcoodIndices, (pMesh->rawVertexLayoutFlags & VERT_COLOR));
+
+			rmax::RMAXMesh* const mesh = rmax->GetMeshLast();
+
+			// data parsing
+			for (uint32_t i = 0; i < pMesh->vertCount; i++)
+			{
+				const Vertex_t* const pVertex = vertices + i;
+
+				Vector normal;
+				Vector tangent;
+				pVertex->normalPacked.UnpackNormal(normal, tangent);
+
+				mesh->AddVertex(pVertex->position, normal);
+
+				if (pMesh->rawVertexLayoutFlags & VERT_COLOR)
+					mesh->AddColor(pVertex->color);
+
+				for (uint16_t texcoordIdx = 0; texcoordIdx < pMesh->texcoordCount; texcoordIdx++)
+					mesh->AddTexcoord(*pVertex->GetTexcoordForVertex(texcoordIdx, pMesh->texcoordCount, texcoords, i));
+
+				for (uint32_t weightIdx = 0; weightIdx < pVertex->weightCount; weightIdx++)
+				{
+					const VertexWeight_t* const weight = weights + (pVertex->weightIndex + weightIdx);
+					mesh->AddWeight(i, weight->bone, weight->weight);
+				}
+			}
+
+			for (uint32_t i = 0; i < pMesh->indexCount; i += 3)
+				mesh->AddIndice(indices[i], indices[i + 1], indices[i + 2]);
+		}
+	}
+
+	CManagedBuffer* const buffer = g_BufferManager.ClaimBuffer();
+
+	rmax->ToFile(buffer->Buffer());
+	rmax->ResetMeshData();
+
+	g_BufferManager.RelieveBuffer(buffer);
 
 	return true;
 }
 
+// export parsed data to cast
+// [rika]: todo rewrite this soon tm (it is so bad)
+void ParseMaterialIntoCast(const ModelParsedData_t* const parsedData, const ModelMaterialExport_t* const materialExportInfo, cast::CastNode* const modelNode)
+{
+	const ModelMaterialData_t* const pMaterialData = parsedData->pMaterial(materialExportInfo->id);
+
+	// [rika]: a cast material has at least two properties, name and material type (pbr in our case)
+	cast::CastNode matlNode(cast::CastId::Material, 2, pMaterialData->guid);
+	matlNode.SetProperty(1, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMaterial::Type), "pbr", 1u);
+
+	if (!pMaterialData->asset)
+	{
+		matlNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMaterial::Name), GetStringAfterLastSlash(pMaterialData->name), 1u); // unsure why it does this but we're rolling with it!
+		modelNode->AddChild(matlNode);
+		return;
+	}
+
+	assert(pMaterialData->GetMaterialAsset());
+	const MaterialAsset* const materialAsset = pMaterialData->GetMaterialAsset();
+
+	matlNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMaterial::Name), GetStringAfterLastSlash(materialAsset->name), 1u);
+
+	// [rika]: parse out our textures if we have bindings for them, don't if not
+	// [rika]: exit early if no textures
+	if (materialAsset->resourceBindings.empty())
+	{
+		modelNode->AddChild(matlNode);
+		return;
+	}
+
+	for (const TextureAssetEntry_t& entry : materialAsset->txtrAssets)
+	{
+		// [rika]: we don't have a resource binding or we don't have a name for the texture
+		if (!materialAsset->resourceBindings.count(entry.index) || !materialExportInfo->textures.contains(entry.index))
+			continue;
+
+		const std::string resource(materialAsset->resourceBindings.find(entry.index)->second.name);
+
+		// [rika]: texture type isn't supported, skip it
+		if (!cast::s_TextureTypeMap.count(resource))
+			continue;
+
+		const MaterialTextureExportInfo_s& info = materialExportInfo->textures.find(entry.index)->second;
+		const std::string filePath = std::format("{}/{}.png", info.exportPath.string(), info.exportName);
+
+		const uint64_t textureGuid = entry.asset->data()->guid; // texture guid
+
+		const cast::CastPropsMaterial matlTxtrProp = cast::s_TextureTypeMap.find(resource)->second;
+
+		matlNode.AddProperty(cast::CastPropertyId::Integer64, static_cast<int>(matlTxtrProp), textureGuid);
+
+		cast::CastNode fileNode(cast::CastId::File, 1, textureGuid);
+
+		// [rika]: need to figure out how this works more
+		fileNode.SetString(filePath); // materials exported from models always use png, as blender support for dds is bad, todo: make it so we can use ALL formats!
+		fileNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsFile::Path), fileNode.GetString(), 1u);
+
+		matlNode.AddChild(fileNode);
+	}
+
+	modelNode->AddChild(matlNode);
+}
+
+bool ExportModelCAST(const ModelParsedData_t* const parsedData, const ModelMaterialExportMap_t* const materials, const ModelModelData_t* const models, const int numModels, void* const file, const char* const fileName)
+{
+	cast::CastExporter* const cast = reinterpret_cast<cast::CastExporter* const>(file);
+	cast->SetName(fileName);
+
+	// cast
+	cast::CastNode* rootNode = cast->GetChild(0); // we only have one root node, no hash
+	cast::CastNode* modelNode = rootNode->AddChild(cast::CastId::Model, cast->GetGUID());
+
+	// [rika]: we can predict how big this vector needs to be, however resizing it will make adding new members a pain.
+	const size_t modelChildrenCount = 1ull + parsedData->MaterialCount() + numModels; // skeleton (one), materials (varies), meshes (varies)
+	modelNode->ReserveChildren(modelChildrenCount);
+
+	// [rika]: yoink the pre parsed skeleton
+	modelNode->AddChild(cast->GetSkeleton());
+
+	const ModelExportInfo_t modelInfo(models, numModels);
+
+	CManagedBuffer* const vertexBuffer = g_BufferManager.ClaimBuffer();
+
+	// [rika]: has to be store in a linear format so we copy everything out
+	Vector* const linearPositions = reinterpret_cast<Vector* const>(vertexBuffer->Buffer());
+	Vector* const linearNormals = linearPositions + modelInfo.numVertices;
+	Color32* const linearColors = reinterpret_cast<Color32* const>(linearNormals + modelInfo.numVertices);
+	Vector2D* const linearTexcoords = reinterpret_cast<Vector2D* const>(linearColors + modelInfo.numVertices); // all uvs stored here
+
+	// [rika]: we have to flip the winding of these
+	uint16_t* const linearIndices = reinterpret_cast<uint16_t* const>(linearTexcoords + (modelInfo.numVertices * modelInfo.texcoordsPerVert));
+
+	const size_t boneIndiceWidth = parsedData->BoneCount() > 256 ? sizeof(uint16_t) : sizeof(uint8_t);
+	float* const linearBlendWeights = reinterpret_cast<float* const>(linearIndices + modelInfo.numIndices);
+	void* const linearBlendIndices = reinterpret_cast<void* const>(linearBlendWeights + (modelInfo.numVertices * modelInfo.weightsPerVert));
+
+	assertm(((char*)linearBlendIndices + ((modelInfo.numVertices * modelInfo.weightsPerVert) * boneIndiceWidth)) - (char*)linearPositions < managedBufferSize, "exceeded managed buffer size");
+
+	size_t curIndex = 0; // current index into vertex data
+	size_t indiceIndex = 0;
+
+	// do meshes
+	for (int modelIdx = 0; modelIdx < numModels; modelIdx++)
+	{
+		const ModelModelData_t* const pModel = models + modelIdx;
+
+		for (int meshIdx = 0; meshIdx < pModel->meshCount; meshIdx++)
+		{
+			const ModelMeshData_t* const pMesh = pModel->meshes + meshIdx;
+
+			assertm(pMesh->meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
+
+			std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(pMesh->meshVertexDataIndex);
+			const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
+
+			const uint16_t* const indices = parsedVertexData->GetIndices();
+			const Vertex_t* const vertices = parsedVertexData->GetVertices();
+			const VertexWeight_t* const weights = parsedVertexData->GetWeights();
+			const Vector2D* const texcoords = parsedVertexData->GetTexcoords();
+
+			// [rika]: get the material for the skin in that index
+			assertm(materials->contains(pMesh->materialId), "material should be parsed as it is used");
+			const ModelMaterialExport_t* const materialExportInfo = &materials->find(pMesh->materialId)->second;
+			const uint64_t materialGUID = parsedData->pMaterial(materialExportInfo->id)->guid;
+
+			ParseMaterialIntoCast(parsedData, materialExportInfo, modelNode);
+
+			std::string matl = nullptr != pMesh->materialAsset ? GetStringAfterLastSlash(pMesh->GetMaterialAsset()->name) : std::to_string(materialGUID);
+			std::string meshName = std::format("{}_{}", pModel->name, matl);
+			cast::CastNode meshNode(cast::CastId::Mesh, 1, RTech::StringToGuid(meshName.c_str())); // name
+
+			// name, pos, normal, blendweight, blendindices, indices, uv count, max blends, material, texcoords, color
+			const size_t meshPropertiesCount = 9 + pMesh->texcoordCount + (pMesh->rawVertexLayoutFlags & VERT_COLOR ? 1 : 0);
+			meshNode.ReserveProperties(meshPropertiesCount);
+
+			// works on files but not here, why?
+			// update: now it works after changing how the string is formed, lovely.
+			meshNode.SetString(meshName);
+			meshNode.SetProperty(0, cast::CastPropertyId::String, static_cast<int>(cast::CastPropsMesh::Name), meshNode.GetString(), 1u);
+
+			meshNode.AddProperty(cast::CastPropertyId::Vector3, static_cast<int>(cast::CastPropsMesh::Vertex_Postion_Buffer),linearPositions + curIndex, pMesh->vertCount);
+			meshNode.AddProperty(cast::CastPropertyId::Vector3, static_cast<int>(cast::CastPropsMesh::Vertex_Normal_Buffer), linearNormals + curIndex, pMesh->vertCount);
+
+			if (pMesh->rawVertexLayoutFlags & VERT_COLOR)
+				meshNode.AddProperty(cast::CastPropertyId::Integer32, static_cast<int>(cast::CastPropsMesh::Vertex_Color_Buffer), linearColors + curIndex, pMesh->vertCount);
+
+			// cast cries if we use the proper index
+			for (int16_t texcoordIdx = 0; texcoordIdx < pMesh->texcoordCount; texcoordIdx++)
+				meshNode.AddProperty(cast::CastPropertyId::Vector2, static_cast<int>(cast::CastPropsMesh::Vertex_UV_Buffer), linearTexcoords + ((modelInfo.numVertices * texcoordIdx) + curIndex), pMesh->vertCount, true, texcoordIdx);
+
+			meshNode.AddProperty(boneIndiceWidth == sizeof(uint16_t) ? cast::CastPropertyId::Short : cast::CastPropertyId::Byte, static_cast<int>(cast::CastPropsMesh::Vertex_Weight_Bone_Buffer), reinterpret_cast<char*>(linearBlendIndices) + ((modelInfo.weightsPerVert * curIndex) * boneIndiceWidth), (pMesh->vertCount * pMesh->weightsPerVert));
+			meshNode.AddProperty(cast::CastPropertyId::Float, static_cast<int>(cast::CastPropsMesh::Vertex_Weight_Value_Buffer), linearBlendWeights + (modelInfo.weightsPerVert * curIndex), (pMesh->vertCount * pMesh->weightsPerVert));
+
+			// parse our vertices into the buffer, so cringe!
+			for (uint32_t vertIdx = 0; vertIdx < pMesh->vertCount; vertIdx++)
+			{
+				const Vertex_t& vert = vertices[vertIdx];
+
+				Vector tangent;
+
+				linearPositions[curIndex + vertIdx] = vert.position;
+				vert.normalPacked.UnpackNormal(linearNormals[curIndex + vertIdx], tangent);
+				linearColors[curIndex + vertIdx] = vert.color;
+
+				for (uint16_t texcoordIdx = 0; texcoordIdx < pMesh->texcoordCount; texcoordIdx++)
+				{
+					const Vector2D* const texcoord = vert.GetTexcoordForVertex(texcoordIdx, pMesh->texcoordCount, texcoords, vertIdx);
+					linearTexcoords[(modelInfo.numVertices * texcoordIdx) + curIndex + vertIdx] = *texcoord;
+				}
+
+				const size_t baseWeightIndex = ((modelInfo.weightsPerVert * curIndex) + (pMesh->weightsPerVert * vertIdx)) * boneIndiceWidth;
+				switch (boneIndiceWidth)
+				{
+				case sizeof(uint8_t):
+				{
+					for (uint32_t weightIdx = 0; weightIdx < pMesh->weightsPerVert; weightIdx++)
+					{
+						if (weightIdx < vert.weightCount)
+						{
+							reinterpret_cast<uint8_t*>(linearBlendIndices)[baseWeightIndex + weightIdx] = static_cast<uint8_t>(weights[vert.weightIndex + weightIdx].bone);
+							linearBlendWeights[baseWeightIndex + weightIdx] = weights[vert.weightIndex + weightIdx].weight;
+						}
+						else
+						{
+							reinterpret_cast<uint8_t*>(linearBlendIndices)[baseWeightIndex + weightIdx] = 0u;
+							linearBlendWeights[baseWeightIndex + weightIdx] = 0.0f;
+						}
+					}
+
+					break;
+				}
+				case sizeof(uint16_t):
+				{
+					for (uint32_t weightIdx = 0; weightIdx < pMesh->weightsPerVert; weightIdx++)
+					{
+						if (weightIdx < vert.weightCount)
+						{
+							reinterpret_cast<uint16_t*>(linearBlendIndices)[baseWeightIndex + weightIdx] = weights[vert.weightIndex + weightIdx].bone;
+							linearBlendWeights[baseWeightIndex + weightIdx] = weights[vert.weightIndex + weightIdx].weight;
+						}
+						else
+						{
+							reinterpret_cast<uint16_t*>(linearBlendIndices)[baseWeightIndex + weightIdx] = 0u;
+							linearBlendWeights[baseWeightIndex + weightIdx] = 0.0f;
+						}
+					}
+
+					break;
+				}
+				default:
+				{
+					assertm(false, "bad indice width");
+					break;
+				}
+				}
+			}
+
+			// parse our indices into the buffer, and flip the winding
+			const uint32_t indexCount = pMesh->indexCount;
+			meshNode.AddProperty(cast::CastPropertyId::Short, static_cast<int>(cast::CastPropsMesh::Face_Buffer), linearIndices + indiceIndex, indexCount);
+
+			for (uint32_t idxIdx = 0; idxIdx < indexCount; idxIdx += 3)
+			{
+				const size_t baseIndex = indiceIndex + idxIdx;
+
+				linearIndices[baseIndex] = indices[idxIdx + 2];
+				linearIndices[baseIndex + 1] = indices[idxIdx + 1];
+				linearIndices[baseIndex + 2] = indices[idxIdx];
+			}
+
+			meshNode.AddProperty(cast::CastPropertyId::Short, static_cast<int>(cast::CastPropsMesh::UV_Layer_Count), pMesh->texcoordCount);
+			meshNode.AddProperty(cast::CastPropertyId::Short, static_cast<int>(cast::CastPropsMesh::Max_Weight_Influence), pMesh->weightsPerVert);
+
+			meshNode.AddProperty(cast::CastPropertyId::Integer64, static_cast<int>(cast::CastPropsMesh::Material), materialGUID);
+
+			modelNode->AddChild(meshNode);
+
+			curIndex += pMesh->vertCount;
+			indiceIndex += indexCount;
+		}
+	}
+
+	CManagedBuffer* const exportBuffer = g_BufferManager.ClaimBuffer();
+
+	cast->ToFile(exportBuffer->Buffer());
+	cast->Reset(0ull);
+
+	g_BufferManager.RelieveBuffer(vertexBuffer);
+	g_BufferManager.RelieveBuffer(exportBuffer);
+
+	return true;
+}
+
+// smd
 // parse a Vertex_t into a smd vertex
 inline void ParseVertexIntoSMD(const Vertex_t* const srcVert, const VertexWeight_t* const srcWeights, smd::Vertex* const vert, const bool isStaticProp, const uint32_t texcoordWidth = 1u, const Vector2D* const extraTexcoords = nullptr, const uint32_t vertexIndex = 0u)
 {
@@ -3014,203 +3095,234 @@ inline void ParseVertexIntoSMD(const Vertex_t* const srcVert, const VertexWeight
 	}
 }
 
-// export parsed data into smd files
-bool ExportModelSMD(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath)
+bool ExportModelSMD(const ModelParsedData_t* const parsedData, const ModelMaterialExportMap_t* const materials, const ModelModelData_t* const models, const int numModels, void* const file, const char* const fileName)
 {
-	std::string fileNameBase = exportPath.stem().string();
-	const std::filesystem::path filePath(exportPath.parent_path());
-
-	smd::CStudioModelData* const smd = new smd::CStudioModelData(filePath, parsedData->BoneCount(), 1ull);
-
-	// [rika]: initialize the nodes, and in this case the frames since we should only have one
-	for (int i = 0; i < parsedData->BoneCount(); i++)
-	{
-		const ModelBone_t* const bone = parsedData->pBone(i);
-		const int ibone = static_cast<int>(i);
-
-		smd->InitNode(bone->name, ibone, bone->parent);
-		smd->InitFrameBone(0, ibone, bone->pos, bone->rot);
-	}
-
-	// [rika]: model is skin and bones, no meat
-	if (parsedData->LODCount() == 0)
-	{
-		smd->SetName(fileNameBase);
-		smd->Write();
-
-		return true;
-	}
-
-	const std::filesystem::path texturePath(std::format("{}/{}", filePath.string(), fileNameBase)); // todo, remove duplicate code
-	std::unordered_map<int, ModelMaterialExport_t> materials;
-	HandleModelMaterials(parsedData, materials, texturePath);
+	smd::CStudioModelData* const smd = reinterpret_cast<smd::CStudioModelData* const>(file);
+	smd->SetName(fileName);
 
 	const bool isStaticProp = parsedData->IsStaticProp();
 
-	CManagedBuffer* const buf = g_BufferManager.ClaimBuffer();
-
-	for (size_t lodIdx = 0; lodIdx < parsedData->LODCount(); lodIdx++)
+	for (int modelIdx = 0; modelIdx < numModels; modelIdx++)
 	{
-		const ModelLODData_t* const lod = parsedData->pLOD(lodIdx);
+		const ModelModelData_t* const model = models + modelIdx;
 
-		for (uint32_t modelIdx = 0; modelIdx < lod->GetModelCount(); modelIdx++)
+		for (uint32_t meshIdx = 0; meshIdx < model->meshCount; meshIdx++)
 		{
-			const ModelModelData_t* const model = lod->pModel(modelIdx);
+			const ModelMeshData_t* const pMesh = model->meshes + meshIdx;
 
-			std::string name(model->name);
-			FixupExportLodNames(name, static_cast<int>(lodIdx));
+			assertm(pMesh->meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
 
-			// unique prefix so we don't overwrite files
-			name = std::format("{}_{}", fileNameBase, name);
-			smd->SetName(name);
+			std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(pMesh->meshVertexDataIndex);
+			const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
 
-			for (uint32_t meshIdx = 0; meshIdx < model->meshCount; meshIdx++)
+			const uint16_t* const indices = parsedVertexData->GetIndices();
+			const Vertex_t* const vertices = parsedVertexData->GetVertices();
+			const VertexWeight_t* const weights = parsedVertexData->GetWeights();
+			const Vector2D* const texcoords = parsedVertexData->GetTexcoords();
+
+			// [rika]: add more triangles
+			smd->AddMeshCapacity(pMesh->vertCount, pMesh->indexCount / 3u);
+
+			// [rika]: get the material for the skin in that index
+			assertm(materials->contains(pMesh->materialId), "material should be parsed as it is used");
+			const ModelMaterialExport_t* const materialExportInfo = &materials->find(pMesh->materialId)->second;
+
+			const ModelMaterialData_t* const materialData = parsedData->pMaterial(materialExportInfo->id);
+
+			// [rika]: making the choice to use the stored rmdl name here when possible, as that is what it was likely compiled with
+			const char* material = materialData->GetName(true);
+			assertm(material, "material name should always be valid");
+
+			material = g_rsxSettings.exportModelMatsTruncated ? material : GetStringAfterLastSlash(material);
+
+			for (uint32_t vertexIdx = 0; vertexIdx < pMesh->vertCount; vertexIdx++)
 			{
-				const ModelMeshData_t* const meshData = model->meshes + meshIdx;
+				smd::Vertex vertex;
+				ParseVertexIntoSMD(&vertices[vertexIdx], weights, &vertex, isStaticProp, pMesh->texcoordCount, texcoords, vertexIdx);
 
-				assertm(meshData->meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
-
-				std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(meshData->meshVertexDataIndex);
-				const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
-
-				const uint16_t* const indices = parsedVertexData->GetIndices();
-				const Vertex_t* const vertices = parsedVertexData->GetVertices();
-				const VertexWeight_t* const weights = parsedVertexData->GetWeights();
-				const Vector2D* const texcoords = parsedVertexData->GetTexcoords();
-
-				// [rika]: add more triangles
-				smd->AddMeshCapacity(meshData->vertCount, meshData->indexCount / 3u);
-
-				const ModelMaterialData_t* const materialData = parsedData->pMaterial(meshData->materialId);
-
-				// [rika]: making the choice to use the stored rmdl name here when possible, as that is what it was likely compiled with
-				const char* material = materialData->GetName(true);
-				assertm(material, "material name should always be valid");
-
-				material = g_rsxSettings.exportModelMatsTruncated ? material : GetStringAfterLastSlash(material);
-
-				for (uint32_t vertexIdx = 0; vertexIdx < meshData->vertCount; vertexIdx++)
-				{
-					smd::Vertex vertex;
-					ParseVertexIntoSMD(&vertices[vertexIdx], weights, &vertex, isStaticProp, meshData->texcoordCount, texcoords, vertexIdx);
-
-					smd->InitVertex(&vertex);
-				}
-
-				for (uint32_t indiceIdx = 0; indiceIdx < meshData->indexCount; indiceIdx += 3)
-				{
-					const uint16_t indice0 = indices[indiceIdx];
-					const uint16_t indice1 = indices[indiceIdx + 1];
-					const uint16_t indice2 = indices[indiceIdx + 2];
-
-					// order of indices is odd
-					smd->InitLocalTriangle(material, indice0, indice2, indice1);
-				}
+				smd->InitVertex(&vertex);
 			}
 
-			smd->Write(buf->Buffer(), managedBufferSize);
-			smd->ResetMeshData();
+			for (uint32_t indiceIdx = 0; indiceIdx < pMesh->indexCount; indiceIdx += 3)
+			{
+				const uint16_t indice0 = indices[indiceIdx];
+				const uint16_t indice1 = indices[indiceIdx + 1];
+				const uint16_t indice2 = indices[indiceIdx + 2];
+
+				// order of indices is odd
+				smd->InitLocalTriangle(material, indice0, indice2, indice1);
+			}
 		}
 	}
 
-	FreeAllocVar(smd);
+	CManagedBuffer* const buf = g_BufferManager.ClaimBuffer();
+
+	smd->Write(buf->Buffer(), managedBufferSize);
+	smd->ResetMeshData();
+
 	g_BufferManager.RelieveBuffer(buf);
 
 	return true;
 }
 
-//bool ExportModelSMD(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const ModelModelData_t* const models, const int numModels)
-//{
-//	std::string fileNameBase = exportPath.stem().string();
-//	const std::filesystem::path filePath(exportPath.parent_path());
-//
-//	smd::CStudioModelData* const smd = new smd::CStudioModelData(filePath, parsedData->BoneCount(), 1ull);
-//
-//	// [rika]: initialize the nodes, and in this case the frames since we should only have one
-//	for (size_t i = 0; i < parsedData->BoneCount(); i++)
-//	{
-//		const ModelBone_t* const bone = parsedData->pBone(i);
-//		const int ibone = static_cast<int>(i);
-//
-//		smd->InitNode(bone->pszName(), ibone, bone->parent);
-//		smd->InitFrameBone(0, ibone, bone->pos, bone->rot);
-//	}
-//
-//	const std::filesystem::path texturePath(std::format("{}/{}", filePath.string(), fileNameBase)); // todo, remove duplicate code
-//	std::unordered_map<int, ModelMaterialExport_t> materials;
-//	HandleModelMaterials(parsedData, materials, texturePath);
-//
-//	const bool isStaticProp = parsedData->IsStaticProp();
-//
-//	CManagedBuffer* const buf = g_BufferManager.ClaimBuffer();
-//
-//	for (size_t lodIdx = 0; lodIdx < parsedData->lods.size(); lodIdx++)
-//	{
-//		const ModelLODData_t& lod = parsedData->lods.at(lodIdx);
-//
-//		for (const ModelModelData_t& model : lod.models)
-//		{
-//			std::string name(model.name);
-//			FixupExportLodNames(name, static_cast<int>(lodIdx));
-//
-//			// unique prefix so we don't overwrite files
-//			name = std::format("{}_{}", fileNameBase, name);
-//			smd->SetName(name);
-//
-//			for (uint32_t meshIdx = 0; meshIdx < model.meshCount; meshIdx++)
-//			{
-//				const ModelMeshData_t& meshData = lod.meshes.at(model.meshIndex + meshIdx);
-//
-//				assertm(meshData.meshVertexDataIndex != invalidNoodleIdx, "mesh data hasn't been parsed ??");
-//
-//				std::unique_ptr<char[]> parsedVertexDataBuf = parsedData->meshVertexData.getIdx(meshData.meshVertexDataIndex);
-//				const CMeshData* const parsedVertexData = reinterpret_cast<CMeshData*>(parsedVertexDataBuf.get());
-//
-//				const uint16_t* const indices = parsedVertexData->GetIndices();
-//				const Vertex_t* const vertices = parsedVertexData->GetVertices();
-//				const VertexWeight_t* const weights = parsedVertexData->GetWeights();
-//				const Vector2D* const texcoords = parsedVertexData->GetTexcoords();
-//
-//				// [rika]: add more triangles
-//				smd->AddMeshCapacity(meshData.vertCount, meshData.indexCount / 3u);
-//
-//				const ModelMaterialData_t* const materialData = parsedData->pMaterial(meshData.materialId);
-//
-//				// [rika]: making the choice to use the stored rmdl name here when possible, as that is what it was likely compiled with
-//				const char* material = materialData->GetName(true);
-//				assertm(material, "material name should always be valid");
-//
-//				material = g_rsxSettings.exportModelMatsTruncated ? material : GetStringAfterLastSlash(material);
-//
-//				for (uint32_t vertexIdx = 0; vertexIdx < meshData.vertCount; vertexIdx++)
-//				{
-//					smd::Vertex vertex;
-//					ParseVertexIntoSMD(&vertices[vertexIdx], weights, &vertex, isStaticProp, meshData.texcoordCount, texcoords, vertexIdx);
-//
-//					smd->InitVertex(&vertex);
-//				}
-//
-//				for (uint32_t indiceIdx = 0; indiceIdx < meshData.indexCount; indiceIdx += 3)
-//				{
-//					const uint16_t indice0 = indices[indiceIdx];
-//					const uint16_t indice1 = indices[indiceIdx + 1];
-//					const uint16_t indice2 = indices[indiceIdx + 2];
-//
-//					// order of indices is odd
-//					smd->InitLocalTriangle(material, indice0, indice2, indice1);
-//				}
-//			}
-//
-//			smd->Write(buf->Buffer(), managedBufferSize);
-//			smd->ResetMeshData();
-//		}
-//	}
-//
-//	FreeAllocVar(smd);
-//	g_BufferManager.RelieveBuffer(buf);
-//
-//	return true;
-//}
+typedef void (*ModelUpdatePathFunc_t)(void* const, const std::filesystem::path&);
+
+void ExportModelUpdatePath_RMAX(void* const file, const std::filesystem::path& exportPath)
+{
+	rmax::RMAXExporter* const rmax = reinterpret_cast<rmax::RMAXExporter* const>(file);
+	rmax->SetPath(exportPath);
+
+	if (!CreateDirectories(exportPath))
+	{
+		assertm(false, "Failed to create directory.");
+	}
+}
+
+void ExportModelUpdatePath_CAST(void* const file, const std::filesystem::path& exportPath)
+{
+	cast::CastExporter* const cast = reinterpret_cast<cast::CastExporter* const>(file);
+	cast->SetPath(exportPath);
+
+	if (!CreateDirectories(exportPath))
+	{
+		assertm(false, "Failed to create directory.");
+	}
+}
+
+void ExportModelUpdatePath_SMD(void* const file, const std::filesystem::path& exportPath)
+{
+	smd::CStudioModelData* const smd = reinterpret_cast<smd::CStudioModelData* const>(file);
+	smd->SetPath(exportPath);
+
+	if (!CreateDirectories(exportPath))
+	{
+		assertm(false, "Failed to create directory.");
+	}
+}
+
+typedef void* (*ModelSetupFunc_t)(const ModelParsedData_t* const, const char* const, const char* const);
+//typedef void (*ModelCleanupFunc_t)(void* const);
+typedef bool (*ModelExportFunc_t)(const ModelParsedData_t* const, const ModelMaterialExportMap_t* const, const ModelModelData_t* const, const int, void* const, const char* const);
+
+// to cpp
+static ModelSetupFunc_t s_Model3DSetupFuncs[eModelExportSetting::MODEL_FMT_3D_COUNT] =
+{
+	&ExportModelSetupCAST,
+	&ExportModelSetupRMAX,
+	&ExportModelSetupSMD,
+};
+
+ModelUpdatePathFunc_t s_Model3DUpdatePathFuncs[eModelExportSetting::MODEL_FMT_3D_COUNT] =
+{
+	&ExportModelUpdatePath_CAST,
+	&ExportModelUpdatePath_RMAX,
+	&ExportModelUpdatePath_SMD,
+};
+
+static ModelExportFunc_t s_Model3DExportFuncs[eModelExportSetting::MODEL_FMT_3D_COUNT] =
+{
+	&ExportModelCAST,
+	&ExportModelRMAX,
+	&ExportModelSMD
+};
+
+bool ExportModelMeshes(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const int setting, const int version)
+{
+	const bool exportQC = true;
+	const bool lodAsModel = false;
+
+	assertm(setting < eModelExportSetting::MODEL_FMT_3D_COUNT, "unimplemented 3d format");
+
+	if (exportQC)
+	{
+		ExportModelQC(parsedData, exportPath, setting, version);
+	}
+
+	const std::string fileStem = exportPath.stem().string();
+	const std::string filePath = exportPath.parent_path().string();
+
+	void* const file = s_Model3DSetupFuncs[setting](parsedData, filePath.c_str(), fileStem.c_str());
+
+	if (parsedData->LODCount())
+	{
+		// [rika]: parse materials taking the skin into account
+		ModelMaterialExportMap_t materials;
+		{
+			std::filesystem::path texturePath(filePath);
+			texturePath.append(fileStem);
+			HandleModelMaterials(parsedData, materials, texturePath);
+		}
+
+		if (lodAsModel)
+		{
+			for (int i = 0; i < parsedData->LODCount(); i++)
+			{
+				const ModelLODData_t* const pLOD = parsedData->pLOD(i);
+
+				char nameBuffer[MAX_PATH];
+				snprintf(nameBuffer, MAX_PATH, "%s_LOD%i\0", fileStem.c_str(), i);
+
+				if (s_Model3DExportFuncs[setting](parsedData, &materials, pLOD->models, pLOD->numModels, file, nameBuffer) == false)
+				{
+					assertm(false, "model export failed");
+					return false;
+				}
+			}
+		}
+		else
+		{
+			// [rika]: we are changing the base path, could cause issue if used after
+			exportPath.remove_filename();
+			exportPath.append(fileStem);
+			s_Model3DUpdatePathFuncs[setting](file, exportPath);
+
+			for (int i = 0; i < parsedData->LODCount(); i++)
+			{
+				const ModelLODData_t* const pLOD = parsedData->pLOD(i);
+
+				for (uint32_t model = 0; model < pLOD->GetModelCount(); model++)
+				{
+					const ModelModelData_t* const pModel = pLOD->pModel(model);
+
+					if (s_Model3DExportFuncs[setting](parsedData, &materials, pModel, 1, file, pModel->name) == false)
+					{
+						assertm(false, "model export failed");
+						return false;
+					}
+				}
+			}
+		}
+	}
+
+	switch (setting)
+	{
+	case eModelExportSetting::MODEL_CAST:
+	{
+		cast::CastExporter* const cast = reinterpret_cast<cast::CastExporter* const>(file);
+		FreeAllocVar(cast);
+
+		break;
+	}
+	case eModelExportSetting::MODEL_RMAX:
+	{
+		rmax::RMAXExporter* const rmax = reinterpret_cast<rmax::RMAXExporter* const>(file);
+		FreeAllocVar(rmax);
+
+		break;
+	}
+	case eModelExportSetting::MODEL_SMD:
+	{
+		smd::CStudioModelData* const smd = reinterpret_cast<smd::CStudioModelData* const>(file);
+		FreeAllocVar(smd);
+
+		break;
+	}
+	default:
+		break;
+	}
+
+	return true;
+}
 
 // export a seqdesc to rmax
 bool ExportSeqDescRMAX(const ModelSeq_t* const seqdesc, std::filesystem::path& exportPath, const char* const skelName, const ModelParsedData_t* const rig)
@@ -3306,9 +3418,9 @@ bool ExportSeqDescCast(const ModelSeq_t* const seqdesc, std::filesystem::path& e
 		const ModelAnim_t* const animdesc = seqdesc->anims + animIdx;
 
 		const std::string tmpName(std::format("{}_{}.cast", fileNameBase, std::to_string(animIdx)));
-		exportPath.replace_filename(tmpName);
+		//exportPath.replace_filename(tmpName);
 
-		cast::CastExporter cast(exportPath.string());
+		cast::CastExporter cast(exportPath, tmpName.c_str(), guid);
 
 		// cast
 		cast::CastNode* const rootNode = cast.GetChild(0); // we only have one root node, no hash

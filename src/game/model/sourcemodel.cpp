@@ -367,22 +367,16 @@ bool ExportSourceModelAsset(CAsset* const asset, const int setting)
 
     exportPath.append(std::format("{}.mdl", modelStem));    
 
-    //const ModelParsedData_t* const parsedData = srcMdlAsset->GetParsedData();
+    const ModelParsedData_t* const parsedData = srcMdlAsset->GetParsedData();
+
     switch (settingFixup)
     {
-    /*case eModelExportSetting::MODEL_CAST:
-    {
-        return ExportModelCast(parsedData, exportPath, asset->GetAssetGUID());
-    }
+    case eModelExportSetting::MODEL_CAST:
     case eModelExportSetting::MODEL_RMAX:
-    {
-        return ExportModelRMAX(parsedData, exportPath);
-    }
     case eModelExportSetting::MODEL_SMD:
     {
-        return ExportModelSMD(parsedData, exportPath) && ExportModelQC(parsedData, exportPath, settingFixup, srcMdlAsset->GetAssetVersion().majorVer);
-    }*/
-    case 0:
+        return ExportModelMeshes(parsedData, exportPath, settingFixup, 54);
+    }
     default:
     {
         assertm(false, "Export setting is not handled.");

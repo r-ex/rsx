@@ -593,38 +593,48 @@ namespace cast
 	// CAST HEADER/EXPORTER
 	CastNode* CastExporter::GetChild(const uint64_t hash)
 	{
-		return CastNode::GetChild(hash, rootNodes);
+		return CastNode::GetChild(hash, nodes);
 	}
 
 	// export this cast to file
-	void CastExporter::ToFile() const
+	void CastExporter::ToFile(char* const buffer) const
 	{
-		char* fileBuf = new char[castFileSize] {}; // it would be possible to get the file size before writing, but the cost probably does not outweight just allocating a big buffer
-		char* curpos = fileBuf;
+		char* curpos = buffer;
 
 		CastHeader* castHeader = reinterpret_cast<CastHeader*>(curpos);
 
 		castHeader->Magic = castFileId;
 		castHeader->Version = castFileVersion;
-		castHeader->RootNodes = static_cast<uint32_t>(rootNodes.size());
+		castHeader->RootNodes = static_cast<uint32_t>(nodes.size());
 		castHeader->Flags = 0; // what?
 
 		curpos += sizeof(CastHeader);
 
-		for (auto& root : rootNodes)
+		for (auto& root : nodes)
 		{
 			curpos = root.Write(curpos);
 		}
 
-		if (!CreateDirectories(path.parent_path()))
+		if (!CreateDirectories(filePath))
 		{
 			assertm(false, "failed to create directory");
 			return;
 		}
 
-		StreamIO out(path.string(), eStreamIOMode::Write);
-		out.write(fileBuf, curpos - fileBuf);
+		std::filesystem::path outPath(filePath);
+		outPath.append(fileName);
+		outPath.replace_extension(".cast");
 
-		delete[] fileBuf;
+		StreamIO out(outPath, eStreamIOMode::Write);
+		out.write(buffer, curpos - buffer);
+	}
+
+	void CastExporter::ToFile() const
+	{
+		char* const fileBuf = new char[castFileSize] {}; // it would be possible to get the file size before writing, but the cost probably does not outweight just allocating a big buffer
+
+		ToFile(fileBuf);
+
+		FreeAllocArray(fileBuf);
 	}
 }

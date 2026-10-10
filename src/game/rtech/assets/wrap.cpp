@@ -6,6 +6,15 @@
 #include <thirdparty/imgui/imgui.h>
 #include <thirdparty/imgui/misc/imgui_memory_editor.h>
 
+WrapAsset::~WrapAsset()
+{
+    if (type == VPKFileType_e::BSP && parsedData)
+    {
+        delete reinterpret_cast<CBSPData*>(parsedData);
+        parsedData = nullptr;
+    }
+}
+
 void LoadWrapAsset(CAssetContainer* const pak, CAsset* const asset)
 {
     UNUSED(pak);

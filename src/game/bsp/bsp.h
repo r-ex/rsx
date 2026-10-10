@@ -107,6 +107,8 @@ public:
 		envEntitiesKV(), scriptEntitiesKV()
 	{};
 
+	~CBSPData();
+
 	void PopulateFromPakAsset(CPakAsset* pakAsset, void* bspData);
 
 	CDXDrawData* ConstructPreviewData();

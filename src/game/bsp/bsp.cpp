@@ -9,6 +9,16 @@
 #include "entities.h"
 #include <imgui.h>
 
+CBSPData::~CBSPData()
+{
+	FreeAllocVar(m_drawData);
+
+	DX_RELEASE_PTR(m_vertPositionsSRV);
+	DX_RELEASE_PTR(m_vertNormalsSRV);
+	DX_RELEASE_PTR(m_vertPositionsBuffer);
+	DX_RELEASE_PTR(m_vertNormalsBuffer);
+}
+
 extern CDXParentHandler* g_dxHandler;
 extern std::unique_ptr<char[]> GetWrapAssetData(CAsset* const asset, uint64_t* outSize);
 

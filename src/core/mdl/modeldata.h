@@ -323,7 +323,7 @@ struct ModelModelData_t
 	{
 		constexpr size_t bufSize = 80ull;
 
-		char* nameBuf = new char[bufSize];
+		char nameBuf[bufSize];
 		snprintf(nameBuf, bufSize, "%s_%i_LOD%i\0", part, localIndex, lodLevel);
 
 		const size_t length = strnlen(nameBuf, bufSize) + 1ull;

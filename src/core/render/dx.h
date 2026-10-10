@@ -69,7 +69,7 @@ struct DXDrawDataTexture_t
 #define DMDD_FOGVOL  (1 << 2) // fog_volume
 #define DMDD_EXPVOL  (1 << 3) // exposure_volume
 
-static const std::unordered_map<const char*, int> s_dxMeshTypeFlags = {
+static const std::map<const char*, int> s_dxMeshTypeFlags = {
     {"Triggers", DMDD_TRIGGER},
     {"Water", DMDD_WATER},
     {"Fog Volumes", DMDD_FOGVOL},

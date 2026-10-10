@@ -3228,8 +3228,8 @@ static ModelExportFunc_t s_Model3DExportFuncs[eModelExportSetting::MODEL_FMT_3D_
 
 bool ExportModelMeshes(const ModelParsedData_t* const parsedData, std::filesystem::path& exportPath, const int setting, const int version)
 {
-	const bool exportQC = true;
-	const bool lodAsModel = false;
+	const bool exportQC = setting == eModelExportSetting::MODEL_SMD ? true : false;
+	const bool lodAsModel = setting == eModelExportSetting::MODEL_SMD ? false : true;
 
 	assertm(setting < eModelExportSetting::MODEL_FMT_3D_COUNT, "unimplemented 3d format");
 

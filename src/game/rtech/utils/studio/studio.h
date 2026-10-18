@@ -1148,12 +1148,17 @@ public:
 
 	enum LooseDataType : int8_t
 	{
+		SLD_VTX_DX11,
+		SLD_VTX_DX9,
+		SLD_VTX_DX8,
+		SLD_VTX_SW,	// software
 		SLD_VTX,
 		SLD_VVD,
 		SLD_VVC,
 		SLD_VVW,
 
-		SLD_COUNT
+		SLD_COUNT,
+		SLD_VTX_COUNT = SLD_VVC,
 	};
 
 	inline const char* const VertBuf() const { return vertexDataBuffer; }
@@ -1164,7 +1169,7 @@ public:
 	inline const int PhysOffset() const { return physicsDataOffset; }
 	inline const int PhysSize() const { return physicsDataSize; }
 
-	inline const OptimizedModel::FileHeader_t* const GetVTX() const { return vertexDataSize[SLD_VTX] ? reinterpret_cast<const OptimizedModel::FileHeader_t* const>(vertexDataBuffer + vertexDataOffset[SLD_VTX]) : nullptr; }
+	inline const OptimizedModel::FileHeader_t* const GetVTX() const { return vertexDataSize[primaryVTX] ? reinterpret_cast<const OptimizedModel::FileHeader_t* const>(vertexDataBuffer + vertexDataOffset[primaryVTX]) : nullptr; }
 	inline const vvd::vertexFileHeader_t* const GetVVD() const { return vertexDataSize[SLD_VVD] ? reinterpret_cast<const vvd::vertexFileHeader_t* const>(vertexDataBuffer + vertexDataOffset[SLD_VVD]) : nullptr; }
 	inline const vvc::vertexColorFileHeader_t* const GetVVC() const { return vertexDataSize[SLD_VVC] ? reinterpret_cast<const vvc::vertexColorFileHeader_t* const>(vertexDataBuffer + vertexDataOffset[SLD_VVC]) : nullptr; }
 	inline const vvw::vertexBoneWeightsExtraFileHeader_t* const GetVVW() const { return vertexDataSize[SLD_VVW] ? reinterpret_cast<const vvw::vertexBoneWeightsExtraFileHeader_t* const>(vertexDataBuffer + vertexDataOffset[SLD_VVW]) : nullptr; }
@@ -1192,10 +1197,16 @@ private:
 	bool vertexBufAllocated;
 	bool physicsBufAllocated;
 	bool animBufAllocated;
+
+	LooseDataType primaryVTX;
 };
 
 static const char* s_StudioLooseDataExtensions[StudioLooseData_t::LooseDataType::SLD_COUNT] = {
 	".dx11.vtx",
+	".dx90.vtx",
+	".dx80.vtx",
+	".sw.vtx",
+	".vtx",
 	".vvd",
 	".vvc",
 	".vvw",

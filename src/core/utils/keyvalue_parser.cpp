@@ -256,40 +256,50 @@ namespace kv_parser
 			// seek to the next value
 			if (i > 0)
 			{
-				while (tokie[0])
+				// seek through the current token
+				while (tokie[0] != '\0')
 				{
 					tokie++;
 				}
 
+				// skip over the null terminator for the previous token
 				tokie++;
 			}
 
 			// determine what type of token this is
-			const int iVal = strtol(tokie, nullptr, 10);
-			if (iVal == 0 && tokie[0] != '0')
+			errno = 0;
+			char* endOfString = nullptr;
+			size_t depth = 0ull;
+
+			const size_t length = strnlen_s(tokie, maxStringLength);
+
+			const int iVal = strtol(tokie, &endOfString, 10);
+			depth = endOfString - tokie;
+			if (length && errno != ERANGE && depth == length)
 			{
-				const size_t length = strnlen_s(tokie, maxStringLength);
-
-				token[i].data.data_string = new char[length + 1]{};
-				token[i].dataType = TOKEN_STRING;
-
-				strncpy_s(token[i].data.data_string, length + 1, tokie, length);
+				token[i].data.data_int = iVal;
+				token[i].dataType = TOKEN_INT;
 
 				continue;
 			}
 
 			// token can only be represented as floating point number
-			const char* const decimal = strchr(tokie, '.');
-			if (decimal)
+			const float flVal = strtof(tokie, &endOfString);
+			depth = endOfString - tokie;
+			if (length && errno != ERANGE && depth == length)
 			{
-				token[i].data.data_float = strtof(tokie, nullptr);
+				token[i].data.data_float = flVal;
 				token[i].dataType = TOKEN_FLOAT;
 
 				continue;
 			}
 
-			token[i].data.data_int = iVal;
-			token[i].dataType = TOKEN_INT;
+			const size_t bufSize = length + 1;
+			token[i].data.data_string = new char[bufSize];
+			token[i].dataType = TOKEN_STRING;
+
+			memset(token[i].data.data_string, 0, bufSize);
+			strncpy_s(token[i].data.data_string, bufSize, tokie, length);
 		}
 	}
 

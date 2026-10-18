@@ -5,7 +5,8 @@
 #include <game/rtech/utils/studio/studio_r5.h>
 
 StudioLooseData_t::StudioLooseData_t(const std::filesystem::path& path, const char* name, char* buffer, const size_t bufferSize, const bool hasIDCV, const char* const aniname) : vertexDataBuffer(nullptr), vertexDataOffset(), vertexDataSize(),
-physicsDataBuffer(nullptr), physicsDataOffset(0), physicsDataSize(0), animDataBuffer(nullptr), animDataOffset(0), animDataSize(0), vertexBufAllocated(false), physicsBufAllocated(false), animBufAllocated(false)
+    physicsDataBuffer(nullptr), physicsDataOffset(0), physicsDataSize(0), animDataBuffer(nullptr), animDataOffset(0), animDataSize(0),
+    vertexBufAllocated(false), physicsBufAllocated(false), animBufAllocated(false), primaryVTX(StudioLooseData_t::LooseDataType::SLD_COUNT)
 {
     std::filesystem::path filePath(path);
 
@@ -25,6 +26,9 @@ physicsDataBuffer(nullptr), physicsDataOffset(0), physicsDataSize(0), animDataBu
         // values should default to 0
         if (!std::filesystem::exists(filePath))
             continue;
+
+        if (primaryVTX == LooseDataType::SLD_COUNT && i < LooseDataType::SLD_VTX_COUNT)
+            primaryVTX = static_cast<LooseDataType>(i);
 
         const size_t fileSize = std::filesystem::file_size(filePath);
 
@@ -117,19 +121,20 @@ physicsDataBuffer(nullptr), physicsDataOffset(0), physicsDataSize(0), animDataBu
     }
 }
 
-StudioLooseData_t::StudioLooseData_t(const char* const file) : vertexDataBuffer(file), physicsDataBuffer(file), animDataBuffer(nullptr), animDataOffset(0), animDataSize(0), vertexBufAllocated(false), physicsBufAllocated(false), animBufAllocated(false)
+StudioLooseData_t::StudioLooseData_t(const char* const file) : vertexDataBuffer(file), physicsDataBuffer(file), animDataBuffer(nullptr), animDataOffset(0), animDataSize(0),
+    vertexBufAllocated(false), physicsBufAllocated(false), animBufAllocated(false), primaryVTX(SLD_VTX_DX11)
 {
     const r2::studiohdr_t* const pStudioHdr = reinterpret_cast<const r2::studiohdr_t* const>(file);
 
     assertm(pStudioHdr->id == IDSTUDIOHEADER, "invalid file");
     assertm(pStudioHdr->version == 53, "invalid file");
 
-    vertexDataOffset[SLD_VTX] = pStudioHdr->vtxOffset;
+    vertexDataOffset[SLD_VTX_DX11] = pStudioHdr->vtxOffset;
     vertexDataOffset[SLD_VVD] = pStudioHdr->vvdOffset;
     vertexDataOffset[SLD_VVC] = pStudioHdr->vvcOffset;
     vertexDataOffset[SLD_VVW] = 0;
 
-    vertexDataSize[SLD_VTX] = pStudioHdr->vtxSize;
+    vertexDataSize[SLD_VTX_DX11] = pStudioHdr->vtxSize;
     vertexDataSize[SLD_VVD] = pStudioHdr->vvdSize;
     vertexDataSize[SLD_VVC] = pStudioHdr->vvcSize;
     vertexDataSize[SLD_VVW] = 0;
@@ -138,19 +143,20 @@ StudioLooseData_t::StudioLooseData_t(const char* const file) : vertexDataBuffer(
     physicsDataSize = pStudioHdr->phySize;
 }
 
-StudioLooseData_t::StudioLooseData_t(const char* const file, const char* const vertex, const char* const physics) : vertexDataBuffer(vertex), physicsDataBuffer(physics), animDataBuffer(nullptr), animDataOffset(0), animDataSize(0), vertexBufAllocated(false), physicsBufAllocated(false), animBufAllocated(false)
+StudioLooseData_t::StudioLooseData_t(const char* const file, const char* const vertex, const char* const physics) : vertexDataBuffer(vertex), physicsDataBuffer(physics), animDataBuffer(nullptr), animDataOffset(0), animDataSize(0),
+    vertexBufAllocated(false), physicsBufAllocated(false), animBufAllocated(false), primaryVTX(SLD_VTX_DX11)
 {
     const r5::studiohdr_v8_t* const pStudioHdr = reinterpret_cast<const r5::studiohdr_v8_t* const>(file);
 
     assertm(pStudioHdr->id == IDSTUDIOHEADER, "invalid file");
     assertm(pStudioHdr->version == 54, "invalid file");
 
-    vertexDataOffset[SLD_VTX] = pStudioHdr->vtxOffset > -1 ? pStudioHdr->vtxOffset : 0;
+    vertexDataOffset[SLD_VTX_DX11] = pStudioHdr->vtxOffset > -1 ? pStudioHdr->vtxOffset : 0;
     vertexDataOffset[SLD_VVD] = pStudioHdr->vvdOffset;
     vertexDataOffset[SLD_VVC] = pStudioHdr->vvcOffset;
     vertexDataOffset[SLD_VVW] = pStudioHdr->vvwOffset;
 
-    vertexDataSize[SLD_VTX] = pStudioHdr->vtxSize;
+    vertexDataSize[SLD_VTX_DX11] = pStudioHdr->vtxSize;
     vertexDataSize[SLD_VVD] = pStudioHdr->vvdSize;
     vertexDataSize[SLD_VVC] = pStudioHdr->vvcSize;
     vertexDataSize[SLD_VVW] = pStudioHdr->vvwSize;
@@ -158,6 +164,7 @@ StudioLooseData_t::StudioLooseData_t(const char* const file, const char* const v
     physicsDataOffset = pStudioHdr->phyOffset > -1 ? pStudioHdr->phyOffset : 0;
     physicsDataSize = pStudioHdr->phySize;
 }
+
 
 // verify all the loose files for a studio model
 const bool StudioLooseData_t::VerifyFileIntegrity(const studiohdr_short_t* const pHdr) const
@@ -206,7 +213,7 @@ const bool StudioLooseData_t::VerifyFileIntegrity(const studiohdr_short_t* const
         return false;
     }
 
-    if (pANI && (pANI->id != IDSTUDIOANIMGROUPHEADER || pANI->version != pHdr->version || pANI->checksum != pHdr->checksum))
+    if (pANI && (pANI->id != IDSTUDIOANIMGROUPHEADER || pANI->version != pHdr->version || (pANI->checksum != pHdr->checksum && pANI->checksum)))
     {
         assertm(false, "invalid ani file");
         return false;

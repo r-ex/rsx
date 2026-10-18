@@ -1428,6 +1428,7 @@ namespace qc
 		return optionsIndex;
 	}
 
+	// todo: apex specific based off version, since it would be laid out different
 	CommandOption_t* CommandJiggleBone_ParseBinary(QCFile* const file, uint32_t* const numOptions, const void* const data, const uint32_t count, const bool store = false)
 	{
 		UNUSED(file);
@@ -2368,7 +2369,7 @@ namespace qc
 		{
 		case IK_SELF:
 		{
-			options[optionsIndex].Init(&s_CommandAnimation_Option_IKRule_Footstep);
+			options[optionsIndex].Init(&s_CommandAnimation_Option_IKRule_Touch);
 			options[optionsIndex].SetPtr(ikRule->bonename);
 			optionsIndex++;
 
@@ -2376,7 +2377,7 @@ namespace qc
 		}
 		case IK_GROUND:
 		{
-			options[optionsIndex].Init(&s_CommandAnimation_Option_IKRule_Touch);
+			options[optionsIndex].Init(&s_CommandAnimation_Option_IKRule_Footstep);
 			optionsIndex++;
 
 			break;
@@ -3671,15 +3672,18 @@ namespace qc
 		const Command_t* const commandFirst = *reinterpret_cast<const Command_t* const* const>(a);
 		const Command_t* const commandSecond = *reinterpret_cast<const Command_t* const* const>(b);
 
-		const float thresholdFirst = CompareCommandLOD_GetThreshold(commandFirst);
-		const float thresholdSecond = CompareCommandLOD_GetThreshold(commandSecond);
-
-		// todo: test!!!
-		// sort shadowlod last
-		if (thresholdFirst == -1.0f)
+		// $shadowlod does not get a threshold option
+		if (commandFirst->GetCmd() == QC_SHADOWLOD)
 		{
 			return 1;
 		}
+		else if (commandSecond->GetCmd() == QC_SHADOWLOD)
+		{
+			return -1;
+		}
+
+		const float thresholdFirst = CompareCommandLOD_GetThreshold(commandFirst);
+		const float thresholdSecond = CompareCommandLOD_GetThreshold(commandSecond);
 
 		if (thresholdFirst < thresholdSecond)
 		{

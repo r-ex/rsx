@@ -1597,6 +1597,9 @@ bool ExportSeqQC(const ModelParsedData_t* const parsedData, const ModelSeq_t* co
 		const ModelAnim_t* const anim = sequence->Anim(i);
 		animInfo[i] = ModelAnimInfo_t(anim, nullptr, anim->pszName());
 
+		// [rika]: probably a good idea to actually set this? how did this work before..
+		seqInfo.blends[i] = i;
+
 		QC_ParseStudioAnimation(&qcFile, parsedData, &animInfo[i], fileStem.c_str(), setting);
 	}
 

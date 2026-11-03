@@ -46,6 +46,7 @@ void LoadAnimSeqAsset(CAssetContainer* const container, CAsset* const asset)
 	case eSeqVersion::VERSION_12_1:
 	case eSeqVersion::VERSION_13:
 	case eSeqVersion::VERSION_14:
+	case eSeqVersion::VERSION_16:
 	{
 		AnimSeqAssetHeader_v8_t* hdr = reinterpret_cast<AnimSeqAssetHeader_v8_t*>(pakAsset->header());
 		seqAsset = new AnimSeqAsset(hdr, streamEntry, ver);
@@ -129,6 +130,7 @@ bool AnimSeq_ParseExtraData(CPakAsset* pakAsset)
 	}
 	case eSeqVersion::VERSION_13:
 	case eSeqVersion::VERSION_14:
+	case eSeqVersion::VERSION_16:
 	{
 		// [rika]: parse the animseq's raw data size in post load if we couldn't determine a bone count before.
 		if (seqAsset->dataSize == 0)

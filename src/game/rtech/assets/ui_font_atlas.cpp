@@ -263,8 +263,8 @@ void LoadUIFontAtlasAsset(CAssetContainer* const pak, CAsset* const asset)
 
     // handled as one buffer with an index in source
     // different proportions of characters
-    Vector2D imageBoundsScale[8];
-    Vector2D imageSizeBase[8];
+    Vector2D imageBoundsScale[FONT_MAX_PROPORTIONS];
+    Vector2D imageSizeBase[FONT_MAX_PROPORTIONS];
 
     for (uint16_t i = 0; i < fontAsset->fontCount; i++)
     {

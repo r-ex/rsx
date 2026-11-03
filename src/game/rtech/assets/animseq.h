@@ -71,6 +71,8 @@ enum class eSeqVersion : int
 	VERSION_12_1,
 	VERSION_13,
 	VERSION_14,
+	VERSION_15,
+	VERSION_16,
 };
 
 static const std::map<int, eSeqVersion> s_seqVersionMap
@@ -83,6 +85,8 @@ static const std::map<int, eSeqVersion> s_seqVersionMap
 	{ 12, eSeqVersion::VERSION_12 },
 	{ 13, eSeqVersion::VERSION_13 },
 	{ 14, eSeqVersion::VERSION_14 },
+	{ 15, eSeqVersion::VERSION_15 },
+	{ 16, eSeqVersion::VERSION_16 },
 };
 
 constexpr uint64_t s_AnimSeqTimeStamp_V12_1 = 0x01DC1DF805C28000; // 09/05/2025 00:00:00
@@ -178,6 +182,7 @@ public:
 		case eSeqVersion::VERSION_12_1:
 		case eSeqVersion::VERSION_13:
 		case eSeqVersion::VERSION_14:
+		case eSeqVersion::VERSION_16:
 		{
 			r5::mstudioseqdesc_v18_t* const tmp = reinterpret_cast<r5::mstudioseqdesc_v18_t* const>(data);
 

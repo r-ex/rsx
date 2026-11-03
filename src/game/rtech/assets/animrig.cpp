@@ -113,6 +113,7 @@ void LoadAnimRigAsset(CAssetContainer* const container, CAsset* const asset)
     case eMDLVersion::VERSION_19_2:
     case eMDLVersion::VERSION_19_3:
     case eMDLVersion::VERSION_20:
+    case eMDLVersion::VERSION_21:
     {
         parsedData->ParseModelBoneData_v19();
         parsedData->ParseModelAttachmentData<r5::mstudioattachment_v16_t>();
@@ -206,6 +207,7 @@ void PostLoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
     }
     case eMDLVersion::VERSION_19_3:
     case eMDLVersion::VERSION_20:
+    case eMDLVersion::VERSION_21:
     {
         parsedData->ParseModelSequenceData_Stall_V19_1(ANIM_BONEFLAG_BITS_6);
 

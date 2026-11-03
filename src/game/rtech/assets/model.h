@@ -188,6 +188,7 @@ enum class eMDLVersion : int
 	VERSION_19_2,
 	VERSION_19_3,
 	VERSION_20,
+	VERSION_21,
 
 	VERSION_PAK_COUNT,
 
@@ -211,6 +212,7 @@ static const std::map<int, eMDLVersion> s_mdlVersionFromPak
 	{ 18, eMDLVersion::VERSION_18 },
 	{ 19, eMDLVersion::VERSION_19 },
 	{ 20, eMDLVersion::VERSION_20 },
+	{ 21, eMDLVersion::VERSION_21 },
 };
 
 static const int s_mdlVersionToPak_Major[static_cast<int>(eMDLVersion::VERSION_PAK_COUNT)] =
@@ -238,6 +240,7 @@ static const int s_mdlVersionToPak_Major[static_cast<int>(eMDLVersion::VERSION_P
 	19,	// eMDLVersion::VERSION_19_2
 	19,	// eMDLVersion::VERSION_19_3
 	20,	// eMDLVersion::VERSION_20
+	21,	// eMDLVersion::VERSION_21
 };
 
 static const int s_mdlVersionToPak_Minor[static_cast<int>(eMDLVersion::VERSION_PAK_COUNT)] =
@@ -265,6 +268,7 @@ static const int s_mdlVersionToPak_Minor[static_cast<int>(eMDLVersion::VERSION_P
 	2,	// eMDLVersion::VERSION_19_2
 	3,	// eMDLVersion::VERSION_19_3
 	0,	// eMDLVersion::VERSION_20
+	0,	// eMDLVersion::VERSION_21
 };
 
 inline const AssetVersion_t GetAssetVersionFromMDL(const eMDLVersion version)
@@ -402,6 +406,7 @@ public:
 		case eMDLVersion::VERSION_19_2:
 		case eMDLVersion::VERSION_19_3:
 		case eMDLVersion::VERSION_20:
+		case eMDLVersion::VERSION_21:
 		{
 			parsedData = ModelParsedData_t(reinterpret_cast<const r5::studiohdr_v19_2_t* const>(data), assetVersion, cpu->dataSizePhys, cpu->dataSizeModel);
 			break;

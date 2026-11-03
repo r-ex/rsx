@@ -15,7 +15,7 @@ class UIFontAtlasAsset;
 constexpr uint32_t FONT_TEXTURE_IDX_INVALID = 0xffffffff;
 constexpr int FONT_UTF16_QMARK = L'?';
 constexpr int FONT_UTF16_BOX = 0x25A1;
-constexpr int FONT_MAX_PROPORTIONS = 8;
+constexpr int FONT_MAX_PROPORTIONS = 10; // [rika]: previously 8, proportions get loaded into a stack buffer in Pak_LoadUIFontAtlasAsset of this size, updated to 10 in season 31
 
 #define MAX_FONTS 32
 

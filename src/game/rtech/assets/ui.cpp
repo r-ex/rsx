@@ -18,6 +18,7 @@ void LoadUIAsset(CAssetContainer* const container, CAsset* const asset)
 
     UIAsset* uiAsset = nullptr;
 
+    // [rika]: version 43 added in season 31, not sure the changes but does not affect us currently
     switch (pakAsset->version())
     {
     case 29: // r2
@@ -25,6 +26,7 @@ void LoadUIAsset(CAssetContainer* const container, CAsset* const asset)
     case 39: // r5
     case 40: // |
     case 42: // |
+    case 43: // |
     {
         UIAssetHeader_t* const hdr = reinterpret_cast<UIAssetHeader_t* const>(pakAsset->header());
         uiAsset = new UIAsset(hdr);

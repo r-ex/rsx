@@ -324,7 +324,8 @@ const bool CMilesAudioBank::ParseFromHeader()
 
 		break;
 	}
-	case 49: // Apex Season 30.0   2026_07_29_15_44, released 
+	case 49: // Apex Season 30.0   2026_07_29_15_44, released
+	case 50:
 	{
 		this->languageNames = {
 			"english", "french", "german", "spanish", "italian",

@@ -77,6 +77,7 @@ MilesEventActionParseResult_e ActionPlay_Parse(CMilesAudioAsset* asset, void* ac
 	case 13:
 		return ActionPlay_Parse_v13(asset, reinterpret_cast<EventAction_0_v13_s*>(actionData), pd);
 	case 49:
+	case 50:
 		return ActionPlay_Parse_v49(asset, reinterpret_cast<EventAction_0_s*>(actionData), pd);
 	}
 

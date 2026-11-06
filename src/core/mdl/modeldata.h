@@ -1101,6 +1101,7 @@ public:
 	void ParseModelVertexData_v12_1(const char* const vertexData);
 	void ParseModelVertexData_v14(const char* const vertexData);
 	void ParseModelVertexData_v16(const char* const vertexData, const uint8_t parseFlags = 0x0);
+	void ParseModelVertexData_Null();
 
 	void ParseModelAnimTypes_V8();
 	void ParseModelAnimTypes_V16();

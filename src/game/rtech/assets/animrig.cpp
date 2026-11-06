@@ -148,6 +148,9 @@ void PostLoadAnimRigAsset(CAssetContainer* const pak, CAsset* const asset)
 
     ModelParsedData_t* const parsedData = arigAsset->GetParsedData();
 
+    // [rika]: clear potential offsets for vertex data
+    parsedData->ParseModelVertexData_Null();
+
     // parse sequences for children
     ParseExternalSequences(parsedData, arigAsset->numAnimSeqs, arigAsset->animSeqs);
 

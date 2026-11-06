@@ -1541,7 +1541,7 @@ void ModelParsedData_t::ParseModelVertexData_v9(const char* const vertexData)
 
 void ModelParsedData_t::ParseModelVertexData_v12_1(const char* const vertexData)
 {
-	if (numLODs == 0 || numBodyparts == 0)
+	if (numLODs == 0 || numBodyparts == 0 || numHwGroups == 0)
 	{
 		assertm(false, "model without LODs");
 
@@ -1669,7 +1669,7 @@ void ModelParsedData_t::ParseModelVertexData_v12_1(const char* const vertexData)
 
 void ModelParsedData_t::ParseModelVertexData_v14(const char* const vertexData)
 {
-	if (numLODs == 0 || numBodyparts == 0)
+	if (numLODs == 0 || numBodyparts == 0 || numHwGroups == 0)
 	{
 		assertm(false, "model without LODs");
 
@@ -1829,7 +1829,7 @@ void ModelParsedData_t::ParseModelVertexData_v14(const char* const vertexData)
 
 void ModelParsedData_t::ParseModelVertexData_v16(const char* const vertexData, const uint8_t parseFlags)
 {
-	if (numLODs == 0 || numBodyparts == 0)
+	if (numLODs == 0 || numBodyparts == 0 || numHwGroups == 0)
 	{
 		assertm(false, "model without LODs");
 
@@ -1959,6 +1959,15 @@ void ModelParsedData_t::ParseModelVertexData_v16(const char* const vertexData, c
 
 	g_BufferManager.RelieveBuffer(lodBuffer);
 	g_BufferManager.RelieveBuffer(meshBuffer);
+}
+
+void ModelParsedData_t::ParseModelVertexData_Null()
+{
+	INDEX_TO_NULL(hwGroups);
+	INDEX_TO_NULL(lods);
+	INDEX_TO_NULL(bodyparts);
+
+	return;
 }
 
 // anim
